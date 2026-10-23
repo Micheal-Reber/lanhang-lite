@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 
-class ScheduleWidgetProvider : AppWidgetProvider() {
+open class ScheduleWidgetProvider : AppWidgetProvider() {
+
+    /** 排版变体：false=全周课表（4×4），true=课表·小（2×2，今日列表紧凑档） */
+    open val isSmall: Boolean = false
 
     override fun onUpdate(
         context: Context,
@@ -34,7 +37,10 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        ScheduleWidgetUpdater.cancelMidnight(context)
+        // 本组件最后一个实例移除时，另一组件（课表·小）可能还有实例在用午夜闹钟
+        if (ScheduleWidgetUpdater.activeCount(context) == 0) {
+            ScheduleWidgetUpdater.cancelMidnight(context)
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

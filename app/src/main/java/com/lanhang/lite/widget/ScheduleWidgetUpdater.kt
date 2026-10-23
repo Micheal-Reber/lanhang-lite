@@ -27,15 +27,31 @@ object ScheduleWidgetUpdater {
     private const val ALARM_REQUEST = 4101
     private const val CLICK_REQUEST = 4200
 
+    /** 全部已注册变体（组件 → isSmall）— 刷新广播/更新统一遍历 */
+    private val allVariants = listOf(
+        ScheduleWidgetProvider::class.java to false,
+        ScheduleWidgetSmallProvider::class.java to true
+    )
+
+    /** 已放置的小部件实例总数（两组件合计）— 午夜闹钟存活判定用 */
+    fun activeCount(context: Context): Int {
+        val app = context.applicationContext
+        val manager = AppWidgetManager.getInstance(app)
+        return allVariants.sumOf { (cls, _) ->
+            manager.getAppWidgetIds(ComponentName(app, cls))?.size ?: 0
+        }
+    }
+
     fun updateAll(context: Context) {
         val app = context.applicationContext
         val manager = AppWidgetManager.getInstance(app)
-        val ids = manager.getAppWidgetIds(ComponentName(app, ScheduleWidgetProvider::class.java))
-        if (ids.isEmpty()) return
         val snapshot = runCatching { ScheduleWidgetData.load() }.getOrNull()
-        for (id in ids) {
-            runCatching { updateWidget(app, manager, id, snapshot) }
-                .onFailure { Log.e(TAG, "updateAll failed id=$id", it) }
+        for ((cls, isSmall) in allVariants) {
+            val ids = manager.getAppWidgetIds(ComponentName(app, cls)) ?: continue
+            for (id in ids) {
+                runCatching { updateWidget(app, manager, id, snapshot, isSmall) }
+                    .onFailure { Log.e(TAG, "updateAll failed id=$id", it) }
+            }
         }
     }
 
@@ -44,18 +60,29 @@ object ScheduleWidgetUpdater {
         runCatching {
             val manager = AppWidgetManager.getInstance(app)
             val snapshot = runCatching { ScheduleWidgetData.load() }.getOrNull()
-            updateWidget(app, manager, appWidgetId, snapshot)
+            updateWidget(app, manager, appWidgetId, snapshot, isSmallInstance(manager, appWidgetId))
         }.onFailure { Log.e(TAG, "updateWidget failed id=$appWidgetId", it) }
     }
+
+    private fun isSmallInstance(manager: AppWidgetManager, appWidgetId: Int): Boolean =
+        runCatching {
+            manager.getAppWidgetInfo(appWidgetId)?.provider?.className ==
+                ScheduleWidgetSmallProvider::class.java.name
+        }.getOrDefault(false)
 
     private fun updateWidget(
         context: Context,
         manager: AppWidgetManager,
         appWidgetId: Int,
-        snapshot: ScheduleWidgetData.WeekSnapshot?
+        snapshot: ScheduleWidgetData.WeekSnapshot?,
+        isSmall: Boolean
     ) {
         val (wDp, hDp) = sizeDp(manager.getAppWidgetOptions(appWidgetId))
-        val bitmap = ScheduleWidgetRenderer.render(context, snapshot, wDp, hDp)
+        val bitmap = if (isSmall) {
+            ScheduleWidgetRenderer.renderToday(context, snapshot, wDp, hDp)
+        } else {
+            ScheduleWidgetRenderer.render(context, snapshot, wDp, hDp)
+        }
         val views = RemoteViews(context.packageName, R.layout.widget_schedule_week)
         views.setImageViewBitmap(R.id.widget_bitmap, bitmap)
         views.setOnClickPendingIntent(R.id.widget_bitmap, clickPendingIntent(context, appWidgetId))

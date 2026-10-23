@@ -315,24 +315,85 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showExportOptions(payload: ScheduleExporter.ExportPayload) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.schedule_export_title)
-            .setMessage(
-                getString(
-                    R.string.schedule_export_message,
-                    payload.courseCount,
-                    payload.firstWeek,
-                    payload.lastWeek
+        val ctx = requireContext()
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density).toInt()
+
+        fun themeColor(attr: Int): Int {
+            val a = ctx.obtainStyledAttributes(intArrayOf(attr))
+            val c = a.getColor(0, 0)
+            a.recycle()
+            return c
+        }
+
+        // AppCompat AlertController 中 setMessage 与 setItems 互斥（设了 message
+        // 列表就永不挂载），因此说明文字与选项行都放进自定义 view。
+        val onSurface = themeColor(com.google.android.material.R.attr.colorOnSurface)
+        val container = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+
+        val message = TextView(ctx).apply {
+            text = getString(
+                R.string.schedule_export_message,
+                payload.courseCount,
+                payload.firstWeek,
+                payload.lastWeek
+            )
+            val ta = ctx.obtainStyledAttributes(
+                intArrayOf(com.google.android.material.R.attr.materialAlertDialogBodyTextStyle)
+            )
+            val styleId = ta.getResourceId(0, 0)
+            ta.recycle()
+            if (styleId != 0) setTextAppearance(ctx, styleId)
+            setTextColor(onSurface)
+            setPadding(dp(20), 0, dp(20), dp(12))
+        }
+        container.addView(
+            message,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val labels = arrayOf(
+            getString(R.string.schedule_export_ics),
+            getString(R.string.schedule_export_csv),
+            getString(R.string.schedule_export_share)
+        )
+        val rows = labels.map { label ->
+            TextView(ctx).apply {
+                text = label
+                textSize = 16f
+                setTextColor(onSurface)
+                gravity = Gravity.CENTER_VERTICAL
+                minHeight = dp(48)
+                setPadding(dp(20), dp(12), dp(20), dp(12))
+                val tvAttrs =
+                    ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+                val ripple = tvAttrs.getDrawable(0)
+                tvAttrs.recycle()
+                if (ripple != null) background = ripple
+            }
+        }
+        rows.forEach {
+            container.addView(
+                it,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             )
-            .setItems(
-                arrayOf(
-                    getString(R.string.schedule_export_ics),
-                    getString(R.string.schedule_export_csv),
-                    getString(R.string.schedule_export_share)
-                )
-            ) { _, which ->
-                when (which) {
+        }
+
+        val dialog = MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.schedule_export_title)
+            .setView(container)
+            .setNegativeButton(R.string.schedule_export_cancel, null)
+            .create()
+        rows.forEachIndexed { index, row ->
+            row.setOnClickListener {
+                dialog.dismiss()
+                when (index) {
                     0 -> {
                         pendingExport = payload
                         createIcsDocument.launch("${payload.baseFileName}.ics")
@@ -344,8 +405,8 @@ class SettingsFragment : Fragment() {
                     2 -> shareSchedule(payload.text)
                 }
             }
-            .setNegativeButton(R.string.schedule_export_cancel, null)
-            .show()
+        }
+        dialog.show()
     }
 
     private fun createExportProgress(): ExportProgress {

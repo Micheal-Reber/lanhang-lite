@@ -19,12 +19,14 @@ import kotlin.math.roundToInt
 object ScheduleWidgetRenderer {
 
     private val dayLabels = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    private val compactDayLabels = arrayOf("一", "二", "三", "四", "五", "六", "日")
     private val periodTimes = arrayOf(
         "08:00-08:45", "08:55-09:40", "10:00-10:45", "10:55-11:40",
         "14:00-14:45", "14:55-15:40", "16:00-16:45", "16:55-17:40",
         "19:00-19:45", "19:55-20:40", "20:50-21:35"
     )
     private val dateFormatter = DateTimeFormatter.ofPattern("M-d")
+    private val todayDateFormatter = DateTimeFormatter.ofPattern("M/d")
 
     fun render(
         context: Context,
@@ -85,6 +87,289 @@ object ScheduleWidgetRenderer {
         )
     }
 
+    /**
+     * 「课表 · 小」2×2 紧凑档：今日课程列表。
+     * 头部「周X 日期 … 第N周」+ 每节一行（课程色条 + 课名 + 教室/时间）；
+     * 行放不下 → 截断 + 底部「+N」胶囊；无课/未登录 → 空态。
+     */
+    fun renderToday(
+        context: Context,
+        snapshot: WeekSnapshot?,
+        widthDp: Int,
+        heightDp: Int
+    ): Bitmap {
+        val density = context.resources.displayMetrics.density
+        val width = (widthDp * density).roundToInt().coerceAtLeast(1)
+        val height = (heightDp * density).roundToInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val palette = palette(context)
+        val radius = 18f * density
+        paint.color = palette.background
+        canvas.drawRoundRect(
+            RectF(0f, 0f, width.toFloat(), height.toFloat()),
+            radius,
+            radius,
+            paint
+        )
+        if (snapshot == null) {
+            drawEmpty(canvas, paint, context, width, height, density, palette)
+            return bitmap
+        }
+        TodayRenderer(canvas, paint, context, density, width, height, palette, snapshot).draw()
+        return bitmap
+    }
+
+    private fun courseColorFor(name: String, isDark: Boolean): Int {
+        val hue = ((name.hashCode() * 137.508f % 360f) + 360f) % 360f
+        return if (isDark) {
+            ColorUtils.HSLToColor(floatArrayOf(hue, 0.40f, 0.28f))
+        } else {
+            ColorUtils.HSLToColor(floatArrayOf(hue, 0.55f, 0.82f))
+        }
+    }
+
+    private class TodayRenderer(
+        private val canvas: Canvas,
+        private val paint: Paint,
+        private val context: Context,
+        private val density: Float,
+        private val width: Int,
+        private val height: Int,
+        private val palette: Palette,
+        private val snapshot: WeekSnapshot
+    ) {
+        private val today = LocalDate.now()
+        private val outerPad = dp(10f)
+        private val headerH = dp(26f)
+        private val headerGap = dp(7f)
+        private val cardGap = dp(6f)
+        private val minRowH = dp(28f)
+
+        fun draw() {
+            drawHeader()
+            val contentTop = outerPad + headerH + headerGap
+            val footerH = if (height >= dp(130f)) dp(25f) else 0f
+            val contentH = (height - outerPad - footerH - contentTop).coerceAtLeast(0f)
+            val courses = snapshot.days.firstOrNull { it.date == today }?.courses.orEmpty()
+            if (courses.isEmpty()) drawNoCourse(contentTop, contentH)
+            else drawRows(courses, contentTop, contentH)
+            if (footerH > 0f) drawFooter(height - outerPad - footerH, footerH)
+        }
+
+        private fun drawHeader() {
+            val centerY = outerPad + headerH / 2f
+            val weekday = dayLabels[(today.dayOfWeek.value - 1).coerceIn(0, 6)]
+            val title = "今天 · $weekday"
+            val dateText = today.format(todayDateFormatter)
+            paint.textAlign = Paint.Align.LEFT
+            paint.alpha = 255
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = dp(15f)
+            paint.color = palette.onSurface
+            canvas.drawText(ellipsize(title, width * 0.62f), outerPad, centerY + paint.textSize * 0.35f, paint)
+            paint.textAlign = Paint.Align.RIGHT
+            paint.textSize = dp(14f)
+            paint.color = palette.onSurfaceVariant
+            canvas.drawText(dateText, width - outerPad, centerY + paint.textSize * 0.35f, paint)
+            paint.textAlign = Paint.Align.LEFT
+        }
+
+        private fun drawRows(courses: List<CourseBlock>, contentTop: Float, contentH: Float) {
+            if (contentH <= 0f) return
+            val maxFit = ((contentH + cardGap) / (minRowH + cardGap)).toInt().coerceAtLeast(1)
+            val hasOverflow = courses.size > maxFit
+            val overflowRowH =
+                if (hasOverflow) minOf(dp(18f), contentH * 0.30f) else 0f
+            val shown = if (hasOverflow) {
+                maxOf(1, minOf(courses.size, ((contentH - overflowRowH + cardGap) / (minRowH + cardGap)).toInt()))
+            } else {
+                courses.size
+            }
+            val rowH = ((contentH - overflowRowH - cardGap * (shown - 1)) / shown).coerceAtLeast(1f)
+            for (index in 0 until shown) {
+                val course = courses[index]
+                val top = contentTop + index * (rowH + cardGap)
+                drawRow(course, top, rowH)
+            }
+            if (hasOverflow) drawMorePill(
+                context.getString(
+                    com.lanhang.lite.R.string.widget_today_more, courses.size - shown
+                ),
+                contentTop + shown * (rowH + cardGap) - cardGap,
+                overflowRowH
+            )
+        }
+
+        private fun drawRow(course: CourseBlock, top: Float, rowH: Float) {
+            paint.style = Paint.Style.FILL
+            paint.alpha = 255
+            val cardColor = courseColorFor(course.name, palette.isDark)
+            paint.color = cardColor
+            canvas.drawRoundRect(
+                RectF(outerPad, top, width - outerPad, top + rowH),
+                minOf(dp(12f), rowH / 2f),
+                minOf(dp(12f), rowH / 2f),
+                paint
+            )
+            val textLeft = outerPad + dp(9f)
+            val textW = (width - outerPad - dp(9f) - textLeft).coerceAtLeast(1f)
+            val room = course.room
+            val twoLine = rowH >= dp(26f)
+            val nameSize =
+                if (twoLine) minOf(dp(14f), rowH * 0.40f)
+                else (rowH * 0.60f).coerceIn(dp(8f), dp(14f))
+            val metaSize = minOf(dp(10f), nameSize * 0.72f).coerceAtLeast(dp(7f))
+            val blockH = nameSize + if (twoLine) dp(2f) + metaSize else 0f
+            val blockTop = top + (rowH - blockH) / 2f
+            val nameBaseline = blockTop + nameSize * 0.82f
+
+            // 课名（加粗，超宽省略）；单行且有教室时给教室留右侧位
+            var nameAvail = textW
+            var roomW = 0f
+            if (!twoLine && room.isNotBlank()) {
+                paint.typeface = Typeface.DEFAULT
+                paint.textSize = metaSize
+                roomW = minOf(paint.measureText(room), textW * 0.42f)
+                nameAvail = (textW - roomW - dp(6f)).coerceAtLeast(1f)
+            }
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = nameSize
+            paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) Color.WHITE else TEXT_DARK
+            paint.alpha = 255
+            paint.textAlign = Paint.Align.LEFT
+            canvas.drawText(ellipsize(course.name, nameAvail), textLeft, nameBaseline, paint)
+
+            if (twoLine) {
+                val metaTop = blockTop + nameSize + dp(2f)
+                val meta = timeRange(course) +
+                    (if (room.isNotBlank()) " · $room" else "")
+                paint.typeface = Typeface.DEFAULT
+                paint.textSize = metaSize
+                paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) 0xE6FFFFFF.toInt() else TEXT_DARK
+                canvas.drawText(
+                    ellipsize(meta, textW),
+                    textLeft,
+                    metaTop + metaSize * 0.82f,
+                    paint
+                )
+            } else if (room.isNotBlank()) {
+                paint.typeface = Typeface.DEFAULT
+                paint.textSize = metaSize
+                paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) 0xE6FFFFFF.toInt() else TEXT_DARK
+                paint.textAlign = Paint.Align.RIGHT
+                canvas.drawText(
+                    ellipsize(room, roomW),
+                    width - outerPad,
+                    nameBaseline + (nameSize - metaSize) * 0.2f,
+                    paint
+                )
+                paint.textAlign = Paint.Align.LEFT
+            }
+        }
+
+        private fun drawMorePill(text: String, rowTop: Float, rowH: Float) {
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = dp(9f)
+            paint.textAlign = Paint.Align.LEFT
+            val textW = paint.measureText(text)
+            val pillW = textW + dp(14f)
+            val pillH = minOf(rowH - dp(2f), dp(15f)).coerceAtLeast(dp(11f))
+            val left = (width - pillW) / 2f
+            val top = rowTop + (rowH - pillH) / 2f
+            paint.color = palette.today
+            paint.style = Paint.Style.FILL
+            paint.alpha = 255
+            canvas.drawRoundRect(
+                RectF(left, top, left + pillW, top + pillH),
+                pillH / 2f,
+                pillH / 2f,
+                paint
+            )
+            paint.color = palette.primary
+            canvas.drawText(
+                text,
+                left + (pillW - textW) / 2f,
+                top + pillH / 2f + paint.textSize * 0.36f,
+                paint
+            )
+        }
+
+        private fun drawNoCourse(contentTop: Float, contentH: Float) {
+            val centerY = contentTop + contentH / 2f
+            paint.textAlign = Paint.Align.CENTER
+            paint.alpha = 255
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = dp(13f)
+            paint.color = palette.onSurface
+            canvas.drawText(
+                context.getString(com.lanhang.lite.R.string.widget_today_empty),
+                width / 2f,
+                centerY - dp(4f),
+                paint
+            )
+            paint.typeface = Typeface.DEFAULT
+            paint.textSize = dp(10f)
+            paint.color = palette.onSurfaceVariant
+            canvas.drawText(
+                context.getString(com.lanhang.lite.R.string.widget_empty_hint),
+                width / 2f,
+                centerY + dp(14f),
+                paint
+            )
+        }
+
+        private fun drawFooter(top: Float, footerH: Float) {
+            val weekText = context.getString(com.lanhang.lite.R.string.widget_week_format, snapshot.week)
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = dp(10f)
+            val labelW = paint.measureText(weekText) + dp(16f)
+            val pillH = minOf(dp(18f), footerH)
+            val pillTop = top + (footerH - pillH) / 2f
+            paint.color = palette.today
+            canvas.drawRoundRect(
+                RectF(outerPad, pillTop, outerPad + labelW, pillTop + pillH),
+                pillH / 2f,
+                pillH / 2f,
+                paint
+            )
+            paint.color = palette.primary
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(
+                weekText,
+                outerPad + labelW / 2f,
+                pillTop + pillH / 2f + paint.textSize * 0.35f,
+                paint
+            )
+            paint.textAlign = Paint.Align.LEFT
+        }
+
+        /** 节次时间区间，如「08:00-11:40」；单节为整段「08:00-08:45」 */
+        private fun timeRange(course: CourseBlock): String {
+            val start = course.start.coerceIn(1, 11)
+            val end = course.end.coerceIn(start, 11)
+            return if (end <= start) {
+                periodTimes[start - 1]
+            } else {
+                "${periodTimes[start - 1].substringBefore('-')}-" +
+                    periodTimes[end - 1].substringAfter('-')
+            }
+        }
+
+        private fun ellipsize(text: String, maxWidth: Float): String {
+            if (maxWidth <= 0f) return ""
+            if (paint.measureText(text) <= maxWidth) return text
+            var result = text
+            while (result.isNotEmpty() && paint.measureText("$result…") > maxWidth) {
+                result = result.dropLast(1)
+            }
+            return "$result…"
+        }
+
+        private fun dp(value: Float): Float = value * density
+    }
+
     private class CanvasRenderer(
         private val canvas: Canvas,
         private val paint: Paint,
@@ -97,7 +382,8 @@ object ScheduleWidgetRenderer {
     ) {
         private val today = LocalDate.now()
         private val outerPad = dp(6f)
-        private val headH = dp(56f)
+        private val compactHeader = width < dp(320f)
+        private val headH = if (compactHeader) dp(36f) else dp(56f)
         private val timeW = if (width < dp(260f)) dp(36f) else dp(40f)
         private val gapH = dp(1.5f)
         private val gapW = dp(2.5f)
@@ -153,14 +439,19 @@ object ScheduleWidgetRenderer {
                 )
                 paint.textAlign = Paint.Align.CENTER
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                paint.textSize = (headH * 0.24f).coerceIn(dp(9f), dp(13f))
+                paint.textSize = if (compactHeader) {
+                    (headH * 0.42f).coerceIn(dp(9f), dp(13f))
+                } else {
+                    (headH * 0.24f).coerceIn(dp(9f), dp(13f))
+                }
                 paint.color = if (isToday) palette.primary else palette.onSurface
                 canvas.drawText(
-                    dayLabels[index],
+                    if (compactHeader) compactDayLabels[index] else dayLabels[index],
                     x + dayW / 2f,
-                    outerPad + headH * 0.4f,
+                    if (compactHeader) outerPad + headH * 0.60f else outerPad + headH * 0.4f,
                     paint
                 )
+                if (compactHeader) continue
                 paint.typeface = Typeface.DEFAULT
                 paint.textSize = (headH * 0.18f).coerceIn(dp(7f), dp(10f))
                 paint.color = if (isToday) palette.primary else palette.onSurfaceVariant
@@ -416,14 +707,8 @@ object ScheduleWidgetRenderer {
             return bodyTop + gapH + index * (slotH + gapH)
         }
 
-        private fun courseColor(name: String): Int {
-            val hue = ((name.hashCode() * 137.508f % 360f) + 360f) % 360f
-            return if (palette.isDark) {
-                ColorUtils.HSLToColor(floatArrayOf(hue, 0.40f, 0.28f))
-            } else {
-                ColorUtils.HSLToColor(floatArrayOf(hue, 0.55f, 0.82f))
-            }
-        }
+        private fun courseColor(name: String): Int =
+            courseColorFor(name, palette.isDark)
 
         private fun tokenize(name: String): List<TextToken> {
             val source = name.filter { it != '\n' && it != ' ' }

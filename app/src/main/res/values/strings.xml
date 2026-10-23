@@ -7,8 +7,8 @@
     <string name="login">登录</string>
     <string name="tab_schedule">课表</string>
     <string name="action_logout">退出登录</string>
-    <string name="widget_schedule_name">全周课表</string>
-    <string name="widget_schedule_description">显示当前教学周的全周课程</string>
+    <string name="widget_schedule_name">全周网格</string>
+    <string name="widget_schedule_description">按星期和节次显示整周课程</string>
     <string name="widget_week_format">第 %1$d 周</string>
     <string name="widget_schedule_empty_online">打开同步课表</string>
     <string name="widget_schedule_empty_offline">点击登录同步课表</string>
@@ -17,6 +17,10 @@
     <string name="widget_empty_login">打开应用登录并同步</string>
     <string name="widget_empty_hint">点击此处打开课程表</string>
     <string name="widget_no_course_week">本周暂无课程</string>
+    <string name="widget_schedule_small_name">今日课程</string>
+    <string name="widget_schedule_small_description">以课程卡片显示今天的课程</string>
+    <string name="widget_today_empty">今天没有课程</string>
+    <string name="widget_today_more">+%1$d</string>
     <string name="settings_schedule_tools">课表工具</string>
     <string name="settings_export_schedule">导出课表</string>
     <string name="settings_export_schedule_subtitle">保存为日历/表格文件或分享课表文本</string>
