@@ -95,6 +95,7 @@
                 android:visibility="gone">
 
                 <androidx.core.widget.NestedScrollView
+                    android:id="@+id/weekScroll"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:fillViewport="true">
@@ -147,6 +148,7 @@
                 android:padding="8dp">
 
                 <androidx.core.widget.NestedScrollView
+                    android:id="@+id/gridScroll"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"

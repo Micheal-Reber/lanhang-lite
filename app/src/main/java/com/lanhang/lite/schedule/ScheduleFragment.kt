@@ -5,7 +5,9 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -77,8 +79,64 @@ class ScheduleFragment : Fragment() {
         btnCalendar.setOnClickListener { showWeekPicker(it) }
         btnViewToggle.setOnClickListener { switchView(!showingGrid) }
         swipeRefresh.setOnRefreshListener { refresh() }
+        installWeekSwipe(view.findViewById(R.id.weekScroll))
+        installWeekSwipe(view.findViewById(R.id.gridScroll))
 
         loadCacheOrRefresh()
+    }
+
+    /**
+     * 仅识别明显的横向手势：左滑进入下一周、右滑返回上一周。
+     * NestedScrollView 保持处理纵向滚动；识别到横滑后才阻止 SwipeRefreshLayout 拦截。
+     */
+    private fun installWeekSwipe(target: View) {
+        val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
+        val minimumDistance = dp(56).toFloat()
+        var downX = 0f
+        var downY = 0f
+        var horizontal = false
+
+        target.setOnTouchListener { touchedView, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    horizontal = false
+                    false
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    if (!horizontal && abs(dx) > touchSlop && abs(dx) > abs(dy)) {
+                        horizontal = true
+                        touchedView.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
+                    false
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    val isWeekSwipe = horizontal &&
+                        abs(dx) >= minimumDistance &&
+                        abs(dx) > abs(dy) * 1.2f
+                    if (isWeekSwipe) {
+                        switchWeek(if (dx < 0f) currentWeek + 1 else currentWeek - 1)
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    horizontal = false
+                    false
+                }
+
+                else -> false
+            }
+        }
     }
 
     /** 数据固定在本地：有缓存直接显示，不自动联网；只有手动下拉刷新才重新拉取覆盖 */
