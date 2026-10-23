@@ -27,7 +27,7 @@
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_avatar_placeholder"
-                android:contentDescription="头像"
+                android:contentDescription="@string/moments_cd_avatar"
                 android:scaleType="centerCrop" />
 
             <LinearLayout
@@ -105,7 +105,7 @@
                 <ImageView
                     android:layout_width="17dp"
                     android:layout_height="17dp"
-                    android:contentDescription="赞"
+                    android:contentDescription="@string/moments_cd_like"
                     android:src="@drawable/ic_favorite_outline"
                     app:tint="@color/link" />
 
@@ -139,19 +139,17 @@
                     android:layout_width="17dp"
                     android:layout_height="17dp"
                     android:layout_marginTop="2dp"
-                    android:contentDescription="评论"
+                    android:contentDescription="@string/moments_cd_comment"
                     android:src="@drawable/ic_mode_comment"
                     app:tint="@color/link" />
 
-                <TextView
-                    android:id="@+id/tvComments"
+                <LinearLayout
+                    android:id="@+id/llComments"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="7dp"
                     android:layout_weight="1"
-                    android:lineSpacingExtra="4dp"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp" />
+                    android:orientation="vertical" />
             </LinearLayout>
         </LinearLayout>
 
@@ -176,7 +174,7 @@
                     android:id="@+id/ivLike"
                     android:layout_width="18dp"
                     android:layout_height="18dp"
-                    android:contentDescription="赞"
+                    android:contentDescription="@string/moments_cd_like"
                     android:src="@drawable/ic_favorite_outline" />
 
                 <TextView
@@ -201,7 +199,7 @@
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
-                    android:contentDescription="评论"
+                    android:contentDescription="@string/moments_cd_comment"
                     android:src="@drawable/ic_mode_comment" />
 
                 <TextView

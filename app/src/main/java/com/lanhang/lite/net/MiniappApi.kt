@@ -1,6 +1,8 @@
 package com.lanhang.lite.net
 
 import android.util.Log
+import com.lanhang.lite.R
+import com.lanhang.lite.schedule.AppContext
 import com.lanhang.lite.session.Session
 import okhttp3.Request
 
@@ -98,7 +100,7 @@ object MiniappApi {
             Log.w(TAG, "empty body for $dumpName, re-handshake and retry")
             ApiClient.clearMiniappCookies()
             if (!handshake(Session.deviceId(appContext))) {
-                throw ApiException(-1, "课表登录失败，请重新登录")
+                throw ApiException(-1, AppContext.instance.getString(R.string.error_schedule_login))
             }
             body = fetchOnce(url)
         }
@@ -122,7 +124,12 @@ object MiniappApi {
         return client().newCall(req).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
             Log.d(TAG, "fetchOnce code=${resp.code} len=${body.length}")
-            if (!resp.isSuccessful) throw ApiException(resp.code, "课表数据请求失败")
+            if (!resp.isSuccessful) {
+                throw ApiException(
+                    resp.code,
+                    AppContext.instance.getString(R.string.error_schedule_request)
+                )
+            }
             body
         }
     }

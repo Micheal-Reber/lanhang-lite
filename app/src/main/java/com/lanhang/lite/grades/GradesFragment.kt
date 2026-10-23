@@ -77,8 +77,8 @@ class GradesFragment : Fragment() {
         } catch (e: Exception) {
             if (semesters.isEmpty()) {
                 binding.tvEmpty.isVisible = true
-                binding.tvEmpty.text = "加载失败：${e.message}"
-                toast("加载失败：${e.message}")
+                binding.tvEmpty.text = getString(R.string.grades_load_failed, e.message.orEmpty())
+                toast(getString(R.string.grades_load_failed, e.message.orEmpty()))
             }
         }
         if (selectedTerm.isEmpty() && semesters.isNotEmpty()) {
@@ -154,13 +154,13 @@ class GradesFragment : Fragment() {
                 adapter.submit(scores)
                 renderStats()
                 binding.tvEmpty.isVisible = scores.isEmpty()
-                binding.tvEmpty.text = "本学期暂无成绩"
+                binding.tvEmpty.text = getString(R.string.grades_empty)
             } catch (e: Exception) {
                 if (scores.isEmpty()) {
                     binding.tvEmpty.isVisible = true
-                    binding.tvEmpty.text = "加载失败：${e.message}"
+                    binding.tvEmpty.text = getString(R.string.grades_load_failed, e.message.orEmpty())
                 }
-                toast("加载失败：${e.message}")
+                toast(getString(R.string.grades_load_failed, e.message.orEmpty()))
             }
             loading = false
             binding.progress.isVisible = false
@@ -224,7 +224,9 @@ private class GradeAdapter : RecyclerView.Adapter<GradeAdapter.VH>() {
         fun bind(item: GradeItem) {
             tvName.text = item.courseName.orEmpty()
             val parts = listOfNotNull(
-                item.creditValue?.let { "${item.credit}学分" },
+                item.creditValue?.let {
+                    itemView.context.getString(R.string.grades_credit, item.credit)
+                },
                 item.nature?.takeIf { it.isNotBlank() } ?: item.attribute,
                 item.examMode?.takeIf { it.isNotBlank() }
             )

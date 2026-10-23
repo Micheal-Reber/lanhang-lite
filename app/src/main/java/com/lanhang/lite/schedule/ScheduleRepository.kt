@@ -3,6 +3,7 @@ package com.lanhang.lite.schedule
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.lanhang.lite.R
 import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.net.ApiException
 import com.lanhang.lite.net.MiniappApi
@@ -63,12 +64,17 @@ object ScheduleRepository {
         // 确保 miniapp 会话有效
         if (!hasMiniappSession()) {
             val ok = MiniappApi.handshake(Session.deviceId(AppContext.instance))
-            if (!ok) throw ApiException(-1, "课表登录失败，请重新登录")
+            if (!ok) {
+                throw ApiException(-1, AppContext.instance.getString(R.string.error_schedule_login))
+            }
         }
         val raw = MiniappApi.getScheduleRaw(week)
         val resp = gson.fromJson(raw, ScheduleResponse::class.java)
         if (resp?.code != 0 || resp.data == null) {
-            throw ApiException(resp?.code ?: -1, resp?.msg ?: "课表数据异常")
+            throw ApiException(
+                resp?.code ?: -1,
+                resp?.msg ?: AppContext.instance.getString(R.string.error_schedule_request)
+            )
         }
         if (week == null) {
             cacheFile.writeText(raw)

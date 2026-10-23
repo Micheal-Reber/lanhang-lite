@@ -47,7 +47,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="加权平均分"
+                                android:text="@string/grades_weighted_avg"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
 
@@ -82,7 +82,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="总学分"
+                                android:text="@string/grades_total_credits"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
 
@@ -116,7 +116,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="课程数"
+                                android:text="@string/grades_course_count"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
 
@@ -165,7 +165,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:text="本学期暂无成绩"
+        android:text="@string/grades_empty"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="14sp"
         android:visibility="gone" />

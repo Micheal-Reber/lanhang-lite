@@ -1,10 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:orientation="vertical">
+    android:background="?attr/colorSurface">
+
+    <!-- 自定义背景三层：底色/图片 → 自适应遮罩 → 内容 -->
+    <View
+        android:id="@+id/bgSolidLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/bgImageLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/bgVeil"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -28,7 +50,7 @@
                     android:layout_height="32dp"
                     android:layout_gravity="start|center_vertical"
                     android:background="@drawable/bg_circle_button"
-                    android:contentDescription="跳转周次"
+                    android:contentDescription="@string/schedule_jump_week"
                     android:src="@drawable/ic_calendar"
                     android:padding="6dp"
                     app:tint="?attr/colorPrimary" />
@@ -45,7 +67,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:background="@drawable/bg_circle_button"
-                        android:contentDescription="上一周"
+                        android:contentDescription="@string/schedule_prev_week"
                         android:src="@drawable/ic_chevron_left"
                         android:padding="6dp"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -58,7 +80,7 @@
                         android:background="@drawable/bg_week_pill"
                         android:paddingHorizontal="14dp"
                         android:paddingVertical="4dp"
-                        android:text="第 1 周"
+                        android:text="@string/ph_week"
                         android:textColor="@color/week_pill_text"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -68,7 +90,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:background="@drawable/bg_circle_button"
-                        android:contentDescription="下一周"
+                        android:contentDescription="@string/schedule_next_week"
                         android:src="@drawable/ic_chevron_right"
                         android:padding="6dp"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -80,8 +102,8 @@
                     android:layout_height="32dp"
                     android:layout_gravity="end|center_vertical"
                     android:background="@drawable/bg_circle_button"
-                    android:contentDescription="切换网格/周视图"
-                    android:src="@drawable/ic_view_grid"
+                    android:contentDescription="@string/schedule_switch_to_week"
+                    android:src="@drawable/ic_view_week"
                     android:padding="6dp"
                     app:tint="?attr/colorOnSurfaceVariant" />
             </FrameLayout>
@@ -131,7 +153,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:text="本周无课"
+                    android:text="@string/schedule_week_no_course"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="16sp"
                     android:visibility="gone" />
@@ -173,4 +195,4 @@
         </LinearLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-</LinearLayout>
+</FrameLayout>

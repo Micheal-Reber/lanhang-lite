@@ -2,6 +2,8 @@ package com.lanhang.lite.net
 
 import android.os.Build
 import com.google.gson.reflect.TypeToken
+import com.lanhang.lite.R
+import com.lanhang.lite.schedule.AppContext
 import java.io.IOException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -37,10 +39,16 @@ object RceApi {
             val parsed: ApiResponse<T> = try {
                 ApiClient.gson.fromJson(text, type)
             } catch (e: Exception) {
-                throw ApiException(-1, "数据异常: ${text.take(200)}")
+                throw ApiException(
+                    -1,
+                    AppContext.instance.getString(R.string.error_payload_invalid, text.take(200))
+                )
             }
             if (!parsed.isSuccess) {
-                throw ApiException(parsed.code ?: -1, parsed.msg ?: "请求失败")
+                throw ApiException(
+                    parsed.code ?: -1,
+                    parsed.msg ?: AppContext.instance.getString(R.string.error_request_failed)
+                )
             }
             @Suppress("UNCHECKED_CAST")
             return parsed.result as T
@@ -100,18 +108,19 @@ object RceApi {
             val parsed: RawTokenResponse = try {
                 ApiClient.gson.fromJson(text, RawTokenResponse::class.java)
             } catch (e: Exception) {
-                throw ApiException(-1, "数据异常: ${text.take(200)}")
+                throw ApiException(
+                    -1,
+                    AppContext.instance.getString(R.string.error_payload_invalid, text.take(200))
+                )
             }
             if (parsed.code != 10000) {
-                throw ApiException(parsed.code ?: -1, "请求失败")
+                throw ApiException(
+                    parsed.code ?: -1,
+                    AppContext.instance.getString(R.string.error_request_failed)
+                )
             }
             return parsed.result
         }
-    }
-
-    fun allApps(): OAWebAppBean? {
-        val body = """{"state":[0,1]}"""
-        return post("/apps/all", body)
     }
 
     fun refreshUserByDel(userId: String): Any? =

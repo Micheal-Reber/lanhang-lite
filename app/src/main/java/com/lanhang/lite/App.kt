@@ -7,6 +7,7 @@ import com.lanhang.lite.net.MiniappApi
 import com.lanhang.lite.net.MomentsApi
 import com.lanhang.lite.schedule.AppContext
 import com.lanhang.lite.schedule.ScheduleRepository
+import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 
 class App : Application() {
@@ -16,6 +17,8 @@ class App : Application() {
         MiniappApi.init(this)
         MomentsApi.init(this)
         Session.init(this)
+        // 语言必须在任何 Activity 创建前应用（低版本系统不保存 per-app language）
+        AppLanguage.apply(Session.language)
         applyTheme()
         AppContext.init(this)
         ScheduleRepository.init(this)

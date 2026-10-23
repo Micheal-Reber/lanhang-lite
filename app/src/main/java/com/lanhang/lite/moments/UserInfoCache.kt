@@ -1,7 +1,9 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.R
 import com.lanhang.lite.net.RceApi
 import com.lanhang.lite.net.StaffBrief
+import com.lanhang.lite.schedule.AppContext
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,7 +14,8 @@ object UserInfoCache {
 
     fun get(id: String?): StaffBrief? = id?.let { cache[it] }
 
-    fun nameOf(id: String?): String = get(id)?.name?.takeIf { it.isNotBlank() } ?: "用户"
+    fun nameOf(id: String?): String = get(id)?.name?.takeIf { it.isNotBlank() }
+        ?: AppContext.instance.getString(R.string.moments_anonymous)
 
     suspend fun resolve(ids: Collection<String>) {
         val missing = ids.filter { it.isNotEmpty() && !cache.containsKey(it) }.distinct()

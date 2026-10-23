@@ -11,7 +11,7 @@
         android:layout_width="42dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
-        android:text="5-6节"
+        android:text="@string/ph_period"
         android:textColor="#FFFFFF"
         android:textSize="12sp"
         android:textStyle="bold" />
@@ -27,7 +27,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="2"
-            android:text="课程名"
+            android:text="@string/ph_course_name"
             android:textColor="#FFFFFF"
             android:textSize="12sp"
             android:textStyle="bold" />
@@ -37,7 +37,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:alpha="0.8"
-            android:text="教师 · 教室"
+            android:text="@string/ph_lesson_meta"
             android:textColor="#FFFFFF"
             android:textSize="11sp" />
 

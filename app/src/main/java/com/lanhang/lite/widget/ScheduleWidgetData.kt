@@ -37,20 +37,33 @@ object ScheduleWidgetData {
     )
     private val dateFormatter = DateTimeFormatter.ofPattern("M/d")
 
-    fun load(): WeekSnapshot? {
+    /**
+     * 生成小部件快照。
+     *
+     * @param targetDate 期望展示的日期（今日小部件翻天用）；null = 今天。
+     *   会先钳制到学期范围（首周周一 ~ 末周周日），再换算成对应周次，
+     *   跨周时取该周的按周缓存；无缓存则该周课程为空（不拿本周数据冒充）。
+     */
+    fun load(targetDate: LocalDate? = null): WeekSnapshot? {
         if (!Session.isLoggedIn) return null
         val base = ScheduleRepository.loadCached() ?: return null
         val data = base.data ?: return null
         val startWeek = data.weekInfo?.startWeek?.trim()?.toIntOrNull() ?: 1
         val endWeek = data.weekInfo?.endWeek?.trim()?.toIntOrNull() ?: 20
         val cachedWeek = data.weekInfo?.currentWeek?.trim()?.toIntOrNull() ?: 1
-        val week = resolveWeek(cachedWeek, startWeek, endWeek)
-        val source = ScheduleRepository.loadCachedWeek(week)?.data ?: data
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+        val baseWeek = resolveWeek(cachedWeek, startWeek, endWeek)
+        val todayMonday = LocalDate.now().with(DayOfWeek.MONDAY)
+        val week = resolveTargetWeek(baseWeek, startWeek, endWeek, todayMonday, targetDate)
+        val monday = todayMonday.plusWeeks((week - baseWeek).toLong())
+        val source = if (week == baseWeek) {
+            ScheduleRepository.loadCachedWeek(week)?.data ?: data
+        } else {
+            ScheduleRepository.loadCachedWeek(week)?.data
+        }
         val days = (0..6).map { index ->
             DayInfo(
                 date = monday.plusDays(index.toLong()),
-                courses = coursesForDay(source, index, week)
+                courses = source?.let { coursesForDay(it, index, week) }.orEmpty()
             )
         }
         val sunday = monday.plusDays(6)
@@ -60,6 +73,44 @@ object ScheduleWidgetData {
             endWeek = endWeek,
             days = days,
             range = "${dateFormatter.format(monday)} - ${dateFormatter.format(sunday)}"
+        )
+    }
+
+    /**
+     * 目标日期 → 周次：先钳制到学期区间（首周周一 ~ 末周周日），再按周差换算，
+     * 最后夹在 start..end 之间。targetDate 为 null 时返回本周。
+     */
+    private fun resolveTargetWeek(
+        baseWeek: Int,
+        startWeek: Int,
+        endWeek: Int,
+        baseMonday: LocalDate,
+        targetDate: LocalDate?
+    ): Int {
+        if (targetDate == null) return baseWeek
+        val first = minOf(startWeek, endWeek)
+        val last = maxOf(startWeek, endWeek)
+        val semesterStart = baseMonday.plusWeeks((first - baseWeek).toLong())
+        val semesterEnd = semesterStart.plusWeeks((last - first).toLong()).plusDays(6)
+        val date = when {
+            targetDate.isBefore(semesterStart) -> semesterStart
+            targetDate.isAfter(semesterEnd) -> semesterEnd
+            else -> targetDate
+        }
+        val deltaWeeks = ChronoUnit.WEEKS.between(baseMonday, date.with(DayOfWeek.MONDAY))
+        return (baseWeek + deltaWeeks.toInt()).coerceIn(first, last)
+    }
+
+    /** 目标日期对应的周次（供导航时判断是否需要补拉该周缓存）；未登录/无缓存返回 null */
+    fun targetWeekOf(targetDate: LocalDate): Int? {
+        if (!Session.isLoggedIn) return null
+        val data = ScheduleRepository.loadCached()?.data ?: return null
+        val startWeek = data.weekInfo?.startWeek?.trim()?.toIntOrNull() ?: 1
+        val endWeek = data.weekInfo?.endWeek?.trim()?.toIntOrNull() ?: 20
+        val cachedWeek = data.weekInfo?.currentWeek?.trim()?.toIntOrNull() ?: 1
+        val baseWeek = resolveWeek(cachedWeek, startWeek, endWeek)
+        return resolveTargetWeek(
+            baseWeek, startWeek, endWeek, LocalDate.now().with(DayOfWeek.MONDAY), targetDate
         )
     }
 
@@ -99,7 +150,11 @@ object ScheduleWidgetData {
             if (number !in 1..11) continue
             for (course in period.courses.orEmpty()) {
                 if (!course.isWeekValid(week) || !course.isOddEvenValid(week)) continue
-                val name = course.name?.trim().orEmpty().ifEmpty { "未命名课程" }
+                val name = course.name?.trim().orEmpty().ifEmpty {
+                    com.lanhang.lite.schedule.AppContext.instance.getString(
+                        com.lanhang.lite.R.string.schedule_unnamed_course
+                    )
+                }
                 items.add(
                     CourseBlock(
                         name = name,

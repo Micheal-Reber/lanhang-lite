@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.JsonElement
 import com.google.gson.reflect.TypeToken
+import com.lanhang.lite.R
 import com.lanhang.lite.moments.AuthResult
 import com.lanhang.lite.moments.CommentEntry
 import com.lanhang.lite.moments.FeedIdRepo
@@ -31,6 +32,9 @@ object MomentsApi {
 
     private val JSON = "application/json;charset=utf-8".toMediaType()
 
+    /** 网络层错误文案统一走资源（App 启动时 [init] 已注入 application context） */
+    private fun text(id: Int): String = appContext.getString(id)
+
     private var authorization: String? = null
     private lateinit var appContext: Context
 
@@ -41,15 +45,18 @@ object MomentsApi {
     @Synchronized
     fun ensureAuth() {
         if (!authorization.isNullOrEmpty()) return
-        val cookie = ApiClient.firstSessionCookieValue() ?: throw ApiException(-2, "未登录（无Cookie）")
-        if (Session.userId.isEmpty()) throw ApiException(-2, "未登录（无userId）")
+        val cookie = ApiClient.firstSessionCookieValue()
+            ?: throw ApiException(-2, text(R.string.error_cookie_missing))
+        if (Session.userId.isEmpty()) throw ApiException(-2, text(R.string.error_user_missing))
         // 官方 AuthReq @SerializedName("user_id")（DbHelper.COLUMN_NAME_USER_ID = "user_id"）
         val body = ApiClient.gson.toJson(mapOf("cookie" to cookie, "user_id" to Session.userId))
         val result = call("/user/auth", "POST", body, authorized = false, retry = false)
-            ?: throw ApiException(-1, "auth返回为空")
+            ?: throw ApiException(-1, text(R.string.error_auth_empty))
         val auth = ApiClient.gson.fromJson(result, AuthResult::class.java)
         authorization = auth?.authorization
-        if (authorization.isNullOrEmpty()) throw ApiException(-1, "auth返回无authorization")
+        if (authorization.isNullOrEmpty()) {
+            throw ApiException(-1, text(R.string.error_auth_missing))
+        }
     }
 
     fun logout() {
@@ -89,7 +96,11 @@ object MomentsApi {
                 return call(path, method, body, authorized, retry = false)
             }
             if (code != SUCCESS) {
-                throw ApiException(code, obj?.get("msg")?.asString ?: "请求失败(${resp.code})")
+                throw ApiException(
+                    code,
+                    obj?.get("msg")?.asString
+                        ?: appContext.getString(R.string.error_request_failed_code, resp.code)
+                )
             }
             return if (obj != null && obj.has("result") && !obj.get("result").isJsonNull) {
                 obj.get("result")
@@ -166,7 +177,7 @@ object MomentsApi {
      * 返回新动态 feed_id。
      */
     fun publishFeed(text: String, media: List<com.lanhang.lite.moments.MediaItem> = emptyList()): String? {
-        require(text.isNotBlank() || media.isNotEmpty()) { "文字或图片至少需要一项" }
+        require(text.isNotBlank() || media.isNotEmpty()) { text(R.string.error_content_empty) }
         // content 是 JSON 字符串，不是对象
         val content = ApiClient.gson.toJson(
             mapOf("media" to media, "text" to text)

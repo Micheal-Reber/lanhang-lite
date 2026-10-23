@@ -1,8 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_bitmap"
+<!--
+  小部件根布局：底层是整张课程位图（点击打开课表），
+  上层右下角叠加三个「翻天」按钮的点击热区（仅 2×2 今日课程变体显示，由 ScheduleWidgetUpdater 控制显隐）：
+  ◀（前一天） │ ⟳（回到今天） │ ▶（后一天）。
+  按钮的圆角底色由 ScheduleWidgetRenderer.drawNavButtons 画在位图里（与标题/卡片同一套配色，
+  复位按钮还有「高亮/禁用」两种底色），布局里的 ImageView 只负责图标 + 点击；
+  图标浅/深/禁用多套，运行时用 setImageViewResource 切换。
+  几何必须与 ScheduleWidgetRenderer.TODAY_NAV_* 常量一致：24×22dp、间距 4dp、右边距 9dp。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:adjustViewBounds="false"
-    android:contentDescription="@string/widget_open_description"
-    android:scaleType="fitXY" />
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bitmap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:adjustViewBounds="false"
+        android:contentDescription="@string/widget_open_description"
+        android:scaleType="fitXY" />
+
+    <!-- 前一天：右边距 = 9 + 24 + 4 + 24 + 4 = 65dp -->
+    <ImageView
+        android:id="@+id/widget_nav_prev"
+        android:layout_width="24dp"
+        android:layout_height="22dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="65dp"
+        android:layout_marginBottom="9dp"
+        android:contentDescription="@string/widget_nav_prev"
+        android:padding="6dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_nav_left"
+        android:visibility="gone" />
+
+    <!-- 回到今天（居中于两侧箭头之间）：右边距 = 9 + 24 + 4 = 37dp -->
+    <ImageView
+        android:id="@+id/widget_nav_reset"
+        android:layout_width="24dp"
+        android:layout_height="22dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="37dp"
+        android:layout_marginBottom="9dp"
+        android:contentDescription="@string/widget_nav_reset"
+        android:padding="5dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_nav_reset"
+        android:visibility="gone" />
+
+    <!-- 后一天：右边距 = 9dp（= outerPad） -->
+    <ImageView
+        android:id="@+id/widget_nav_next"
+        android:layout_width="24dp"
+        android:layout_height="22dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="9dp"
+        android:layout_marginBottom="9dp"
+        android:contentDescription="@string/widget_nav_next"
+        android:padding="6dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_nav_right"
+        android:visibility="gone" />
+
+</FrameLayout>

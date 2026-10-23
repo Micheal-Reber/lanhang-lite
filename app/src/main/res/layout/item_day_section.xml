@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="周一"
+        android:text="@string/ph_day_name"
         android:textColor="?attr/colorOnSurface"
         android:textSize="14sp"
         android:textStyle="bold" />

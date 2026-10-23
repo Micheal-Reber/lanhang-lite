@@ -1,11 +1,8 @@
 package com.lanhang.lite.moments
 
 import android.annotation.SuppressLint
-import android.graphics.Color
+import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.TextPaint
-import android.text.method.LinkMovementMethod
-import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
@@ -102,7 +99,7 @@ class MomentAdapter(
         private val tvText: TextView = itemView.findViewById(R.id.tvText)
         private val rvImages: RecyclerView = itemView.findViewById(R.id.rvImages)
         private val tvLikes: TextView = itemView.findViewById(R.id.tvLikes)
-        private val tvComments: TextView = itemView.findViewById(R.id.tvComments)
+        private val llComments: LinearLayout = itemView.findViewById(R.id.llComments)
         private val llInteract: View = itemView.findViewById(R.id.llInteract)
         private val likesRow: View = itemView.findViewById(R.id.likesRow)
         private val dividerMid: View = itemView.findViewById(R.id.dividerMid)
@@ -114,8 +111,9 @@ class MomentAdapter(
         private val tvComment: TextView = itemView.findViewById(R.id.tvComment)
 
         fun bind(item: MomentItem) {
+            val ctx = itemView.context
             val user = UserInfoCache.get(item.feed.user_id)
-            tvName.text = user?.name ?: "用户"
+            tvName.text = user?.name ?: ctx.getString(R.string.moments_anonymous)
             val sub = listOfNotNull(user?.depart_name, user?.duty_name)
                 .filter { it.isNotBlank() }.joinToString(" · ")
             tvSub.text = sub
@@ -148,79 +146,84 @@ class MomentAdapter(
             }
 
             if (hasComments) {
-                tvComments.text = buildComments(item)
                 commentsRow.visibility = View.VISIBLE
-            } else {
-                commentsRow.visibility = View.GONE
-            }
-            dividerMid.visibility =
-                if (hasLikes && hasComments) View.VISIBLE else View.GONE
-
-            tvLike.text = if (item.likedByMe) "已赞 ${item.likes.size}" else "赞 ${item.likes.size}"
-            ivLike.setImageResource(if (item.likedByMe) R.drawable.ic_favorite else R.drawable.ic_favorite_outline)
-            val tintRes = if (item.likedByMe) R.color.like_red else R.color.icon_muted
-            ivLike.imageTintList = androidx.core.content.ContextCompat.getColorStateList(itemView.context, tintRes)
-            tvComment.text = "评论 ${item.comments.size}"
-
-            llLike.setOnClickListener { onLike(item) }
-            llComment.setOnClickListener { onComment(item) }
-
-            if (hasComments) {
-                tvComments.movementMethod = LinkMovementMethod.getInstance()
-                tvComments.highlightColor = Color.TRANSPARENT
-                tvComments.setOnLongClickListener {
-                    onCommentsLongPress(item)
-                    true
-                }
+                bindComments(item)
                 commentsRow.setOnLongClickListener {
                     onCommentsLongPress(item)
                     true
                 }
             } else {
-                tvComments.movementMethod = null
+                commentsRow.visibility = View.GONE
+                llComments.removeAllViews()
+            }
+            dividerMid.visibility =
+                if (hasLikes && hasComments) View.VISIBLE else View.GONE
+
+            tvLike.text = if (item.likedByMe) {
+                ctx.getString(R.string.moments_liked, item.likes.size)
+            } else {
+                ctx.getString(R.string.moments_like, item.likes.size)
+            }
+            ivLike.setImageResource(if (item.likedByMe) R.drawable.ic_favorite else R.drawable.ic_favorite_outline)
+            val tintRes = if (item.likedByMe) R.color.like_red else R.color.icon_muted
+            ivLike.imageTintList = androidx.core.content.ContextCompat.getColorStateList(itemView.context, tintRes)
+            tvComment.text = ctx.getString(R.string.moments_comment_count, item.comments.size)
+
+            llLike.setOnClickListener { onLike(item) }
+            llComment.setOnClickListener { onComment(item) }
+        }
+
+        /**
+         * 每条评论独占一行：整行（正文 + 行末空白）点击都回复该评论作者。
+         * 旧实现把所有评论拼进一个 TextView，只有名字的 ClickableSpan 能点，点正文完全没反应。
+         */
+        private fun bindComments(item: MomentItem) {
+            val ctx = itemView.context
+            val link = androidx.core.content.ContextCompat.getColor(ctx, R.color.link)
+            val list = item.comments
+            // 复用已有行，避免每次 bind 都 inflate
+            while (llComments.childCount > list.size) {
+                llComments.removeViewAt(llComments.childCount - 1)
+            }
+            list.forEachIndexed { i, c ->
+                val uid = c.user_id ?: return@forEachIndexed
+                val row = if (i < llComments.childCount) {
+                    llComments.getChildAt(i) as TextView
+                } else {
+                    (LayoutInflater.from(ctx)
+                        .inflate(R.layout.item_moment_comment, llComments, false) as TextView)
+                        .also { llComments.addView(it) }
+                }
+                row.text = buildCommentLine(c, link)
+                row.setOnClickListener { onReply(item, uid) }
+                // 行本身 clickable 会吞掉触摸流，长按必须挂在行上，否则原来的「长按删评论」会失效
+                row.setOnLongClickListener {
+                    onCommentsLongPress(item)
+                    true
+                }
             }
         }
 
-        /** 官方样式：人名/回复双方染链接色且可点击回复，内容原色 */
-        private fun buildComments(item: MomentItem): CharSequence {
-            val link = androidx.core.content.ContextCompat.getColor(
-                itemView.context, com.lanhang.lite.R.color.link
-            )
-            val sb = android.text.SpannableStringBuilder()
-            val list = item.comments
-            list.forEachIndexed { i, c ->
-                val who = UserInfoCache.nameOf(c.user_id)
-                val replyTo = c.reply_to?.takeIf { it.isNotEmpty() && it != c.user_id }
-                fun appendName(s: String, targetUserId: String?) {
-                    val st = sb.length
-                    sb.append(s)
-                    if (targetUserId.isNullOrEmpty()) {
-                        sb.setSpan(
-                            ForegroundColorSpan(link),
-                            st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                        )
-                    } else {
-                        sb.setSpan(object : ClickableSpan() {
-                            override fun onClick(widget: View) = onReply(item, targetUserId)
-                            override fun updateDrawState(ds: TextPaint) {
-                                ds.color = link
-                                ds.isUnderlineText = false
-                            }
-                        }, st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
-                }
-                if (replyTo != null) {
-                    appendName(who, c.user_id)
-                    sb.append("回复")
-                    appendName(UserInfoCache.nameOf(replyTo), replyTo)
-                    sb.append(": ")
-                } else {
-                    appendName(who, c.user_id)
-                    sb.append(": ")
-                }
-                sb.append(c.content.orEmpty())
-                if (i < list.lastIndex) sb.append("\n")
+        /** 「张三：内容」/「张三 回复 李四：内容」，人名染链接色；点击意图由整行监听统一处理 */
+        private fun buildCommentLine(c: CommentEntry, link: Int): CharSequence {
+            val sb = SpannableStringBuilder()
+            fun appendName(name: String) {
+                val st = sb.length
+                sb.append(name)
+                sb.setSpan(
+                    ForegroundColorSpan(link), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
             }
+            appendName(UserInfoCache.nameOf(c.user_id))
+            val replyTo = c.reply_to?.takeIf { it.isNotEmpty() && it != c.user_id }
+            if (replyTo != null) {
+                sb.append(" ")
+                sb.append(itemView.context.getString(R.string.moments_reply_inline))
+                sb.append(" ")
+                appendName(UserInfoCache.nameOf(replyTo))
+            }
+            sb.append(itemView.context.getString(R.string.moments_comment_separator))
+            sb.append(c.content.orEmpty())
             return sb
         }
 
@@ -280,6 +283,6 @@ class MomentAdapter(
     }
 
     companion object {
-        private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.CHINA)
+        private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
     }
 }

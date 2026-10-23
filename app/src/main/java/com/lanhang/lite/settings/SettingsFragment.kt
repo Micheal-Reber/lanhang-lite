@@ -22,9 +22,12 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.FragmentSettingsBinding
+import com.lanhang.lite.schedule.ScheduleBackdrop
+import com.lanhang.lite.schedule.ScheduleBackgroundActivity
 import com.lanhang.lite.schedule.ScheduleData
 import com.lanhang.lite.schedule.ScheduleExporter
 import com.lanhang.lite.schedule.ScheduleRepository
+import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.MainActivity
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
@@ -64,6 +67,11 @@ class SettingsFragment : Fragment() {
         pendingExport = null
         if (uri == null || payload == null) return@registerForActivityResult
         saveDocument(uri, payload.ics.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.ics")
+    }
+    private val openBackgroundSettings = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        refreshBackgroundSummary()
     }
     private val createCsvDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
@@ -119,6 +127,14 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         syncToolbar()
+        refreshBackgroundSummary()
+    }
+
+    /** 背景页返回后刷新摘要（纯色/渐变/自定义图片） */
+    private fun refreshBackgroundSummary() {
+        val b = _binding ?: return
+        b.detailContainer.findViewById<TextView>(R.id.tvScheduleBackgroundSummary)?.text =
+            ScheduleBackdrop.summary(requireContext())
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -132,7 +148,7 @@ class SettingsFragment : Fragment() {
         if (isHidden) return
         val page = detailPage
         if (page == null) {
-            act.showToolbarMain("设置")
+            act.showToolbarMain(getString(R.string.tab_settings))
         } else {
             act.showToolbarSub(detailTitle(page)) { closeDetail() }
         }
@@ -178,6 +194,16 @@ class SettingsFragment : Fragment() {
             PAGE_APPEARANCE -> {
                 root.findViewById<TextView>(R.id.tvThemeSummary).text = currentThemeLabel()
                 root.findViewById<View>(R.id.rowTheme).setOnClickListener { showThemeDialog() }
+                root.findViewById<TextView>(R.id.tvScheduleBackgroundSummary).text =
+                    ScheduleBackdrop.summary(requireContext())
+                root.findViewById<View>(R.id.rowScheduleBackground).setOnClickListener {
+                    openBackgroundSettings.launch(
+                        Intent(requireContext(), ScheduleBackgroundActivity::class.java)
+                    )
+                }
+                root.findViewById<TextView>(R.id.tvLanguageSummary).text = currentLanguageLabel()
+                root.findViewById<View>(R.id.rowLanguage)
+                    .setOnClickListener { showLanguageDialog() }
             }
             PAGE_TOOLS -> {
                 root.findViewById<View>(R.id.exportScheduleButton)
@@ -230,6 +256,28 @@ class SettingsFragment : Fragment() {
         context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
     }
 
+    private fun currentLanguageLabel(): String =
+        getString(AppLanguage.labelRes(Session.language))
+
+    private fun showLanguageDialog() {
+        val labels = AppLanguage.options.map { getString(AppLanguage.labelRes(it)) }.toTypedArray()
+        val checked = AppLanguage.options.indexOf(Session.language).coerceAtLeast(0)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_language)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                val mode = AppLanguage.options[which]
+                dialog.dismiss()
+                if (mode != Session.language) {
+                    Session.language = mode
+                    // AppCompat 会自动重建 Activity 让新语言生效；小部件文案是渲染时写死的，需重刷
+                    AppLanguage.apply(mode)
+                    context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
+                }
+            }
+            .setNegativeButton(R.string.common_cancel, null)
+            .show()
+    }
+
     private fun showExportSchedule() {
         val data = ScheduleRepository.loadCached()?.data
         if (data == null) {
@@ -274,7 +322,7 @@ class SettingsFragment : Fragment() {
                         } else {
                             cachedWeek(week, data.termId)
                                 ?: ScheduleRepository.refresh(week, updateWidget = false).data
-                        } ?: throw IllegalStateException("第${week}周课表为空")
+                        } ?: throw IllegalStateException(getString(R.string.settings_week_empty, week))
                         weeks[week] = weekData
                         done++
                         if (progress != null) {
@@ -289,7 +337,7 @@ class SettingsFragment : Fragment() {
                         }
                     }
                     ensureActive()
-                    ScheduleExporter.build(data, plan, weeks)
+                    ScheduleExporter.build(requireContext(), data, plan, weeks)
                 }
                 progress?.dialog?.dismiss()
                 if (payload == null) {
@@ -519,14 +567,14 @@ class SettingsFragment : Fragment() {
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle(R.string.settings_diagnostics)
             .setView(scroll)
-            .setNegativeButton("关闭", null)
-            .setPositiveButton("分享") { _, _ ->
+            .setNegativeButton(R.string.common_close, null)
+            .setPositiveButton(R.string.common_share) { _, _ ->
                 val send = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "蓝航 Lite 诊断日志")
+                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.settings_diagnostics_subject))
                     putExtra(Intent.EXTRA_TEXT, report)
                 }
-                startActivity(Intent.createChooser(send, "分享诊断信息"))
+                startActivity(Intent.createChooser(send, getString(R.string.settings_diagnostics_chooser)))
             }
             .show()
     }

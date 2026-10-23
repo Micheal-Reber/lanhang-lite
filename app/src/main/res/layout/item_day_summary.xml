@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:text="周一"
+        android:text="@string/ph_day_name"
         android:textColor="?attr/colorOnSurface"
         android:textSize="13sp"
         android:textStyle="bold" />
@@ -28,7 +28,7 @@
         android:background="@drawable/bg_count_chip"
         android:paddingHorizontal="7dp"
         android:paddingVertical="2dp"
-        android:text="4 门"
+        android:text="@string/ph_day_count"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="10sp"
         android:textStyle="bold" />

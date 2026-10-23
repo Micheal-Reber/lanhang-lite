@@ -9,22 +9,21 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.core.graphics.ColorUtils
+import com.lanhang.lite.schedule.PeriodClock
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.widget.ScheduleWidgetData.CourseBlock
 import com.lanhang.lite.widget.ScheduleWidgetData.WeekSnapshot
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 object ScheduleWidgetRenderer {
 
-    private val dayLabels = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-    private val compactDayLabels = arrayOf("一", "二", "三", "四", "五", "六", "日")
-    private val periodTimes = arrayOf(
-        "08:00-08:45", "08:55-09:40", "10:00-10:45", "10:55-11:40",
-        "14:00-14:45", "14:55-15:40", "16:00-16:45", "16:55-17:40",
-        "19:00-19:45", "19:55-20:40", "20:50-21:35"
-    )
+    /** 节次时间文本（仅 4×4 网格的时间列用）；时间表的唯一来源是 [PeriodClock] */
+    private val periodTimes = Array(PeriodClock.count) { PeriodClock.rangeText(it + 1, it + 1) }
     private val dateFormatter = DateTimeFormatter.ofPattern("M-d")
     private val todayDateFormatter = DateTimeFormatter.ofPattern("M/d")
 
@@ -87,16 +86,59 @@ object ScheduleWidgetRenderer {
         )
     }
 
+    /** 2×2 底部导航条（◀ ⟳ ▶）占用的高度阈值：低于该高度不显示按钮 */
+    const val TODAY_NAV_MIN_HEIGHT_DP = 130
+
+    /** 底部导航条高度（与 [TodayRenderer] 的 footerH 一致） */
+    const val TODAY_NAV_BAR_HEIGHT_DP = 22
+
+    /**
+     * 今日课程最多同时显示的节数。
+     *
+     * 规则：上完的课立刻从小部件里消失，后面的课依次顶上来，所以任何时刻最多只有
+     * 这么几节「还没上完」的课在列（不是按当天总节数截断）。
+     */
+    const val MAX_TODAY_ROWS = 3
+
+    /**
+     * 底部「翻天」按钮组的几何（dp）。
+     * 3 个按钮等宽等高、间距 4dp：◀（前一天）│ ⟳（回到今天）│ ▶（后一天）。
+     * **必须与 `layout/widget_schedule_week.xml` 里的三个 ImageView 完全一致**，
+     * 因为圆角底画在位图里、图标和点击热区在布局里，两边错 1dp 就会露馅。
+     */
+    const val TODAY_NAV_BUTTON_WIDTH_DP = 24
+    const val TODAY_NAV_BUTTON_HEIGHT_DP = 22
+    const val TODAY_NAV_GAP_DP = 4
+
+    /** 按钮组距离小部件右边缘的留白（= outerPad 9dp） */
+    const val TODAY_NAV_END_PAD_DP = 9
+
+    /** 按钮组总宽：24×3 + 4×2 = 80dp */
+    const val TODAY_NAV_GROUP_WIDTH_DP =
+        TODAY_NAV_BUTTON_WIDTH_DP * 3 + TODAY_NAV_GAP_DP * 2
+
+    /** 当前主题是否为深色（按钮底色/图标颜色与此保持一致） */
+    fun isDark(context: Context): Boolean = palette(context).isDark
+
     /**
      * 「课表 · 小」2×2 紧凑档：今日课程列表。
-     * 头部「周X 日期 … 第N周」+ 每节一行（课程色条 + 课名 + 教室/时间）；
-     * 行放不下 → 截断 + 底部「+N」胶囊；无课/未登录 → 空态。
+     *
+     * 排课规则（与桌面表现一致）：
+     * - **上完即走**：今天已经下课的课不再出现，后面的课依次顶上来；始终最多 [MAX_TODAY_ROWS] 节
+     * - **正在上课**：该行右侧显示「剩 N 分」（距下课），由 [ScheduleWidgetUpdater] 每分钟重绘一次
+     * - 翻到别的日期（昨天/明天）时不做时间过滤，只按节次顺序取前几节
+     * - 底部 ◀ ⟳ ▶：翻转前后一天 + 回到今天；复位按钮在「已翻走」时才高亮可点
+     *
+     * @param targetDate 要展示的日期（翻天导航）；null = 今天
+     * @param now 渲染时刻（默认取系统时间；抽出参数便于测试与预览）
      */
     fun renderToday(
         context: Context,
         snapshot: WeekSnapshot?,
         widthDp: Int,
-        heightDp: Int
+        heightDp: Int,
+        targetDate: LocalDate? = null,
+        now: LocalDateTime = LocalDateTime.now()
     ): Bitmap {
         val density = context.resources.displayMetrics.density
         val width = (widthDp * density).roundToInt().coerceAtLeast(1)
@@ -117,17 +159,67 @@ object ScheduleWidgetRenderer {
             drawEmpty(canvas, paint, context, width, height, density, palette)
             return bitmap
         }
-        TodayRenderer(canvas, paint, context, density, width, height, palette, snapshot).draw()
+        TodayRenderer(
+            canvas, paint, context, density, width, height, palette, snapshot,
+            targetDate ?: now.toLocalDate(), now
+        ).draw()
         return bitmap
     }
 
-    private fun courseColorFor(name: String, isDark: Boolean): Int {
+    /**
+     * 课程卡配色：同课同色、不同课色相差约 137°。
+     *
+     * 卡片上一律白字（与课表页统一），所以浅色主题原本的淡彩（L=0.82）配白字只有 ~2:1，
+     * 会糊成一片 —— 由 [deepenForWhiteText] 按原色相压暗到白字可读；深色主题本来够深，不动。
+     *
+     * @param alpha 卡片实际绘制时的透明度（4×4 网格色块是半透明的）
+     * @param behind 半透明卡片的叠底颜色
+     */
+    private fun courseColorFor(
+        name: String,
+        isDark: Boolean,
+        alpha: Int = 255,
+        behind: Int = Color.WHITE
+    ): Int {
         val hue = ((name.hashCode() * 137.508f % 360f) + 360f) % 360f
-        return if (isDark) {
+        val base = if (isDark) {
             ColorUtils.HSLToColor(floatArrayOf(hue, 0.40f, 0.28f))
         } else {
             ColorUtils.HSLToColor(floatArrayOf(hue, 0.55f, 0.82f))
         }
+        return deepenForWhiteText(base, alpha, behind)
+    }
+
+    /**
+     * 白字版卡片的最低对比度（与 `ScheduleStyle.MIN_WHITE_CONTRAST` 同一档）。
+     * 课名是 10~14sp 加粗，WCAG AA 对大字号要求 3:1，取 3.2 留一点余量。
+     */
+    private const val MIN_CARD_WHITE_CONTRAST = 3.2
+
+    /**
+     * 保持色相/饱和度，仅降低明度直到白字可读；下限 0.24 防止压成黑色。
+     * 半透明卡片按叠底后的实际颜色算对比度，否则白字会算得比看起来亮。
+     */
+    private fun deepenForWhiteText(color: Int, alpha: Int = 255, behind: Int = Color.WHITE): Int {
+        fun composited(c: Int): Int = ColorUtils.blendARGB(behind, c, alpha / 255f)
+
+        if (ColorUtils.calculateContrast(Color.WHITE, composited(color)) >= MIN_CARD_WHITE_CONTRAST) {
+            return color
+        }
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(color, hsl)
+        var lightness = hsl[2]
+        var current = color
+        repeat(40) {
+            lightness = (lightness - 0.015f).coerceAtLeast(0.24f)
+            current = ColorUtils.HSLToColor(floatArrayOf(hsl[0], hsl[1], lightness))
+            if (ColorUtils.calculateContrast(Color.WHITE, composited(current)) >=
+                MIN_CARD_WHITE_CONTRAST || lightness <= 0.24f
+            ) {
+                return current
+            }
+        }
+        return current
     }
 
     private class TodayRenderer(
@@ -138,31 +230,83 @@ object ScheduleWidgetRenderer {
         private val width: Int,
         private val height: Int,
         private val palette: Palette,
-        private val snapshot: WeekSnapshot
+        private val snapshot: WeekSnapshot,
+        private val target: LocalDate,
+        private val now: LocalDateTime
     ) {
-        private val today = LocalDate.now()
-        private val outerPad = dp(10f)
-        private val headerH = dp(26f)
-        private val headerGap = dp(7f)
-        private val cardGap = dp(6f)
-        private val minRowH = dp(28f)
+        private val today = now.toLocalDate()
+
+        /** 星期名随界面语言（跟随 values / values-en） */
+        private val dayLabels = context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names)
+        private val compactDayLabels =
+            context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names_compact)
+
+        /** 相对今天的偏移天数：0=今天，>0=未来，<0=过去（翻天按钮改的就是它） */
+        private val offsetDays = ChronoUnit.DAYS.between(today, target)
+
+        /** 今天才按钟点过滤（上完的课消失）；翻到别的日期不过滤 */
+        private val filterByClock = offsetDays == 0L
+
+        /** 当前时刻的「当天第几分钟」，用于判断上课中 / 已下课 */
+        private val nowMinute = PeriodClock.minutesOf(now.toLocalTime())
+
+        private val outerPad = dp(9f)
+        private val headerH = dp(24f)
+        private val headerGap = dp(5f)
+        private val cardGap = dp(4f)
+        private val minRowH = dp(22f)
 
         fun draw() {
             drawHeader()
             val contentTop = outerPad + headerH + headerGap
-            val footerH = if (height >= dp(130f)) dp(25f) else 0f
+            val footerH = if (height >= dp(TODAY_NAV_MIN_HEIGHT_DP.toFloat())) {
+                dp(TODAY_NAV_BAR_HEIGHT_DP.toFloat())
+            } else {
+                0f
+            }
             val contentH = (height - outerPad - footerH - contentTop).coerceAtLeast(0f)
-            val courses = snapshot.days.firstOrNull { it.date == today }?.courses.orEmpty()
-            if (courses.isEmpty()) drawNoCourse(contentTop, contentH)
-            else drawRows(courses, contentTop, contentH)
+            val all = snapshot.days.firstOrNull { it.date == target }?.courses.orEmpty()
+            // 已经下课的课从这里开始就不存在了 → 后面的课自然顶上来
+            val courses = if (filterByClock) all.filter { isPending(it) } else all
+            when {
+                courses.isNotEmpty() -> drawRows(courses, contentTop, contentH)
+                // 今天本来有课、但全上完了：给一个「已上完」的空态，而不是「今天没有课程」
+                filterByClock && all.isNotEmpty() -> drawDayDone(contentTop, contentH)
+                else -> drawNoCourse(contentTop, contentH)
+            }
             if (footerH > 0f) drawFooter(height - outerPad - footerH, footerH)
+        }
+
+        /** 这节课还没下课（下课时间严格晚于现在） */
+        private fun isPending(course: CourseBlock): Boolean =
+            PeriodClock.endMinute(course.end) > nowMinute
+
+        /** 正在上的那节课（同一时刻最多一节） */
+        private fun ongoingOf(courses: List<CourseBlock>): CourseBlock? {
+            if (!filterByClock) return null
+            return courses.firstOrNull {
+                PeriodClock.startMinute(it.start) <= nowMinute && nowMinute < PeriodClock.endMinute(it.end)
+            }
+        }
+
+        /** 距下课还剩几分钟（向上取整，最后一分钟显示「剩 1 分」而不是 0） */
+        private fun minutesLeft(course: CourseBlock): Int {
+            val endSecond = PeriodClock.endMinute(course.end) * 60
+            val nowSecond = now.toLocalTime().toSecondOfDay()
+            return ceil((endSecond - nowSecond) / 60.0).toInt().coerceAtLeast(1)
         }
 
         private fun drawHeader() {
             val centerY = outerPad + headerH / 2f
-            val weekday = dayLabels[(today.dayOfWeek.value - 1).coerceIn(0, 6)]
-            val title = "今天 · $weekday"
-            val dateText = today.format(todayDateFormatter)
+            val weekday = dayLabels[(target.dayOfWeek.value - 1).coerceIn(0, 6)]
+            val prefix = when (offsetDays) {
+                0L -> context.getString(com.lanhang.lite.R.string.widget_today_prefix)
+                1L -> context.getString(com.lanhang.lite.R.string.widget_tomorrow_prefix)
+                -1L -> context.getString(com.lanhang.lite.R.string.widget_yesterday_prefix)
+                else -> ""
+            }
+            val title = "$prefix$weekday"
+            val dateText = target.format(todayDateFormatter)
             paint.textAlign = Paint.Align.LEFT
             paint.alpha = 255
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -176,33 +320,26 @@ object ScheduleWidgetRenderer {
             paint.textAlign = Paint.Align.LEFT
         }
 
+        /**
+         * 列出「还没上完」的课：最多 [MAX_TODAY_ROWS] 节，按当前可用高度决定实际行数。
+         * 超出部分不再画「+N」胶囊（2×2 里没有多余高度），后面的课会在前面的课下课后自动补位。
+         */
         private fun drawRows(courses: List<CourseBlock>, contentTop: Float, contentH: Float) {
             if (contentH <= 0f) return
-            val maxFit = ((contentH + cardGap) / (minRowH + cardGap)).toInt().coerceAtLeast(1)
-            val hasOverflow = courses.size > maxFit
-            val overflowRowH =
-                if (hasOverflow) minOf(dp(18f), contentH * 0.30f) else 0f
-            val shown = if (hasOverflow) {
-                maxOf(1, minOf(courses.size, ((contentH - overflowRowH + cardGap) / (minRowH + cardGap)).toInt()))
-            } else {
-                courses.size
-            }
-            val rowH = ((contentH - overflowRowH - cardGap * (shown - 1)) / shown).coerceAtLeast(1f)
+            val capacity = ((contentH + cardGap) / (minRowH + cardGap)).toInt().coerceAtLeast(1)
+            val shown = minOf(MAX_TODAY_ROWS, capacity, courses.size)
+            val rowH = ((contentH - cardGap * (shown - 1)) / shown).coerceAtLeast(1f)
+            val ongoing = ongoingOf(courses)
             for (index in 0 until shown) {
                 val course = courses[index]
                 val top = contentTop + index * (rowH + cardGap)
-                drawRow(course, top, rowH)
+                // 只有「正在上」的课才在右侧显示距下课倒计时
+                val left = if (course === ongoing) minutesLeft(course) else null
+                drawRow(course, top, rowH, left)
             }
-            if (hasOverflow) drawMorePill(
-                context.getString(
-                    com.lanhang.lite.R.string.widget_today_more, courses.size - shown
-                ),
-                contentTop + shown * (rowH + cardGap) - cardGap,
-                overflowRowH
-            )
         }
 
-        private fun drawRow(course: CourseBlock, top: Float, rowH: Float) {
+        private fun drawRow(course: CourseBlock, top: Float, rowH: Float, countdown: Int?) {
             paint.style = Paint.Style.FILL
             paint.alpha = 255
             val cardColor = courseColorFor(course.name, palette.isDark)
@@ -213,87 +350,107 @@ object ScheduleWidgetRenderer {
                 minOf(dp(12f), rowH / 2f),
                 paint
             )
+            // 卡片统一白字：「够不够白」由 cardColor 的压深保证（见 courseColorFor）
+            val nameColor = Color.WHITE
+            val metaColor = 0xE6FFFFFF.toInt()
+
             val textLeft = outerPad + dp(9f)
-            val textW = (width - outerPad - dp(9f) - textLeft).coerceAtLeast(1f)
+            val textRight = width - outerPad - dp(9f)
+            val textW = (textRight - textLeft).coerceAtLeast(1f)
             val room = course.room
             val twoLine = rowH >= dp(26f)
             val nameSize =
-                if (twoLine) minOf(dp(14f), rowH * 0.40f)
-                else (rowH * 0.60f).coerceIn(dp(8f), dp(14f))
-            val metaSize = minOf(dp(10f), nameSize * 0.72f).coerceAtLeast(dp(7f))
+                if (twoLine) minOf(dp(13f), rowH * 0.38f)
+                else (rowH * 0.58f).coerceIn(dp(10f), dp(14f))
+            val metaSize = (nameSize * 0.72f).coerceIn(dp(8f), dp(10f))
+
+            // 右侧状态：「剩 N 分」（上课中）优先，其次教室；两行版把教室放进第二行
+            val status = when {
+                countdown != null -> context.getString(com.lanhang.lite.R.string.widget_today_countdown, countdown)
+                twoLine -> null
+                else -> room.ifBlank { null }
+            }
+            var statusW = 0f
+            if (!status.isNullOrEmpty()) {
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.textSize = metaSize
+                statusW = minOf(paint.measureText(status), textW * 0.5f)
+            }
+            val nameAvail = (textW - if (statusW > 0f) statusW + dp(6f) else 0f)
+                .coerceAtLeast(dp(10f))
+
             val blockH = nameSize + if (twoLine) dp(2f) + metaSize else 0f
             val blockTop = top + (rowH - blockH) / 2f
             val nameBaseline = blockTop + nameSize * 0.82f
 
-            // 课名（加粗，超宽省略）；单行且有教室时给教室留右侧位
-            var nameAvail = textW
-            var roomW = 0f
-            if (!twoLine && room.isNotBlank()) {
-                paint.typeface = Typeface.DEFAULT
-                paint.textSize = metaSize
-                roomW = minOf(paint.measureText(room), textW * 0.42f)
-                nameAvail = (textW - roomW - dp(6f)).coerceAtLeast(1f)
-            }
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.textSize = nameSize
-            paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) Color.WHITE else TEXT_DARK
+            paint.color = nameColor
             paint.alpha = 255
             paint.textAlign = Paint.Align.LEFT
             canvas.drawText(ellipsize(course.name, nameAvail), textLeft, nameBaseline, paint)
 
+            if (!status.isNullOrEmpty()) {
+                val statusBaseline = if (twoLine) {
+                    nameBaseline - (nameSize - metaSize) * 0.12f
+                } else {
+                    top + rowH / 2f + metaSize * 0.35f
+                }
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.textSize = metaSize
+                paint.color = metaColor
+                paint.textAlign = Paint.Align.RIGHT
+                canvas.drawText(
+                    ellipsize(status, statusW),
+                    textRight,
+                    statusBaseline,
+                    paint
+                )
+                paint.textAlign = Paint.Align.LEFT
+            }
+
             if (twoLine) {
                 val metaTop = blockTop + nameSize + dp(2f)
-                val meta = timeRange(course) +
-                    (if (room.isNotBlank()) " · $room" else "")
+                val meta = timeRange(course) + (if (room.isNotBlank()) " · $room" else "")
                 paint.typeface = Typeface.DEFAULT
                 paint.textSize = metaSize
-                paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) 0xE6FFFFFF.toInt() else TEXT_DARK
+                paint.color = metaColor
                 canvas.drawText(
                     ellipsize(meta, textW),
                     textLeft,
                     metaTop + metaSize * 0.82f,
                     paint
                 )
-            } else if (room.isNotBlank()) {
-                paint.typeface = Typeface.DEFAULT
-                paint.textSize = metaSize
-                paint.color = if (ColorUtils.calculateLuminance(cardColor) < 0.55) 0xE6FFFFFF.toInt() else TEXT_DARK
-                paint.textAlign = Paint.Align.RIGHT
-                canvas.drawText(
-                    ellipsize(room, roomW),
-                    width - outerPad,
-                    nameBaseline + (nameSize - metaSize) * 0.2f,
-                    paint
-                )
-                paint.textAlign = Paint.Align.LEFT
             }
         }
 
-        private fun drawMorePill(text: String, rowTop: Float, rowH: Float) {
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            paint.textSize = dp(9f)
-            paint.textAlign = Paint.Align.LEFT
-            val textW = paint.measureText(text)
-            val pillW = textW + dp(14f)
-            val pillH = minOf(rowH - dp(2f), dp(15f)).coerceAtLeast(dp(11f))
-            val left = (width - pillW) / 2f
-            val top = rowTop + (rowH - pillH) / 2f
-            paint.color = palette.today
-            paint.style = Paint.Style.FILL
+        /** 今天本来有课、但都已下课：和「今天没有课程」区分开，避免误以为课表丢了 */
+        private fun drawDayDone(contentTop: Float, contentH: Float) {
+            val centerY = contentTop + contentH / 2f
+            paint.textAlign = Paint.Align.CENTER
             paint.alpha = 255
-            canvas.drawRoundRect(
-                RectF(left, top, left + pillW, top + pillH),
-                pillH / 2f,
-                pillH / 2f,
-                paint
-            )
-            paint.color = palette.primary
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.textSize = dp(13f)
+            paint.color = palette.onSurface
             canvas.drawText(
-                text,
-                left + (pillW - textW) / 2f,
-                top + pillH / 2f + paint.textSize * 0.36f,
+                context.getString(com.lanhang.lite.R.string.widget_today_done),
+                width / 2f,
+                centerY - dp(2f),
                 paint
             )
+            paint.typeface = Typeface.DEFAULT
+            paint.textSize = dp(10f)
+            paint.color = palette.onSurfaceVariant
+            canvas.drawText(
+                context.getString(
+                    com.lanhang.lite.R.string.widget_today_done_hint,
+                    snapshot.week
+                ),
+                width / 2f,
+                centerY + dp(14f),
+                paint
+            )
+            paint.textAlign = Paint.Align.LEFT
         }
 
         private fun drawNoCourse(contentTop: Float, contentH: Float) {
@@ -304,7 +461,10 @@ object ScheduleWidgetRenderer {
             paint.textSize = dp(13f)
             paint.color = palette.onSurface
             canvas.drawText(
-                context.getString(com.lanhang.lite.R.string.widget_today_empty),
+                context.getString(
+                    if (offsetDays == 0L) com.lanhang.lite.R.string.widget_today_empty
+                    else com.lanhang.lite.R.string.widget_day_empty
+                ),
                 width / 2f,
                 centerY - dp(4f),
                 paint
@@ -320,11 +480,38 @@ object ScheduleWidgetRenderer {
             )
         }
 
+        /**
+         * 底部：左侧胶囊（今天显示「第 N 周」，翻天时显示「昨天 / 明天 / ±N 天」），
+         * 右侧是布局里的 ◀ ⟳ ▶ 三个按钮，所以胶囊的可用宽度必须扣掉整个按钮组，
+         * 否则文字会被按钮压住。
+         */
         private fun drawFooter(top: Float, footerH: Float) {
-            val weekText = context.getString(com.lanhang.lite.R.string.widget_week_format, snapshot.week)
+            val label = when (offsetDays) {
+                0L -> context.getString(com.lanhang.lite.R.string.widget_week_format, snapshot.week)
+                1L -> context.getString(com.lanhang.lite.R.string.widget_today_tomorrow)
+                -1L -> context.getString(com.lanhang.lite.R.string.widget_today_yesterday)
+                else -> context.getString(
+                    com.lanhang.lite.R.string.widget_day_offset_format,
+                    if (offsetDays > 0) "+$offsetDays" else "$offsetDays"
+                )
+            }
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.textSize = dp(10f)
-            val labelW = paint.measureText(weekText) + dp(16f)
+            // 胶囊右边界 = 按钮组左边界 - 6dp；再扣掉胶囊自身左右内边距（各 5dp）
+            val navLeft = width - outerPad - dp(TODAY_NAV_GROUP_WIDTH_DP.toFloat())
+            val maxTextW = (navLeft - dp(6f) - outerPad - dp(10f)).coerceAtLeast(dp(8f))
+            // 2×2 用 154dp 宽度时，「第 4 周」放不下 → 退成「第4周」，再不够才省略号
+            val text = if (paint.measureText(label) <= maxTextW) {
+                label
+            } else {
+                val compact = if (offsetDays == 0L) {
+                    context.getString(com.lanhang.lite.R.string.widget_week_compact, snapshot.week)
+                } else {
+                    label
+                }
+                ellipsize(compact, maxTextW)
+            }
+            val labelW = paint.measureText(text) + dp(10f)
             val pillH = minOf(dp(18f), footerH)
             val pillTop = top + (footerH - pillH) / 2f
             paint.color = palette.today
@@ -337,25 +524,66 @@ object ScheduleWidgetRenderer {
             paint.color = palette.primary
             paint.textAlign = Paint.Align.CENTER
             canvas.drawText(
-                weekText,
+                text,
                 outerPad + labelW / 2f,
                 pillTop + pillH / 2f + paint.textSize * 0.35f,
                 paint
             )
             paint.textAlign = Paint.Align.LEFT
+            drawNavButtons(top, footerH)
         }
 
-        /** 节次时间区间，如「08:00-11:40」；单节为整段「08:00-08:45」 */
-        private fun timeRange(course: CourseBlock): String {
-            val start = course.start.coerceIn(1, 11)
-            val end = course.end.coerceIn(start, 11)
-            return if (end <= start) {
-                periodTimes[start - 1]
+        /**
+         * 右下角三个「翻天」按钮的圆角底色：◀ 前一天 │ ⟳ 回到今天 │ ▶ 后一天。
+         *
+         * - 两侧箭头只有静态底色；三角图标由布局里的 ImageView 提供（浅/深两套 drawable）
+         * - 中间复位按钮有状态：**已经翻走**时用主色淡底（可点、有存在感），
+         *   **就在今天**时与两侧同底色、图标置灰（禁用态），点击不产生任何变化
+         *
+         * 这里只画底板，所以几何常量必须与 `layout/widget_schedule_week.xml` 保持一致：
+         * 24×22dp、间距 4dp、右边距 9dp（= outerPad）、垂直居中于底部条。
+         */
+        private fun drawNavButtons(top: Float, footerH: Float) {
+            val btnW = dp(TODAY_NAV_BUTTON_WIDTH_DP.toFloat())
+            val btnH = dp(TODAY_NAV_BUTTON_HEIGHT_DP.toFloat())
+            val gap = dp(TODAY_NAV_GAP_DP.toFloat())
+            val endPad = outerPad
+            val btnTop = top + (footerH - btnH) / 2f
+            val r = dp(7f)
+            val nextRight = width - endPad
+            val nextLeft = nextRight - btnW
+            val resetRight = nextLeft - gap
+            val resetLeft = resetRight - btnW
+            val prevRight = resetLeft - gap
+            val prevLeft = prevRight - btnW
+            paint.style = Paint.Style.FILL
+            paint.alpha = 255
+            val neutral = if (palette.isDark) 0x33FFFFFF else 0x17000000
+            paint.color = neutral
+            canvas.drawRoundRect(
+                RectF(prevLeft, btnTop, prevRight, btnTop + btnH), r, r, paint
+            )
+            canvas.drawRoundRect(
+                RectF(nextLeft, btnTop, nextRight, btnTop + btnH), r, r, paint
+            )
+            // 复位按钮：翻走 = 主色淡底高亮；在今天就 = 与两侧一致的静态底（图标另行置灰）
+            paint.color = if (offsetDays != 0L) {
+                withAlpha(palette.primary, if (palette.isDark) 0x3D else 0x2E)
             } else {
-                "${periodTimes[start - 1].substringBefore('-')}-" +
-                    periodTimes[end - 1].substringAfter('-')
+                neutral
             }
+            canvas.drawRoundRect(
+                RectF(resetLeft, btnTop, resetRight, btnTop + btnH), r, r, paint
+            )
         }
+
+        /** 只替换 alpha，保留 RGB（用于主色淡底） */
+        private fun withAlpha(color: Int, alpha: Int): Int =
+            (color and 0x00FFFFFF) or (alpha shl 24)
+
+        /** 节次时间区间，如「08:00-11:40」；单节为整段「08:00-08:45」 */
+        private fun timeRange(course: CourseBlock): String =
+            PeriodClock.rangeText(course.start.coerceIn(1, 11), course.end.coerceIn(1, 11))
 
         private fun ellipsize(text: String, maxWidth: Float): String {
             if (maxWidth <= 0f) return ""
@@ -383,6 +611,10 @@ object ScheduleWidgetRenderer {
         private val today = LocalDate.now()
         private val outerPad = dp(6f)
         private val compactHeader = width < dp(320f)
+        /** 星期名随界面语言（跟随 values / values-en） */
+        private val dayLabels = context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names)
+        private val compactDayLabels =
+            context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names_compact)
         private val headH = if (compactHeader) dp(36f) else dp(56f)
         private val timeW = if (width < dp(260f)) dp(36f) else dp(40f)
         private val gapH = dp(1.5f)
@@ -538,7 +770,7 @@ object ScheduleWidgetRenderer {
                 val radius = minOf(dp(10f), minOf(layout.width, layout.height) / 2f)
                 paint.style = Paint.Style.FILL
                 paint.color = baseColor
-                paint.alpha = if (palette.isDark) 220 else 205
+                paint.alpha = blockAlpha()
                 canvas.drawRoundRect(
                     RectF(
                         layout.left,
@@ -568,11 +800,7 @@ object ScheduleWidgetRenderer {
                 paint.style = Paint.Style.FILL
                 paint.strokeWidth = 0f
                 paint.alpha = 255
-                val textColor = if (ColorUtils.calculateLuminance(baseColor) < 0.5) {
-                    Color.WHITE
-                } else {
-                    TEXT_DARK
-                }
+                val textColor = Color.WHITE
                 drawCourseName(layout, nameSize, textColor)
                 drawCourseRoom(layout, nameSize, textColor)
             }
@@ -707,8 +935,14 @@ object ScheduleWidgetRenderer {
             return bodyTop + gapH + index * (slotH + gapH)
         }
 
+        /**
+         * 4×4 网格的色块是半透明画的（alpha 见 [drawCourses]），叠在卡片底色上，
+         * 白字的对比度必须按叠底后的颜色算，所以这里把 alpha/behind 一起传进去。
+         */
         private fun courseColor(name: String): Int =
-            courseColorFor(name, palette.isDark)
+            courseColorFor(name, palette.isDark, blockAlpha(), palette.background)
+
+        private fun blockAlpha(): Int = if (palette.isDark) 220 else 205
 
         private fun tokenize(name: String): List<TextToken> {
             val source = name.filter { it != '\n' && it != ' ' }
@@ -802,6 +1036,4 @@ object ScheduleWidgetRenderer {
             )
         }
     }
-
-    private val TEXT_DARK = 0xFF1D1B20.toInt()
 }

@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
@@ -93,22 +94,22 @@ class MainActivity : AppCompatActivity() {
                     LanhangTab(
                         ImageVector.vectorResource(R.drawable.ic_calendar),
                         ImageVector.vectorResource(R.drawable.ic_calendar),
-                        "课表",
+                        stringResource(R.string.tab_schedule),
                     ),
                     LanhangTab(
                         ImageVector.vectorResource(R.drawable.ic_school),
                         ImageVector.vectorResource(R.drawable.ic_school),
-                        "成绩",
+                        stringResource(R.string.tab_grades),
                     ),
                     LanhangTab(
                         ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
                         ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
-                        "工作圈",
+                        stringResource(R.string.tab_moments),
                     ),
                     LanhangTab(
                         ImageVector.vectorResource(R.drawable.ic_settings),
                         ImageVector.vectorResource(R.drawable.ic_settings),
-                        "设置",
+                        stringResource(R.string.tab_settings),
                     ),
                 )
                 // PocketDiary's host pattern: a live LayerBackdrop source and the glass
@@ -166,9 +167,9 @@ class MainActivity : AppCompatActivity() {
             }
             tabState.intValue = restored
             showToolbarMain(when (restored) {
-                TAB_MOMENTS -> "工作圈"
-                TAB_SETTINGS -> "设置"
-                TAB_GRADES -> "成绩"
+                TAB_MOMENTS -> getString(R.string.tab_moments)
+                TAB_SETTINGS -> getString(R.string.tab_settings)
+                TAB_GRADES -> getString(R.string.tab_grades)
                 else -> getString(R.string.app_name)
             })
         }
@@ -209,16 +210,16 @@ class MainActivity : AppCompatActivity() {
         when (tab) {
             TAB_GRADES -> {
                 tx.hide(s).hide(m).hide(st).show(g)
-                showToolbarMain("成绩")
+                showToolbarMain(getString(R.string.tab_grades))
             }
             TAB_MOMENTS -> {
                 tx.hide(s).hide(g).hide(st).show(m)
-                showToolbarMain("工作圈")
+                showToolbarMain(getString(R.string.tab_moments))
                 (m as? MomentsFragment)?.onTabSelected()
             }
             TAB_SETTINGS -> {
                 tx.hide(s).hide(g).hide(m).show(st)
-                showToolbarMain("设置")
+                showToolbarMain(getString(R.string.tab_settings))
             }
             else -> {
                 tx.hide(g).hide(m).hide(st).show(s)
@@ -334,17 +335,26 @@ class MainActivity : AppCompatActivity() {
             try {
                 val result = withContext(Dispatchers.IO) {
                     val ok = MiniappApi.handshake(Session.deviceId(this@MainActivity))
-                    if (!ok) return@withContext "握手失败：ldapToken=${Session.ldapToken.take(20)}…"
+                    if (!ok) {
+                        return@withContext getString(
+                            R.string.debug_handshake_failed,
+                            Session.ldapToken.take(20)
+                        )
+                    }
                     val raw = MiniappApi.getScheduleRaw(null)
-                    "握手OK，GetSchedule返回${raw.length}字符"
+                    getString(R.string.debug_handshake_ok, raw.length)
                 }
                 AlertDialog.Builder(this@MainActivity)
-                    .setTitle("课表接口调试")
+                    .setTitle(R.string.debug_schedule_title)
                     .setMessage(result)
                     .setPositiveButton("OK", null)
                     .show()
             } catch (e: Exception) {
-                android.widget.Toast.makeText(this@MainActivity, "调试失败: " + (e.message ?: e.toString()), android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.debug_failed, e.message ?: e.toString()),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }

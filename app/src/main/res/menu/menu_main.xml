@@ -4,7 +4,7 @@
 
     <item
         android:id="@+id/action_debug_schedule"
-        android:title="调试课表接口"
+        android:title="@string/menu_debug_schedule"
         app:showAsAction="never" />
 
     <item

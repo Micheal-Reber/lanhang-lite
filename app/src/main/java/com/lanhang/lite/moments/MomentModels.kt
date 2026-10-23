@@ -1,14 +1,5 @@
 package com.lanhang.lite.moments
 
-// 融云圈响应包：{code,msg,result}，成功码 20000
-data class MomentsEnvelope<T>(
-    val code: Int? = null,
-    val msg: String? = null,
-    val result: T? = null
-) {
-    val isSuccess: Boolean get() = code == 20000
-}
-
 data class AuthResult(val authorization: String? = null)
 
 // GET /timeline?from_feed_id=&size= → {feed_ids:[...]}

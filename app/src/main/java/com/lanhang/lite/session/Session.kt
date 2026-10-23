@@ -56,6 +56,11 @@ object Session {
         get() = sp.getString("themeMode", "system") ?: "system"
         set(value) = sp.edit().putString("themeMode", value).apply()
 
+    // 界面语言："system" | "zh" | "en"（默认跟随系统语言）
+    var language: String
+        get() = sp.getString("language", "system") ?: "system"
+        set(value) = sp.edit().putString("language", value).apply()
+
     var scheduleWeekAnchorAt: Long
         get() = sp.getLong("scheduleWeekAnchorAt", 0L)
         set(value) = sp.edit().putLong("scheduleWeekAnchorAt", value).apply()
@@ -63,6 +68,11 @@ object Session {
     var scheduleWeekAnchorWeek: Int
         get() = sp.getInt("scheduleWeekAnchorWeek", 0)
         set(value) = sp.edit().putInt("scheduleWeekAnchorWeek", value).apply()
+
+    /** 最近一次向上推送小部件「生成式预览」(API 35+) 的时间戳 — 本地限频用 */
+    var widgetPreviewPushedAt: Long
+        get() = sp.getLong("widgetPreviewPushedAt", 0L)
+        set(value) = sp.edit().putLong("widgetPreviewPushedAt", value).apply()
 
     val isLoggedIn: Boolean get() = token.isNotEmpty()
 

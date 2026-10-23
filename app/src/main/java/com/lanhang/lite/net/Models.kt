@@ -32,27 +32,6 @@ data class StaffInfo(
 
 data class RawTokenResponse(val code: Int? = null, val result: String? = null)
 
-data class OAWebAppBean(
-    val type1: Type1? = null,
-    val type2: Type2? = null
-) {
-    data class Type1(val apps: List<App>? = null)
-    data class Type2(val apps: List<App>? = null, val types: List<Types>? = null)
-    data class Types(val apps: List<App>? = null, val type_name: String? = null)
-    data class App(
-        val id: String? = null,
-        val name: String? = null,
-        val description: String? = null,
-        val home_page_url: String? = null,
-        val pc_home_page_url: String? = null,
-        val logo_url: String? = null,
-        val state: Int? = null,
-        val type: Int? = null
-    ) {
-        val homeUrl: String? get() = home_page_url ?: pc_home_page_url
-    }
-}
-
 // POST /staffs/batch 批量解析；官方 StaffInfo.getUserId() 返回的是 id 字段
 data class StaffBrief(
     val id: String? = null,

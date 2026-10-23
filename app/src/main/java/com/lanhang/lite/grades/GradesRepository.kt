@@ -3,6 +3,7 @@ package com.lanhang.lite.grades
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.lanhang.lite.R
 import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.net.ApiException
 import com.lanhang.lite.net.MiniappApi
@@ -45,7 +46,10 @@ object GradesRepository {
         val raw = MiniappApi.getXnxqListRaw()
         val resp = gson.fromJson(raw, XnxqListResponse::class.java)
         if (resp?.code != 0 || resp.data == null) {
-            throw ApiException(resp?.code ?: -1, resp?.msg ?: "学期列表数据异常")
+            throw ApiException(
+                resp?.code ?: -1,
+                resp?.msg ?: AppContext.instance.getString(R.string.error_grades_terms)
+            )
         }
         semestersFile.writeText(raw)
         return resp.data
@@ -69,7 +73,10 @@ object GradesRepository {
         val raw = MiniappApi.getStudentScoreRaw(term)
         val resp = gson.fromJson(raw, ScoreResponse::class.java)
         if (resp?.code != 0 || resp.data == null) {
-            throw ApiException(resp?.code ?: -1, resp?.msg ?: "成绩数据异常")
+            throw ApiException(
+                resp?.code ?: -1,
+                resp?.msg ?: AppContext.instance.getString(R.string.error_grades_scores)
+            )
         }
         scoresFile(term).writeText(raw)
         Log.d(TAG, "refreshed scores $term: ${resp.data.size} items")
@@ -79,7 +86,7 @@ object GradesRepository {
     private suspend fun ensureSession() {
         if (!hasMiniappSession()) {
             val ok = MiniappApi.handshake(Session.deviceId(AppContext.instance))
-            if (!ok) throw ApiException(-1, "登录失败，请重新登录")
+            if (!ok) throw ApiException(-1, AppContext.instance.getString(R.string.error_relogin))
         }
     }
 

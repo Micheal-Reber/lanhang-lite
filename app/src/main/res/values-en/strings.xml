@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lanhang Lite</string>
+    <string name="login_subtitle">Lightweight schedule</string>
+    <string name="username_hint">Student ID</string>
+    <string name="password_hint">Password</string>
+    <string name="login">Sign in</string>
+    <string name="tab_schedule">Schedule</string>
+    <string name="action_logout">Sign out</string>
+
+    <!-- Widgets -->
+    <string name="widget_schedule_name">Whole week</string>
+    <string name="widget_schedule_description">Show the full week by weekday and period</string>
+    <string name="widget_week_format">Week %1$d</string>
+    <!-- Compact form used when the footer pill cannot fit "Week 4" in a 2×2 layout -->
+    <string name="widget_week_compact">W%1$d</string>
+    <string name="widget_open_description">Open the Lanhang Lite schedule</string>
+    <string name="widget_empty_sync">Open the app to sync</string>
+    <string name="widget_empty_login">Open the app to sign in</string>
+    <string name="widget_empty_hint">Tap here to open the schedule</string>
+    <string name="widget_no_course_week">No classes this week</string>
+    <string name="widget_schedule_small_name">Today</string>
+    <string name="widget_schedule_small_description">Show today as class cards</string>
+    <string name="widget_today_empty">No classes today</string>
+    <string name="widget_day_empty">No classes on this day</string>
+    <string name="widget_today_done">Done for today</string>
+    <string name="widget_today_done_hint">Week %1$d · open the full schedule</string>
+    <string name="widget_today_countdown">%1$d min left</string>
+    <string name="widget_today_yesterday">Yesterday</string>
+    <string name="widget_today_tomorrow">Tomorrow</string>
+    <string name="widget_day_offset_format">%1$s d</string>
+    <string name="widget_nav_prev">Previous day</string>
+    <string name="widget_nav_next">Next day</string>
+    <string name="widget_nav_reset">Back to today</string>
+    <string name="widget_nav_reset_disabled">Already showing today</string>
+    <!-- Picker preview placeholders (layout structure only, not real data) -->
+    <string name="widget_preview_today_title">Today · Mon</string>
+    <string name="widget_preview_today_date">8/31</string>
+    <string name="widget_preview_course_name_1">Calculus A</string>
+    <string name="widget_preview_course_name_2">Physics</string>
+    <string name="widget_preview_course_name_3">Data Structures</string>
+    <string name="widget_preview_course_room_2">B203</string>
+    <string name="widget_preview_course_room_3">C305</string>
+    <string name="widget_preview_countdown">35 min left</string>
+    <string name="widget_preview_week">Week 4</string>
+
+    <!-- Settings -->
+    <string name="settings_schedule_tools">Schedule tools</string>
+    <string name="settings_export_schedule">Export schedule</string>
+    <string name="settings_export_schedule_subtitle">Save as a calendar or spreadsheet file, or share as text</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_tools_summary">Export to ICS, CSV or text</string>
+    <string name="settings_about_app">Lanhang Lite</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_account">Signed in as</string>
+    <string name="settings_app_version">App version</string>
+    <string name="settings_proto">Client ID</string>
+    <string name="settings_diagnostics">Diagnostics &amp; logs</string>
+    <string name="settings_diagnostics_subtitle">Review recent errors and share them</string>
+    <string name="settings_footer">Lanhang Lite · A third-party lightweight client for NCHU</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System default</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_zh">简体中文</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_week_empty">Week %1$d has no data</string>
+    <string name="settings_diagnostics_subject">Lanhang Lite diagnostics</string>
+    <string name="settings_diagnostics_chooser">Share diagnostics</string>
+
+    <!-- Export schedule -->
+    <string name="schedule_export_title">Export schedule</string>
+    <string name="schedule_export_message">%1$d courses · weeks %2$d–%3$d (full term)\nSave as an .ics calendar, a .csv spreadsheet, or share as text.\nThe CSV uses the term week numbers, so when importing into another app set the term start date to the Monday of week 1.</string>
+    <string name="schedule_export_ics">Save calendar file (.ics)</string>
+    <string name="schedule_export_csv">Save spreadsheet file (.csv)</string>
+    <string name="schedule_export_share">Share schedule text</string>
+    <string name="schedule_export_saved">Exported: %1$s</string>
+    <string name="schedule_export_failed">Export failed, please try again</string>
+    <string name="schedule_export_no_data">Nothing to export yet — sync the schedule first</string>
+    <string name="schedule_export_chooser">Share schedule</string>
+    <string name="schedule_export_subject">Lanhang Lite schedule</string>
+    <string name="schedule_export_sync_needed">%1$d weeks are missing. Sync them now?</string>
+    <string name="schedule_export_preparing">Preparing schedule…</string>
+    <string name="schedule_export_syncing">Syncing week %1$d\n%2$d of %3$d done</string>
+    <string name="schedule_export_cancel">Cancel</string>
+    <string name="schedule_export_start_sync">Start sync</string>
+    <string name="schedule_export_file_prefix">LanhangLite_schedule</string>
+    <string name="schedule_export_summary">Weeks %1$d–%2$d · %3$d courses</string>
+    <string name="schedule_export_week_header">Week %1$d (%2$s – %3$s)</string>
+    <string name="schedule_export_period_single">Period %1$d</string>
+    <string name="schedule_export_period_range">Periods %1$d-%2$d</string>
+
+    <!-- Schedule background -->
+    <string name="settings_schedule_background">Schedule background</string>
+    <string name="schedule_bg_title">Schedule background</string>
+    <string name="schedule_bg_back">Back</string>
+    <string name="schedule_bg_section_solid">Solid</string>
+    <string name="schedule_bg_section_gradient">Gradient</string>
+    <string name="schedule_bg_section_image">Photo</string>
+    <string name="schedule_bg_pick_image">Choose a photo</string>
+    <string name="schedule_bg_image_pending">New photo selected — tap Apply</string>
+    <string name="schedule_bg_image_in_use">Using a photo from your library</string>
+    <string name="schedule_bg_image_supported">JPG / PNG / WEBP with clear light and dark areas work best</string>
+    <string name="schedule_bg_image_failed">Couldn\'t load that photo, please try another</string>
+    <string name="schedule_bg_apply">Apply</string>
+    <string name="schedule_bg_remove">Remove background</string>
+    <string name="schedule_bg_applied">Background applied</string>
+    <string name="schedule_bg_removed">Back to the theme background</string>
+    <string name="schedule_bg_hint">Text color adapts to the background brightness and dominant hue, with a contrast-checked veil, so course names, rooms and periods stay readable on any background. The same background looks identical in light and dark themes.</string>
+    <string name="schedule_bg_tone_none">Current: following the theme palette</string>
+    <string name="schedule_bg_tone_dark_text">Adapted: light background with dark text (contrast checked)</string>
+    <string name="schedule_bg_tone_light_text">Adapted: dark background with light text (contrast checked)</string>
+    <string name="schedule_bg_follow_theme">Theme default</string>
+    <string name="schedule_bg_custom_image">Custom photo</string>
+    <string name="schedule_bg_solid_mist">Solid · Mist</string>
+    <string name="schedule_bg_solid_blue">Solid · Pale blue</string>
+    <string name="schedule_bg_solid_sand">Solid · Sand</string>
+    <string name="schedule_bg_solid_navy">Solid · Ink blue</string>
+    <string name="schedule_bg_solid_graphite">Solid · Graphite</string>
+    <string name="schedule_bg_solid_forest">Solid · Pine</string>
+    <string name="schedule_bg_grad_dawn">Gradient · Dawn</string>
+    <string name="schedule_bg_grad_sunset">Gradient · Sunset</string>
+    <string name="schedule_bg_grad_haze">Gradient · Haze</string>
+    <string name="schedule_bg_grad_deep">Gradient · Deep sea</string>
+    <string name="schedule_bg_grad_dusk">Gradient · Dusk</string>
+    <string name="schedule_bg_grad_forest">Gradient · Forest</string>
+
+    <!-- Common -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_close">Close</string>
+    <string name="common_share">Share</string>
+    <string name="common_send">Send</string>
+
+    <!-- Bottom bar / titles -->
+    <string name="tab_grades">Grades</string>
+    <string name="tab_moments">Feed</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Login -->
+    <string name="login_input_required">Enter your student ID and password</string>
+    <string name="login_no_token">Sign-in failed: no token received</string>
+    <string name="login_welcome">Welcome, %1$s</string>
+    <string name="login_failed">Sign-in failed (%1$d): %2$s</string>
+    <string name="login_network_error">Network error: %1$s</string>
+
+    <!-- Schedule -->
+    <string name="schedule_week_format">Week %1$d</string>
+    <string name="schedule_day_today">%1$s · Today</string>
+    <string name="schedule_day_no_course">No classes on %1$s</string>
+    <string name="schedule_week_no_course">No classes this week</string>
+    <string name="schedule_period_single">P%1$d</string>
+    <string name="schedule_period_range">P%1$d-%2$d</string>
+    <string name="schedule_refresh_failed">Refresh failed: %1$s</string>
+    <string name="schedule_jump_week">Jump to week</string>
+    <string name="schedule_prev_week">Previous week</string>
+    <string name="schedule_next_week">Next week</string>
+    <string name="schedule_switch_to_week">Switch to week view</string>
+    <string name="schedule_switch_to_grid">Switch to grid view</string>
+    <string name="schedule_break_noon">Lunch</string>
+    <string name="schedule_break_evening">Break</string>
+    <string name="schedule_unnamed_course">Untitled course</string>
+    <string name="schedule_week_menu_format">Week %1$d</string>
+    <plurals name="schedule_day_count">
+        <item quantity="one">%1$d class</item>
+        <item quantity="other">%1$d classes</item>
+    </plurals>
+    <string-array name="schedule_day_names">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string-array name="schedule_day_names_compact">
+        <item>Mo</item>
+        <item>Tu</item>
+        <item>We</item>
+        <item>Th</item>
+        <item>Fr</item>
+        <item>Sa</item>
+        <item>Su</item>
+    </string-array>
+
+    <!-- Course details -->
+    <string name="course_detail_title">Course details</string>
+    <string name="course_label_name">Course: </string>
+    <string name="course_label_room">Room: </string>
+    <string name="course_label_teacher">Instructor: </string>
+    <string name="course_label_week">Weeks: </string>
+    <string name="course_label_period">Periods: </string>
+    <string name="course_odd_suffix"> (odd weeks)</string>
+    <string name="course_even_suffix"> (even weeks)</string>
+    <string name="course_week_value">%1$s%2$s</string>
+    <string name="course_period_single">%1$02d</string>
+    <string name="course_period_range">%1$02d-%2$02d</string>
+
+    <!-- Grades -->
+    <string name="grades_weighted_avg">Weighted avg.</string>
+    <string name="grades_total_credits">Credits</string>
+    <string name="grades_course_count">Courses</string>
+    <string name="grades_empty">No grades this semester</string>
+    <string name="grades_credit">%1$s cr</string>
+    <string name="grades_load_failed">Load failed: %1$s</string>
+
+    <!-- Feed -->
+    <string name="moments_empty">No posts yet</string>
+    <string name="moments_network_error">Network error</string>
+    <string name="moments_load_failed">Load failed: %1$s</string>
+    <string name="moments_action_failed">Action failed: %1$s</string>
+    <string name="moments_publish_hint">Share something…</string>
+    <string name="moments_add_image">+ Add photos</string>
+    <string name="moments_publish_title">New post</string>
+    <string name="moments_publish">Post</string>
+    <string name="moments_publish_empty">Add some text or photos first</string>
+    <string name="moments_publish_too_long">Posts are limited to 2000 characters</string>
+    <string name="moments_image_hint">Up to 9 photos</string>
+    <string name="moments_image_selected">%1$d/9 selected</string>
+    <string name="moments_publish_done">Posted</string>
+    <string name="moments_publish_failed">Post failed: %1$s</string>
+    <string name="moments_comment_hint">Say something…</string>
+    <string name="moments_comment_title">Add comment</string>
+    <string name="moments_reply_title">Reply to %1$s</string>
+    <string name="moments_sent">Sent</string>
+    <string name="moments_send_failed">Failed to send: %1$s</string>
+    <string name="moments_no_deletable">No comments to delete</string>
+    <string name="moments_delete_item">Delete: %1$s</string>
+    <string name="moments_my_comments">My comments</string>
+    <string name="moments_delete_confirm">Delete this comment?</string>
+    <string name="moments_deleted">Deleted</string>
+    <string name="moments_delete_failed">Delete failed: %1$s</string>
+    <string name="moments_anonymous">User</string>
+    <string name="moments_like">Like %1$d</string>
+    <string name="moments_liked">Liked %1$d</string>
+    <string name="moments_comment_count">Comment %1$d</string>
+    <string name="moments_reply_inline">replied to</string>
+    <string name="moments_comment_separator">: </string>
+    <string name="moments_server_no_id">The server did not return a post id</string>
+    <string name="moments_cd_publish">New post</string>
+    <string name="moments_cd_like">Like</string>
+    <string name="moments_cd_comment">Comment</string>
+    <string name="moments_cd_avatar">Avatar</string>
+    <string name="moments_tag_load">Feed load</string>
+    <string name="moments_tag_publish">Feed publish</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_title">Lanhang Lite diagnostics</string>
+    <string name="diagnostics_version">Version: %1$s</string>
+    <string name="diagnostics_device">Device: %1$s</string>
+    <string name="diagnostics_time">Time: %1$s</string>
+    <string name="diagnostics_scope">Level: Warning / Error; recent local logs only</string>
+    <string name="diagnostics_app_errors">App errors:</string>
+    <string name="diagnostics_log_begin">— log start —</string>
+    <string name="diagnostics_log_end">— log end —</string>
+    <string name="diagnostics_log_failed">Could not read system logs: %1$s</string>
+    <string name="diagnostics_redacted">redacted</string>
+
+    <!-- Widget: today header -->
+    <string name="widget_today_prefix">Today · </string>
+    <string name="widget_tomorrow_prefix">Tomorrow · </string>
+    <string name="widget_yesterday_prefix">Yesterday · </string>
+    <!-- Debug menu -->
+    <string name="debug_schedule_title">Schedule API debug</string>
+    <string name="debug_handshake_failed">Handshake failed: ldapToken=%1$s…</string>
+    <string name="debug_handshake_ok">Handshake OK, GetSchedule returned %1$d chars</string>
+    <string name="debug_failed">Debug failed: %1$s</string>
+
+    <!-- Error messages -->
+    <string name="error_payload_invalid">Unexpected data: %1$s</string>
+    <string name="error_request_failed">Request failed</string>
+    <string name="error_request_failed_code">Request failed (%1$d)</string>
+    <string name="error_cookie_missing">Not signed in (no cookie)</string>
+    <string name="error_user_missing">Not signed in (no user id)</string>
+    <string name="error_auth_empty">Empty auth response</string>
+    <string name="error_auth_missing">Auth response has no authorization</string>
+    <string name="error_relogin">Session expired, please sign in again</string>
+    <string name="error_schedule_login">Schedule sign-in failed, please sign in again</string>
+    <string name="error_schedule_request">Schedule request failed</string>
+    <string name="error_grades_terms">Unexpected semester data</string>
+    <string name="error_grades_scores">Unexpected grade data</string>
+    <string name="error_image_read">Could not read the selected image</string>
+    <string name="error_image_upload_url">Server did not provide an upload URL</string>
+    <string name="error_image_access_url">Server did not provide an image URL</string>
+    <string name="error_image_token_empty">Upload token is empty</string>
+    <string name="error_image_upload_failed">Image upload failed (%1$d): %2$s</string>
+    <string name="error_image_invalid">That file is not a valid image</string>
+    <string name="error_image_decode">Could not decode the image</string>
+    <string name="error_image_too_large">Image exceeds the server size limit</string>
+    <string name="error_content_empty">Add text or at least one photo</string>
+    <string name="web_title_fallback">App</string>
+    <string name="menu_debug_schedule">Debug schedule API</string>
+
+    <!-- Layout placeholders (overwritten at runtime) -->
+    <string name="ph_course_name">Course name</string>
+    <string name="ph_lesson_meta">Instructor · Room</string>
+    <string name="ph_period">P5-6</string>
+    <string name="ph_day_name">Mon</string>
+    <string name="ph_day_count">4 classes</string>
+    <string name="ph_week">Week 1</string>
+</resources>

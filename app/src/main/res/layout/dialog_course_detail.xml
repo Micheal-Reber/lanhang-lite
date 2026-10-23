@@ -13,7 +13,7 @@
         android:layout_height="40dp"
         android:background="?attr/colorPrimary"
         android:gravity="center"
-        android:text="课程详情"
+        android:text="@string/course_detail_title"
         android:textColor="#FFFFFF"
         android:textSize="16sp"
         android:textStyle="bold" />
@@ -29,7 +29,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="课程名："
+            android:text="@string/course_label_name"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="16sp" />
 
@@ -55,7 +55,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="教室："
+            android:text="@string/course_label_room"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="16sp" />
 
@@ -81,7 +81,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="教师："
+            android:text="@string/course_label_teacher"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="16sp" />
 
@@ -107,7 +107,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="周次："
+            android:text="@string/course_label_week"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="16sp" />
 
@@ -133,7 +133,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="节次："
+            android:text="@string/course_label_period"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="16sp" />
 

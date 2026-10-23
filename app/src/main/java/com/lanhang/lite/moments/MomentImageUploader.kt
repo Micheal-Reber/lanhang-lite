@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import com.google.gson.JsonObject
+import com.lanhang.lite.R
 import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.net.RceApi
 import java.io.ByteArrayOutputStream
@@ -39,26 +40,37 @@ object MomentImageUploader {
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 sourceFile.outputStream().use { output -> input.copyTo(output) }
-            } ?: error("无法读取所选图片")
-            compress(sourceFile, imageFile, maxBytes)
+            } ?: error(context.getString(R.string.error_image_read))
+            compress(context, sourceFile, imageFile, maxBytes)
 
             val uploadUrl = config?.uploadUrls?.firstOrNull { it.isNotBlank() }
                 ?: token.server?.let { "http://$it" }
-                ?: error("服务器没有提供图片上传地址")
+                ?: error(context.getString(R.string.error_image_upload_url))
             val downloadBase = config?.downloadUrls?.firstOrNull { it.isNotBlank() }
                 ?: token.domain?.let { "http://$it" }
-                ?: error("服务器没有提供图片访问地址")
+                ?: error(context.getString(R.string.error_image_access_url))
 
             val form = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("token", token.token ?: error("图片上传令牌为空"))
+                .addFormDataPart(
+                    "token",
+                    token.token ?: error(context.getString(R.string.error_image_token_empty))
+                )
                 .addFormDataPart("key", fileName)
                 .addFormDataPart("file", fileName, imageFile.asRequestBody("image/jpeg".toMediaType()))
                 .build()
             val request = Request.Builder().url(uploadUrl).post(form).build()
             uploadHttp.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error("图片上传失败 (${response.code}): ${body.take(160)}")
+                if (!response.isSuccessful) {
+                    error(
+                        context.getString(
+                            R.string.error_image_upload_failed,
+                            response.code,
+                            body.take(160)
+                        )
+                    )
+                }
                 val uploadResult = runCatching {
                     ApiClient.gson.fromJson(body, JsonObject::class.java)?.getAsJsonObject("rc_url")
                 }.getOrNull()
@@ -77,17 +89,19 @@ object MomentImageUploader {
         }
     }
 
-    private fun compress(source: File, destination: File, maxBytes: Long) {
+    private fun compress(context: Context, source: File, destination: File, maxBytes: Long) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "所选文件不是有效图片" }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) {
+            context.getString(R.string.error_image_invalid)
+        }
         val sample = generateSequence(1) { it * 2 }
             .takeWhile { maxOf(bounds.outWidth, bounds.outHeight) / it > MAX_DIMENSION }
             .lastOrNull() ?: 1
         val bitmap = BitmapFactory.decodeFile(
             source.absolutePath,
             BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.ARGB_8888 }
-        ) ?: error("图片解码失败")
+        ) ?: error(context.getString(R.string.error_image_decode))
 
         val orientation = ExifInterface(source.absolutePath)
             .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
@@ -119,7 +133,9 @@ object MomentImageUploader {
                 }
                 val nextWidth = (current.width * 0.8f).toInt()
                 val nextHeight = (current.height * 0.8f).toInt()
-                if (minOf(nextWidth, nextHeight) < 320) error("图片超过服务器大小限制")
+                if (minOf(nextWidth, nextHeight) < 320) {
+                    error(context.getString(R.string.error_image_too_large))
+                }
                 val smaller = Bitmap.createScaledBitmap(current, nextWidth, nextHeight, true)
                 current.recycle()
                 current = smaller

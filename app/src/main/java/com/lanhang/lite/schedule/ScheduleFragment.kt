@@ -1,7 +1,7 @@
 package com.lanhang.lite.schedule
 
+import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -11,6 +11,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
@@ -20,7 +21,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.lanhang.lite.R
-import com.google.android.material.R as MaterialR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +42,13 @@ class ScheduleFragment : Fragment() {
     private lateinit var tvEmpty: TextView
     private lateinit var progress: ProgressBar
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var bgSolidLayer: View
+    private lateinit var bgImageLayer: ImageView
+    private lateinit var bgVeil: View
+    /** 当前配色令牌：无自定义背景时来自主题，有背景时来自背景分析 */
+    private lateinit var style: ScheduleStyle
+    /** 已应用的背景标识，避免每次 onResume 重复分析/重建视图 */
+    private var appliedBackdropKey: String? = null
 
     private var currentWeek = 1
     private var maxWeek = 20
@@ -73,6 +80,12 @@ class ScheduleFragment : Fragment() {
         tvEmpty = view.findViewById(R.id.tvEmpty)
         progress = view.findViewById(R.id.progress)
         swipeRefresh = view.findViewById(R.id.swipeRefresh)
+        bgSolidLayer = view.findViewById(R.id.bgSolidLayer)
+        bgImageLayer = view.findViewById(R.id.bgImageLayer)
+        bgVeil = view.findViewById(R.id.bgVeil)
+
+        style = ScheduleStyle.fromTheme(requireContext())
+        applyChromeStyle()
 
         btnPrev.setOnClickListener { switchWeek(currentWeek - 1) }
         btnNext.setOnClickListener { switchWeek(currentWeek + 1) }
@@ -82,7 +95,55 @@ class ScheduleFragment : Fragment() {
         installWeekSwipe(view.findViewById(R.id.weekScroll))
         installWeekSwipe(view.findViewById(R.id.gridScroll))
 
+        applyBackdrop()
         loadCacheOrRefresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 从「课表背景」设置返回后，背景/配色可能已变化
+        applyBackdrop()
+    }
+
+    /**
+     * 加载并应用自定义背景：图片/纯色/渐变 → 分析明暗与主色 → 生成配色令牌。
+     * 分析在 IO 线程做，主线程只负责上屏。
+     */
+    private fun applyBackdrop(force: Boolean = false) {
+        val ctx = context ?: return
+        val spec = ScheduleBackdrop.load(ctx)
+        val key = "${spec.type}|${spec.value}"
+        if (!force && key == appliedBackdropKey) return
+        appliedBackdropKey = key
+        viewLifecycleOwner.lifecycleScope.launch {
+            val analysis = withContext(Dispatchers.IO) {
+                runCatching { ScheduleBackdrop.analyze(ctx, spec) }.getOrNull()
+            }
+            val host = context ?: return@launch
+            ScheduleBackdrop.bind(host, bgSolidLayer, bgImageLayer, bgVeil, spec, analysis)
+            style = if (analysis == null) {
+                ScheduleStyle.fromTheme(host)
+            } else {
+                ScheduleStyle.fromBackdrop(analysis)
+            }
+            applyChromeStyle()
+            renderAll()
+        }
+    }
+
+    /** 顶栏、面板等「常驻视图」的配色随令牌刷新 */
+    private fun applyChromeStyle() {
+        val density = resources.displayMetrics.density
+        val iconTint = ColorStateList.valueOf(style.onBackgroundVariant)
+        for (button in arrayOf(btnPrev, btnNext, btnViewToggle)) {
+            button.background = style.circle(density, style.circleFill)
+            button.imageTintList = iconTint
+        }
+        btnCalendar.background = style.circle(density, style.circleFill)
+        btnCalendar.imageTintList = ColorStateList.valueOf(style.accent)
+        contentGrid.background = style.rounded(density, 16f, style.panelFill)
+        tvEmpty.setTextColor(style.onBackgroundVariant)
+        updateWeekPill()
     }
 
     /**
@@ -186,7 +247,11 @@ class ScheduleFragment : Fragment() {
                 updateWeekPill()
                 renderAll()
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "刷新失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.schedule_refresh_failed, e.message.orEmpty()),
+                    Toast.LENGTH_SHORT
+                ).show()
                 if (scheduleData == null) tvEmpty.visibility = View.VISIBLE
             } finally {
                 progress.visibility = View.GONE
@@ -223,28 +288,21 @@ class ScheduleFragment : Fragment() {
     }
 
     private fun updateWeekPill() {
-        tvWeekPill.text = "第 $currentWeek 周"
-        val isActual = currentWeek == actualCurrentWeek
-        val ctx = requireContext()
-        val bg = resources.getDrawable(R.drawable.bg_week_pill, null) as GradientDrawable
-        if (isActual) {
-            bg.setColor(getThemeColor(ctx, MaterialR.attr.colorSecondaryContainer))
-            tvWeekPill.setTextColor(getThemeColor(ctx, MaterialR.attr.colorOnSecondaryContainer))
+        tvWeekPill.text = getString(R.string.schedule_week_format, currentWeek)
+        val density = resources.displayMetrics.density
+        if (currentWeek == actualCurrentWeek) {
+            tvWeekPill.background = style.rounded(density, 12f, style.accentFill)
+            tvWeekPill.setTextColor(style.onAccentFill)
         } else {
-            bg.setColor(android.graphics.Color.TRANSPARENT)
-            bg.setStroke(
-                resources.displayMetrics.density.toInt(),
-                getThemeColor(ctx, MaterialR.attr.colorOutline)
-            )
-            tvWeekPill.setTextColor(getThemeColor(ctx, MaterialR.attr.colorOnSurfaceVariant))
+            tvWeekPill.background = style.rounded(density, 12f, Color.TRANSPARENT, 1f, style.outline)
+            tvWeekPill.setTextColor(style.onBackgroundVariant)
         }
-        tvWeekPill.background = bg
     }
 
     private fun showWeekPicker(anchor: View) {
         val popup = PopupMenu(requireContext(), anchor)
         for (w in startWeek..maxWeek) {
-            popup.menu.add(0, w, w, "第 $w 周")
+            popup.menu.add(0, w, w, getString(R.string.schedule_week_menu_format, w))
         }
         popup.setOnMenuItemClickListener { item ->
             switchWeek(item.itemId)
@@ -257,16 +315,17 @@ class ScheduleFragment : Fragment() {
         showingGrid = grid
         contentWeek.visibility = if (grid) View.GONE else View.VISIBLE
         contentGrid.visibility = if (grid) View.VISIBLE else View.GONE
-        // 右上角按钮显示当前视图，点击切换
-        btnViewToggle.setImageResource(if (grid) R.drawable.ic_view_grid else R.drawable.ic_view_week)
+        // 右上角按钮显示「点一下会切到哪个视图」：网格态给列表图标，列表态给网格图标
+        btnViewToggle.setImageResource(
+            if (grid) R.drawable.ic_view_week else R.drawable.ic_view_grid
+        )
+        // setImageResource 会丢掉之前设的 tint（回到 drawable 自带的黑），必须补一次，
+        // 否则切过一次视图后这颗图标就不再跟背景配色走 —— 与左侧图标不一致的根源
+        btnViewToggle.imageTintList = ColorStateList.valueOf(style.onBackgroundVariant)
+        btnViewToggle.contentDescription = getString(
+            if (grid) R.string.schedule_switch_to_week else R.string.schedule_switch_to_grid
+        )
         if (grid) renderGrid() else renderWeekView()
-    }
-
-    private fun getThemeColor(ctx: android.content.Context, attr: Int): Int {
-        val ta = ctx.theme.obtainStyledAttributes(intArrayOf(attr))
-        val c = ta.getColor(0, Color.GRAY)
-        ta.recycle()
-        return c
     }
 
     private fun renderAll() {
@@ -281,13 +340,11 @@ class ScheduleFragment : Fragment() {
         dayStrip.removeAllViews()
         daySections.removeAllViews()
 
-        val ctx = requireContext()
-        val cOnSurface = getThemeColor(ctx, MaterialR.attr.colorOnSurface)
-        val cOnSurfaceVariant = getThemeColor(ctx, MaterialR.attr.colorOnSurfaceVariant)
-        val cOnSecCont = getThemeColor(ctx, MaterialR.attr.colorOnSecondaryContainer)
+        val density = resources.displayMetrics.density
+        val s = style
 
         val today = LocalDate.now()
-        val dayNames = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+        val dayNames = resources.getStringArray(R.array.schedule_day_names)
         val monday = today.with(DayOfWeek.MONDAY)
         val offset = week - actualCurrentWeek
         val weekMonday = monday.plusWeeks(offset.toLong())
@@ -302,16 +359,27 @@ class ScheduleFragment : Fragment() {
 
             // 摘要格
             val summary = LayoutInflater.from(context).inflate(R.layout.item_day_summary, dayStrip, false)
-            summary.findViewById<TextView>(R.id.tvDayName).text = dayNames[dayIdx]
-            summary.findViewById<TextView>(R.id.tvCount).text = "${courses.size} 门"
-            if (isToday) summary.isSelected = true
+            summary.background = s.rounded(density, 12f, if (isToday) s.accentFill else s.chipFill)
+            summary.findViewById<TextView>(R.id.tvDayName).apply {
+                text = dayNames[dayIdx]
+                setTextColor(if (isToday) s.onAccentFill else s.onBackground)
+            }
+            summary.findViewById<TextView>(R.id.tvCount).apply {
+                text = resources.getQuantityString(
+                    R.plurals.schedule_day_count,
+                    courses.size,
+                    courses.size
+                )
+                background = s.rounded(density, 50f, s.badgeFill(isToday))
+                setTextColor(if (isToday) s.onAccentFill else s.onBackgroundVariant)
+            }
 
             val preview = summary.findViewById<LinearLayout>(R.id.coursePreview)
             courses.take(5).forEach { ci ->
                 val tv = TextView(context).apply {
                     text = ci.course.name ?: ""
                     textSize = 9f
-                    setTextColor(if (isToday) cOnSecCont else cOnSurfaceVariant)
+                    setTextColor(if (isToday) s.onAccentFill else s.onBackgroundVariant)
                     maxLines = 2
                     setPadding(0, 1, 0, 1)
                 }
@@ -321,15 +389,21 @@ class ScheduleFragment : Fragment() {
 
             // 课程区
             val section = LayoutInflater.from(requireContext()).inflate(R.layout.item_day_section, daySections, false)
+            section.background = s.rounded(density, 16f, s.cardFill)
             val header = section.findViewById<TextView>(R.id.tvDayHeader)
-            header.text = if (isToday) "${dayNames[dayIdx]} · 今天" else dayNames[dayIdx]
+            header.text = if (isToday) {
+                getString(R.string.schedule_day_today, dayNames[dayIdx])
+            } else {
+                dayNames[dayIdx]
+            }
+            header.setTextColor(if (isToday) s.accent else s.onBackground)
             val container = section.findViewById<LinearLayout>(R.id.lessonContainer)
 
             if (courses.isEmpty()) {
                 val tv = TextView(context).apply {
-                    text = "${dayNames[dayIdx]}没有课程"
+                    text = getString(R.string.schedule_day_no_course, dayNames[dayIdx])
                     textSize = 12f
-                    setTextColor(cOnSurfaceVariant)
+                    setTextColor(s.onBackgroundVariant)
                 }
                 container.addView(tv)
             } else {
@@ -341,53 +415,66 @@ class ScheduleFragment : Fragment() {
             daySections.addView(section)
         }
 
+        tvEmpty.setTextColor(s.onBackgroundVariant)
         tvEmpty.visibility = if (totalCourses == 0) View.VISIBLE else View.GONE
     }
 
-    private fun addLessonRow(parent: LinearLayout, ci: ScheduleAdapter.CourseItem) {
+    private fun addLessonRow(parent: LinearLayout, ci: CourseItem) {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_lesson_row, parent, false)
-        val bg = GradientDrawable().apply {
-            cornerRadius = 12f * resources.displayMetrics.density
-            setColor(courseColor(ci.course.name ?: "?"))
-        }
-        view.background = bg
+        val color = courseColor(ci.course.name ?: "?")
+        view.background = style.rounded(resources.displayMetrics.density, 12f, color)
+        val textColor = style.onCourse(color)
 
-        val periodLabel = if (ci.periodStart == ci.periodEnd) "${ci.periodStart}节" else "${ci.periodStart}-${ci.periodEnd}节"
-        view.findViewById<TextView>(R.id.tvTimeLabel).text = periodLabel
-        view.findViewById<TextView>(R.id.tvName).text = ci.course.name ?: ""
-        view.findViewById<TextView>(R.id.tvMeta).text = "${ci.course.teacher ?: ""} · ${ci.course.room ?: ""}"
+        val periodLabel = if (ci.periodStart == ci.periodEnd) {
+            getString(R.string.schedule_period_single, ci.periodStart)
+        } else {
+            getString(R.string.schedule_period_range, ci.periodStart, ci.periodEnd)
+        }
+        view.findViewById<TextView>(R.id.tvTimeLabel).apply {
+            text = periodLabel
+            setTextColor(textColor)
+        }
+        view.findViewById<TextView>(R.id.tvName).apply {
+            text = ci.course.name ?: ""
+            setTextColor(textColor)
+        }
+        view.findViewById<TextView>(R.id.tvMeta).apply {
+            text = "${ci.course.teacher ?: ""} · ${ci.course.room ?: ""}"
+            setTextColor(textColor)
+        }
 
         view.setOnClickListener { showCourseDetail(ci) }
         parent.addView(view)
     }
 
     /** 课程详情弹窗（参考官方：标题条 + 标签/值行），标题条用该课程的颜色 */
-    private fun showCourseDetail(ci: ScheduleAdapter.CourseItem) {
+    private fun showCourseDetail(ci: CourseItem) {
         val v = layoutInflater.inflate(R.layout.dialog_course_detail, null, false)
         val courseBg = courseColor(ci.course.name ?: "?")
         v.findViewById<TextView>(R.id.tvDetailTitle).apply {
             setBackgroundColor(courseBg)
-            val hsv = FloatArray(3)
-            Color.colorToHSV(courseBg, hsv)
-            setTextColor(if (hsv[2] >= 0.65f) Color.parseColor("#1D1B20") else Color.WHITE)
+            setTextColor(style.onCourse(courseBg))
         }
         fun row(id: Int, text: String) {
             v.findViewById<TextView>(id).text = text
         }
         val odd = when (ci.course.oddEven) {
-            "1" -> "（单周）"
-            "2" -> "（双周）"
+            "1" -> getString(R.string.course_odd_suffix)
+            "2" -> getString(R.string.course_even_suffix)
             else -> ""
         }
         val week = ci.course.weekRange?.takeIf { it.isNotBlank() }
         row(R.id.tvCName, ci.course.name?.takeIf { it.isNotBlank() } ?: "—")
         row(R.id.tvCRoom, ci.course.room?.takeIf { it.isNotBlank() } ?: "—")
         row(R.id.tvCTeacher, ci.course.teacher?.takeIf { it.isNotBlank() } ?: "—")
-        row(R.id.tvCWeek, week?.let { "$it 周$odd" } ?: "—")
+        row(R.id.tvCWeek, week?.let { getString(R.string.course_week_value, it, odd) } ?: "—")
         row(
             R.id.tvCPeriod,
-            if (ci.periodStart == ci.periodEnd) "%02d 节".format(ci.periodStart)
-            else "%02d-%02d 节".format(ci.periodStart, ci.periodEnd)
+            if (ci.periodStart == ci.periodEnd) {
+                getString(R.string.course_period_single, ci.periodStart)
+            } else {
+                getString(R.string.course_period_range, ci.periodStart, ci.periodEnd)
+            }
         )
 
         val dialog = android.app.Dialog(requireContext())
@@ -412,15 +499,10 @@ class ScheduleFragment : Fragment() {
         container.removeAllViews()
 
         val ctx = requireContext()
-        val cOnSurface = getThemeColor(ctx, MaterialR.attr.colorOnSurface)
-        val cOnSurfaceVariant = getThemeColor(ctx, MaterialR.attr.colorOnSurfaceVariant)
-        val cOnSecCont = getThemeColor(ctx, MaterialR.attr.colorOnSecondaryContainer)
-        val cSecCont = getThemeColor(ctx, MaterialR.attr.colorSecondaryContainer)
-        val cSurfaceCont = getThemeColor(ctx, MaterialR.attr.colorSurfaceContainer)
-        val cOutline = getThemeColor(ctx, MaterialR.attr.colorOutline)
-        val cDivider = (cOutline and 0x00FFFFFF) or 0x33000000
+        val density = resources.displayMetrics.density
+        val s = style
         val today = LocalDate.now()
-        val dayNames = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+        val dayNames = resources.getStringArray(R.array.schedule_day_names)
         val monday = today.with(DayOfWeek.MONDAY)
         val weekMonday = monday.plusWeeks((currentWeek - actualCurrentWeek).toLong())
 
@@ -429,8 +511,8 @@ class ScheduleFragment : Fragment() {
         val maxPeriod = dayCourses.maxOf { list -> list.maxOfOrNull { it.periodEnd } ?: 0 }
         if (maxPeriod == 0) {
             container.addView(TextView(ctx).apply {
-                text = "本周无课"
-                setTextColor(cOnSurfaceVariant)
+                text = getString(R.string.schedule_week_no_course)
+                setTextColor(s.onBackgroundVariant)
                 gravity = Gravity.CENTER
                 setPadding(0, 64, 0, 0)
             })
@@ -451,7 +533,10 @@ class ScheduleFragment : Fragment() {
         val timeW = dp(46)
         val colW = ((screenW - timeW - gapW * (7 + 1)) / 7f).toInt().coerceAtLeast(dp(30))
         val bandH = dp(22)
-        val breaksAfter = mapOf(4 to "午休", 8 to "晚休")
+        val breaksAfter = mapOf(
+            4 to getString(R.string.schedule_break_noon),
+            8 to getString(R.string.schedule_break_evening)
+        )
         fun breaksBefore(p: Int): Int = breaksAfter.keys.count { it < p }
         fun yTopOfRow(p: Int): Int = (p - 1) * (rowH + gapH) + breaksBefore(p) * bandH
 
@@ -473,17 +558,14 @@ class ScheduleFragment : Fragment() {
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(colW, dp(48)).apply { marginEnd = gapW }
                 if (isToday) {
-                    background = GradientDrawable().apply {
-                        cornerRadius = 10f * resources.displayMetrics.density
-                        setColor(cSecCont)
-                    }
+                    background = s.rounded(density, 10f, s.accentFill)
                 }
             }
             head.addView(TextView(ctx).apply {
                 text = dayNames[d]
                 textSize = 13f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(if (isToday) cOnSecCont else cOnSurface)
+                setTextColor(if (isToday) s.onAccentFill else s.onBackground)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -492,7 +574,7 @@ class ScheduleFragment : Fragment() {
             head.addView(TextView(ctx).apply {
                 text = String.format("%d/%d", date.monthValue, date.dayOfMonth)
                 textSize = 9f
-                setTextColor(if (isToday) cOnSecCont else cOnSurfaceVariant)
+                setTextColor(if (isToday) s.onAccentFill else s.onBackgroundVariant)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -526,7 +608,7 @@ class ScheduleFragment : Fragment() {
                 text = "$p"
                 textSize = 14f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(cOnSurface)
+                setTextColor(s.onBackground)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -537,7 +619,7 @@ class ScheduleFragment : Fragment() {
                 cell.addView(TextView(ctx).apply {
                     text = t
                     textSize = 8f
-                    setTextColor(cOnSurfaceVariant)
+                    setTextColor(s.onBackgroundVariant)
                     gravity = Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -550,7 +632,7 @@ class ScheduleFragment : Fragment() {
                 timeCol.addView(TextView(ctx).apply {
                     text = label
                     textSize = 10f
-                    setTextColor(cOnSurfaceVariant)
+                    setTextColor(s.onBackgroundVariant)
                     gravity = Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(timeW + gapW, bandH)
                 })
@@ -568,7 +650,7 @@ class ScheduleFragment : Fragment() {
         for (p in 1 until maxPeriod) {
             if (breaksAfter.containsKey(p)) continue
             val divider = View(ctx)
-            divider.setBackgroundColor(cDivider)
+            divider.setBackgroundColor(s.divider)
             val dlp = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(1))
             dlp.topMargin = yTopOfRow(p) + rowH + gapH / 2
             blockArea.addView(divider, dlp)
@@ -577,7 +659,7 @@ class ScheduleFragment : Fragment() {
         // 纵向网格线
         for (d in 1..6) {
             val divider = View(ctx)
-            divider.setBackgroundColor(cDivider)
+            divider.setBackgroundColor(s.divider)
             val dlp = FrameLayout.LayoutParams(dp(1), FrameLayout.LayoutParams.MATCH_PARENT)
             dlp.leftMargin = d * (colW + gapW) - gapW / 2
             blockArea.addView(divider, dlp)
@@ -589,9 +671,9 @@ class ScheduleFragment : Fragment() {
             val band = TextView(ctx).apply {
                 text = label
                 textSize = 10f
-                setTextColor(cOnSurfaceVariant)
+                setTextColor(s.onBackgroundVariant)
                 gravity = Gravity.CENTER
-                setBackgroundColor(cSurfaceCont)
+                background = s.rounded(density, 6f, s.bandFill)
             }
             val blp = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, bandH)
             blp.topMargin = k * (rowH + gapH) + breaksBefore(k) * bandH
@@ -599,23 +681,21 @@ class ScheduleFragment : Fragment() {
         }
 
         // 课程块
-        for (d in 0 until 7) {
-            dayCourses[d].forEach { ci ->
-                val startIdx = ci.periodStart - 1
+        for (d0 in 0 until 7) {
+            dayCourses[d0].forEach { ci ->
                 val span = ci.periodEnd - ci.periodStart + 1
+                val blockColor = courseColor(ci.course.name ?: "?")
+                val blockText = style.onCourse(blockColor)
                 val block = LinearLayout(ctx).apply {
                     orientation = LinearLayout.VERTICAL
                     setPadding(dp(3), dp(3), dp(3), dp(3))
-                    background = GradientDrawable().apply {
-                        cornerRadius = 10f * resources.displayMetrics.density
-                        setColor(courseColor(ci.course.name ?: "?"))
-                    }
+                    background = s.rounded(density, 10f, blockColor)
                 }
                 block.addView(TextView(ctx).apply {
                     text = ci.course.name ?: ""
                     textSize = 10f
                     setTypeface(null, android.graphics.Typeface.BOLD)
-                    setTextColor(Color.WHITE)
+                    setTextColor(blockText)
                     gravity = Gravity.CENTER
                     maxLines = 6
                     layoutParams = LinearLayout.LayoutParams(
@@ -627,7 +707,7 @@ class ScheduleFragment : Fragment() {
                     block.addView(TextView(ctx).apply {
                         text = room
                         textSize = 9f
-                        setTextColor(Color.WHITE)
+                        setTextColor(blockText)
                         alpha = 0.92f
                         gravity = Gravity.CENTER
                         maxLines = 2
@@ -637,7 +717,7 @@ class ScheduleFragment : Fragment() {
                     })
                 }
                 val lp = FrameLayout.LayoutParams(colW, span * (rowH + gapH) - gapH)
-                lp.leftMargin = d * (colW + gapW)
+                lp.leftMargin = d0 * (colW + gapW)
                 lp.topMargin = yTopOfRow(ci.periodStart)
                 block.setOnClickListener { showCourseDetail(ci) }
                 blockArea.addView(block, lp)
@@ -649,26 +729,26 @@ class ScheduleFragment : Fragment() {
 
     // ==================== 数据处理 ====================
 
-    private fun getCoursesForDay(data: ScheduleData, dayIdx: Int, week: Int): List<ScheduleAdapter.CourseItem> {
+    private fun getCoursesForDay(data: ScheduleData, dayIdx: Int, week: Int): List<CourseItem> {
         val dayNames = listOf("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
         val targetName = dayNames.getOrNull(dayIdx) ?: return emptyList()
         val day = data.schedule?.find { it.dayName == targetName } ?: return emptyList()
 
-        val result = mutableListOf<ScheduleAdapter.CourseItem>()
+        val result = mutableListOf<CourseItem>()
         day.periods?.forEach { period ->
             val periodNum = period.periodName?.trim()?.toIntOrNull() ?: return@forEach
             period.courses?.forEach { course ->
                 if (course.isWeekValid(week) && course.isOddEvenValid(week)) {
-                    result.add(ScheduleAdapter.CourseItem(course, periodNum, periodNum))
+                    result.add(CourseItem(course, periodNum, periodNum))
                 }
             }
         }
         return result.sortedBy { it.periodStart }
     }
 
-    private fun mergeCourses(courses: List<ScheduleAdapter.CourseItem>): List<ScheduleAdapter.CourseItem> {
+    private fun mergeCourses(courses: List<CourseItem>): List<CourseItem> {
         if (courses.size <= 1) return courses
-        val result = mutableListOf<ScheduleAdapter.CourseItem>()
+        val result = mutableListOf<CourseItem>()
         var cur = courses[0]
         for (i in 1 until courses.size) {
             val next = courses[i]
@@ -689,12 +769,10 @@ class ScheduleFragment : Fragment() {
 
     // ==================== 配色 ====================
 
-    // 黄金角色相分布：同课同色，不同课色相差 ~137°，区分度最大
+    // 黄金角色相分布：同课同色，不同课色相差 ~137°，区分度最大（算法见 ScheduleStyle）
     private fun courseColor(courseName: String): Int {
         courseColorMap[courseName]?.let { return it }
-        val hue = ((courseName.hashCode() * 137.508f % 360f) + 360f) % 360f
-        // 高饱和+中等明度，白字清晰
-        val color = Color.HSVToColor(floatArrayOf(hue, 0.72f, 0.82f))
+        val color = ScheduleStyle.courseColor(courseName)
         courseColorMap[courseName] = color
         return color
     }

@@ -6,6 +6,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityOaWebviewBinding
 import com.lanhang.lite.session.Session
 
@@ -48,7 +49,7 @@ class OaWebViewActivity : AppCompatActivity() {
             finish()
             return
         }
-        title = intent.getStringExtra(EXTRA_TITLE) ?: "应用"
+        title = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.web_title_fallback)
 
         val settings = binding.webView.settings
         settings.javaScriptEnabled = true

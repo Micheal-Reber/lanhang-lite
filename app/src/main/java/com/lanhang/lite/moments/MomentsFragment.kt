@@ -29,6 +29,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.lanhang.lite.R
 import com.lanhang.lite.databinding.FragmentMomentsBinding
 import com.lanhang.lite.net.ApiException
 import com.lanhang.lite.net.MomentsApi
@@ -133,6 +134,7 @@ class MomentsFragment : Fragment() {
     private fun setupGlassFab() {
         val fab = binding.fabPublish
         val source = binding.swipe
+        val publishLabel = getString(R.string.moments_cd_publish)
         val night = (resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         fab.setContent {
@@ -161,7 +163,7 @@ class MomentsFragment : Fragment() {
                     }
                     LiquidGlassFab(
                         backdrop = backdrop,
-                        contentDescription = "发表动态",
+                        contentDescription = publishLabel,
                         onClick = { showPublishDialog() },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -199,22 +201,22 @@ class MomentsFragment : Fragment() {
                 adapter.append(items)
                 binding.fabPublish.invalidate()
                 binding.tvEmpty.isVisible = adapter.itemCount == 0
-                if (adapter.itemCount == 0) binding.tvEmpty.text = "暂无动态"
+                if (adapter.itemCount == 0) binding.tvEmpty.text = getString(R.string.moments_empty)
             } catch (e: ApiException) {
-                Diagnostics.record(requireContext(), "工作圈加载", e)
+                Diagnostics.record(requireContext(), getString(R.string.moments_tag_load), e)
                 if (reset && adapter.itemCount == 0) {
                     binding.tvEmpty.isVisible = true
-                    binding.tvEmpty.text = "加载失败：${e.message}"
+                    binding.tvEmpty.text = getString(R.string.moments_load_failed, e.message.orEmpty())
                 } else {
-                    toast("加载失败：${e.message}")
+                    toast(getString(R.string.moments_load_failed, e.message.orEmpty()))
                 }
             } catch (e: Exception) {
-                Diagnostics.record(requireContext(), "工作圈加载", e)
+                Diagnostics.record(requireContext(), getString(R.string.moments_tag_load), e)
                 if (reset && adapter.itemCount == 0) {
                     binding.tvEmpty.isVisible = true
-                    binding.tvEmpty.text = "网络异常"
+                    binding.tvEmpty.text = getString(R.string.moments_network_error)
                 } else {
-                    toast("网络异常")
+                    toast(getString(R.string.moments_network_error))
                 }
             }
             loading = false
@@ -246,7 +248,7 @@ class MomentsFragment : Fragment() {
                 adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
                 binding.fabPublish.invalidate()
             } catch (e: Exception) {
-                toast("操作失败：${e.message}")
+                toast(getString(R.string.moments_action_failed, e.message.orEmpty()))
             }
         }
     }
@@ -254,7 +256,7 @@ class MomentsFragment : Fragment() {
     private fun showPublishDialog() {
         selectedImages.clear()
         val input = EditText(requireContext()).apply {
-            hint = "分享点什么…"
+            hint = getString(R.string.moments_publish_hint)
             setPadding(48, 32, 48, 16)
             minLines = 4
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
@@ -278,7 +280,7 @@ class MomentsFragment : Fragment() {
         publishImagesRow = imageRow
         publishImageCount = imageCount
         val addImages = TextView(requireContext()).apply {
-            text = "+ 添加图片"
+            text = getString(R.string.moments_add_image)
             textSize = 14f
             setTextColor(requireContext().getColor(com.lanhang.lite.R.color.primary))
             setPadding(16, 12, 16, 12)
@@ -294,21 +296,21 @@ class MomentsFragment : Fragment() {
             addView(addImages, LinearLayout.LayoutParams(-1, -2))
         }
         val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle("发表动态")
+            .setTitle(R.string.moments_publish_title)
             .setView(content)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("发表", null)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.moments_publish, null)
             .create()
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val text = input.text.toString().trim()
                 val images = selectedImages.toList()
                 if (text.isEmpty() && images.isEmpty()) {
-                    toast("请填写内容或选择图片")
+                    toast(getString(R.string.moments_publish_empty))
                     return@setOnClickListener
                 }
                 if (text.length > 2000) {
-                    toast("内容不能超过 2000 字")
+                    toast(getString(R.string.moments_publish_too_long))
                     return@setOnClickListener
                 }
                 dialog.dismiss()
@@ -344,7 +346,11 @@ class MomentsFragment : Fragment() {
             tile.addView(remove, FrameLayout.LayoutParams(24.dp, 24.dp, android.view.Gravity.TOP or android.view.Gravity.END))
             row.addView(tile)
         }
-        publishImageCount?.text = if (selectedImages.isEmpty()) "最多选择 9 张图片" else "已选择 ${selectedImages.size}/9 张"
+        publishImageCount?.text = if (selectedImages.isEmpty()) {
+            getString(R.string.moments_image_hint)
+        } else {
+            getString(R.string.moments_image_selected, selectedImages.size)
+        }
     }
 
     private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
@@ -358,14 +364,16 @@ class MomentsFragment : Fragment() {
                 val appContext = requireContext().applicationContext
                 withContext(Dispatchers.IO) {
                     val media = images.map { MomentImageUploader.upload(appContext, it) }
-                    check(MomentsApi.publishFeed(text, media) != null) { "服务器未返回动态编号" }
+                    check(MomentsApi.publishFeed(text, media) != null) {
+                        getString(R.string.moments_server_no_id)
+                    }
                 }
                 selectedImages.clear()
-                toast("已发表")
+                toast(getString(R.string.moments_publish_done))
                 load(reset = true)
             } catch (e: Exception) {
-                Diagnostics.record(requireContext(), "工作圈发表", e)
-                toast("发表失败：${e.message}")
+                Diagnostics.record(requireContext(), getString(R.string.moments_tag_publish), e)
+                toast(getString(R.string.moments_publish_failed, e.message.orEmpty()))
             } finally {
                 publishImagesRow = null
                 publishImageCount = null
@@ -378,17 +386,17 @@ class MomentsFragment : Fragment() {
     private fun askComment(item: MomentItem, replyToUserId: String? = null) {
         val feedId = item.feed.feed_id ?: return
         val input = EditText(requireContext()).apply {
-            hint = "说点什么…"
+            hint = getString(R.string.moments_comment_hint)
             setPadding(48, 32, 48, 16)
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(
-                if (replyToUserId.isNullOrEmpty()) "发表评论"
-                else "回复 ${UserInfoCache.nameOf(replyToUserId)}"
+                if (replyToUserId.isNullOrEmpty()) getString(R.string.moments_comment_title)
+                else getString(R.string.moments_reply_title, UserInfoCache.nameOf(replyToUserId))
             )
             .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("发送") { _, _ ->
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.common_send) { _, _ ->
                 val text = input.text.toString().trim()
                 if (text.isEmpty()) return@setPositiveButton
                 viewLifecycleOwner.lifecycleScope.launch {
@@ -407,9 +415,9 @@ class MomentsFragment : Fragment() {
                         }
                         adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
                 binding.fabPublish.invalidate()
-                        toast("已发送")
+                        toast(getString(R.string.moments_sent))
                     } catch (e: Exception) {
-                        toast("发送失败：${e.message}")
+                        toast(getString(R.string.moments_send_failed, e.message.orEmpty()))
                     }
                 }
             }
@@ -422,22 +430,24 @@ class MomentsFragment : Fragment() {
             it.user_id == Session.userId && !it.comment_id.isNullOrEmpty()
         }
         if (mine.isEmpty()) {
-            toast("没有可删除的评论")
+            toast(getString(R.string.moments_no_deletable))
             return
         }
-        val labels = mine.map { "删除：${it.content.orEmpty().take(40)}" }.toTypedArray()
+        val labels = mine.map {
+            getString(R.string.moments_delete_item, it.content.orEmpty().take(40))
+        }.toTypedArray()
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("我的评论")
+            .setTitle(R.string.moments_my_comments)
             .setItems(labels) { _, which -> confirmDeleteComment(item, mine[which]) }
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.common_cancel, null)
             .show()
     }
 
     private fun confirmDeleteComment(item: MomentItem, comment: CommentEntry) {
         MaterialAlertDialogBuilder(requireContext())
-            .setMessage("删除这条评论？")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("删除") { _, _ ->
+            .setMessage(R.string.moments_delete_confirm)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.common_delete) { _, _ ->
                 val feedId = item.feed.feed_id ?: return@setPositiveButton
                 val cid = comment.comment_id ?: return@setPositiveButton
                 viewLifecycleOwner.lifecycleScope.launch {
@@ -446,9 +456,9 @@ class MomentsFragment : Fragment() {
                         item.comments.removeIf { it.comment_id == cid }
                         adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
                 binding.fabPublish.invalidate()
-                        toast("已删除")
+                        toast(getString(R.string.moments_deleted))
                     } catch (e: Exception) {
-                        toast("删除失败：${e.message}")
+                        toast(getString(R.string.moments_delete_failed, e.message.orEmpty()))
                     }
                 }
             }

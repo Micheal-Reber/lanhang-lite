@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityLoginBinding
 import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.net.ApiException
@@ -37,7 +38,7 @@ class LoginActivity : AppCompatActivity() {
         val username = binding.usernameInput.text?.toString()?.trim().orEmpty()
         val password = binding.passwordInput.text?.toString().orEmpty()
         if (username.isEmpty() || password.isEmpty()) {
-            toast("请输入学号和密码")
+            toast(getString(R.string.login_input_required))
             return
         }
         binding.loginButton.isEnabled = false
@@ -56,9 +57,9 @@ class LoginActivity : AppCompatActivity() {
                     login
                 }
                 if (Session.token.isEmpty()) {
-                    toast("登录失败：未获得 token")
+                    toast(getString(R.string.login_no_token))
                 } else {
-                    toast("欢迎，${Session.name.ifEmpty { username }}")
+                    toast(getString(R.string.login_welcome, Session.name.ifEmpty { username }))
                     // 登录后自动导入课表
                     withContext(Dispatchers.IO) {
                         runCatching {
@@ -69,9 +70,9 @@ class LoginActivity : AppCompatActivity() {
                     goMain()
                 }
             } catch (e: ApiException) {
-                toast("登录失败(${e.code}): ${e.message}")
+                toast(getString(R.string.login_failed, e.code, e.message.orEmpty()))
             } catch (e: Exception) {
-                toast("网络异常: ${e.message}")
+                toast(getString(R.string.login_network_error, e.message.orEmpty()))
             } finally {
                 binding.loginButton.isEnabled = true
             }
