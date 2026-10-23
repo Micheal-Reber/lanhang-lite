@@ -55,7 +55,15 @@ class SettingsFragment : Fragment() {
         val payload = pendingExport
         pendingExport = null
         if (uri == null || payload == null) return@registerForActivityResult
-        saveIcs(uri, payload)
+        saveDocument(uri, payload.ics.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.ics")
+    }
+    private val createCsvDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val payload = pendingExport
+        pendingExport = null
+        if (uri == null || payload == null) return@registerForActivityResult
+        saveDocument(uri, payload.csv.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.csv")
     }
 
     override fun onCreateView(
@@ -182,15 +190,20 @@ class SettingsFragment : Fragment() {
             .setItems(
                 arrayOf(
                     getString(R.string.schedule_export_ics),
+                    getString(R.string.schedule_export_csv),
                     getString(R.string.schedule_export_share)
                 )
             ) { _, which ->
                 when (which) {
                     0 -> {
                         pendingExport = payload
-                        createIcsDocument.launch(payload.fileName)
+                        createIcsDocument.launch("${payload.baseFileName}.ics")
                     }
-                    1 -> shareSchedule(payload.text)
+                    1 -> {
+                        pendingExport = payload
+                        createCsvDocument.launch("${payload.baseFileName}.csv")
+                    }
+                    2 -> shareSchedule(payload.text)
                 }
             }
             .setNegativeButton(R.string.schedule_export_cancel, null)
@@ -261,7 +274,7 @@ class SettingsFragment : Fragment() {
         val text: TextView
     )
 
-    private fun saveIcs(uri: Uri, payload: ScheduleExporter.ExportPayload) {
+    private fun saveDocument(uri: Uri, bytes: ByteArray, displayName: String) {
         val ctx = context ?: return
         lifecycleScope.launch {
             val success = withContext(Dispatchers.IO) {
@@ -269,12 +282,12 @@ class SettingsFragment : Fragment() {
                     val output = ctx.contentResolver.openOutputStream(uri)
                         ?: error("open output stream failed")
                     output.use { stream ->
-                        stream.write(payload.ics.toByteArray(Charsets.UTF_8))
+                        stream.write(bytes)
                     }
                 }.isSuccess
             }
             val message = if (success) {
-                ctx.getString(R.string.schedule_export_saved, payload.fileName)
+                ctx.getString(R.string.schedule_export_saved, displayName)
             } else {
                 ctx.getString(R.string.schedule_export_failed)
             }

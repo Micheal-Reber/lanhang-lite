@@ -5,15 +5,6 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.School
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -83,17 +76,34 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 液态玻璃底栏：照抄 PocketDiary LiquidGlassBottomBar（Compose + backdrop 库）
-        val tabs = listOf(
-            LanhangTab(Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth, "课表"),
-            LanhangTab(Icons.Filled.School, Icons.Outlined.School, "成绩"),
-            LanhangTab(Icons.Filled.Forum, Icons.Outlined.Forum, "工作圈"),
-            LanhangTab(Icons.Filled.Settings, Icons.Outlined.Settings, "设置"),
-        )
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         binding.bottomNav.setContent {
             LanhangTheme(darkTheme = night) {
+                // 本地矢量图替代 material-icons-extended（vectorResource 是 @Composable，须在 setContent 内）
+                val tabs = listOf(
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_calendar),
+                        ImageVector.vectorResource(R.drawable.ic_calendar),
+                        "课表",
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_school),
+                        ImageVector.vectorResource(R.drawable.ic_school),
+                        "成绩",
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
+                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
+                        "工作圈",
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_settings),
+                        ImageVector.vectorResource(R.drawable.ic_settings),
+                        "设置",
+                    ),
+                )
                 // PocketDiary's host pattern: a live LayerBackdrop source and the glass
                 // bar share one Compose drawing layer. Draw the visible native fragment
                 // directly at its window-relative position instead of passing stale bitmaps.

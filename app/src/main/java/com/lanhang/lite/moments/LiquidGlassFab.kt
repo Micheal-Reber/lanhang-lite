@@ -7,8 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -21,6 +19,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
@@ -88,7 +88,7 @@ fun LiquidGlassFab(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Rounded.Add,
+            ImageVector.vectorResource(com.lanhang.lite.R.drawable.ic_add),
             contentDescription = contentDescription,
             tint = iconColor,
             modifier = Modifier.size(26.dp),

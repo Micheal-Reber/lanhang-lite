@@ -1,7 +1,7 @@
 # AGENTS.md — 蓝航Lite（com.lanhang.lite）
 
 南昌航空大学官方 App「蓝航」（`cn.edu.nchu.nahang`，UA 标识 `NchuApp/1.0.14`）的第三方轻量客户端。
-功能范围：账号登录 + 课表原生渲染（周视图/网格）+ 成绩（学期切换/统计）+ 工作圈（融云圈动态）+ 设置（亮/暗/跟随系统主题）；底栏四 Tab（课表/成绩/工作圈/设置）。不做 OA 应用列表、IM。
+功能范围：账号登录 + 课表原生渲染（周视图/网格）+ 成绩（学期切换/统计）+ 工作圈（融云圈动态）+ 设置（亮/暗/跟随系统主题、课表导出 .ics/.csv/分享）；底栏四 Tab（课表/成绩/工作圈/设置）。不做 OA 应用列表、IM。
 （成绩曾被用户移除，2026-10-21 应用户要求加回。）
 
 ---
@@ -141,7 +141,7 @@ moments/
   ZoomImageView.kt          自写可缩放图（捏合/双击1x↔2.5x/放大后拖动，MATRIX+clamp）
   ImagePreviewActivity.kt   应用内图片预览（ViewPager2 多图滑动+顶部计数+单击关闭，黑底 Fullscreen 主题）
 settings/
-  SettingsFragment.kt       主题模式三选一（亮色/暗色/跟随系统，胶囊样式同成绩页）+ 关于卡；内部调 AppCompatDelegate.setDefaultNightMode
+  SettingsFragment.kt       主题模式三选一（亮色/暗色/跟随系统，胶囊样式同成绩页）+ 课表工具（导出 .ics/.csv/分享文本，见 ScheduleExporter）+ 诊断 + 关于卡；内部调 AppCompatDelegate.setDefaultNightMode
 ui/
   LoginActivity.kt          登录 → 自动 handshake + refresh 导入课表
   MainActivity.kt           Toolbar + 底栏四 Tab（switchTab hide/show）；菜单：调试导出/退出登录
@@ -161,14 +161,14 @@ ui/
 ## 4. 构建与调试
 
 ### 环境（本机固定路径）
-- Gradle：`E:\dev\gradle\gradle-8.9\bin\gradle.bat`（**项目内 gradlew.bat 已丢失，必须绝对路径调用**）
+- Gradle：`E:\dev\gradle\gradle-8.14.3\bin\gradle.bat`（**项目内 gradlew.bat 已丢失，必须绝对路径调用**；AGP 8.13 要求 Gradle ≥8.13，8.9 不够用）
 - JDK17：`E:\dev\jdk-17`，Android SDK：`E:\dev\android-sdk`，adb：`E:\dev\android-sdk\platform-tools\adb.exe`
-- AGP 8.5.2 / Kotlin 1.9.24 / compileSdk 35 / minSdk 26
+- AGP 8.13.2 / Kotlin 2.3.21 / compileSdk 36 / minSdk 26 / targetSdk 35
 
 ### 常用命令
 ```powershell
 # 构建（workdir = E:\Projects\lanhang-thirdparty）
-& "E:\dev\gradle\gradle-8.9\bin\gradle.bat" assembleDebug --console=plain
+& "E:\dev\gradle\gradle-8.14.3\bin\gradle.bat" assembleDebug --console=plain
 # 输出：app\build\outputs\apk\debug\app-debug.apk（~7.6MB）
 
 # 安装（HyperOS 会拦直接 install，必须走 pm install -r）
@@ -193,7 +193,8 @@ adb shell run-as com.lanhang.lite cat files/moments_last.json            # 工�
 
 ## 5. 约定与红线
 
-- **安装可代做，测试由用户执行（2026-10-23）**：构建通过后可以用 adb 安装 APK（HyperOS 按上文 push + `pm install -r`），但不要启动 App、不要截图或点击验证、不要做真机 UI 测试；安装完成后由用户测试并反馈。
+- **安装与测试（2026-10-23）**：构建通过后可以用 adb 安装 APK（HyperOS 按上文 push + `pm install -r`）。**agent 也要做测试**：可做构建/lint/单元测试、adb 启动检查崩溃、logcat 排错、缓存与导出数据校验等**非界面测试**；但**滑动屏幕、点击操作、截图/录屏等表面 UI 测试一律交由用户执行**，结果由用户反馈。
+- **课表导出保存路径（2026-10-23）**：导出 `.ics`/`.csv` 必须走系统文件选择器（SAF `ActivityResultContracts.CreateDocument`），保存路径由用户自己选择；禁止写死固定目录、禁止静默保存。导出范围为**整学期**（`ScheduleExporter.plan` 的 `startWeek..endWeek`），CSV 带 UTF-8 BOM（Excel 中文）；实现见 `schedule/ScheduleExporter.kt`（plan/buildIcs/buildCsv/buildText）。
 - **sleepy**（github.com/lingion/sleepy）是 GPL-3.0：只参考其设计风格，不抄代码。
 - 成绩 2026-10-21 应用户要求加回（勿再以旧「不做成绩」为由删除）；OA 应用列表、IM 仍不做。
 - 工作圈只重写协议不搬融云 SDK 代码（io.rongcloud.moment 为商业 SDK）。
@@ -201,4 +202,4 @@ adb shell run-as com.lanhang.lite cat files/moments_last.json            # 工�
 - `res/values/colors.xml` **禁止整体覆盖**（曾误删 primary/primary_dark/gray 导致构建失败）。
 - 图标用官方 Material Symbols（如 `drawable/ic_calendar.xml` = Material Symbols Rounded `calendar_month` 原版路径 + `translateY=960` 转换），配 `?attr/colorPrimary` 着色。
 - 课表数据只存本机（filesDir 缓存 + SP），不外传；密码仅在登录时 RSA 加密上送。
-- 修改课表 UI 后流程为「构建 → adb 安装 → 交付 APK」，启动、验证与测试由用户自行完成。
+- **每次功能实现完必须安装（2026-10-23）**：任何功能（新特性/修改）实现完成后，流程固定为「构建 → adb 安装到设备（上文 push + `pm install -r`）→ 非界面测试（启动/崩溃/logcat/构建校验）→ 交付」，**不允许只构建不安装就交付**；滑动、点击、截图等表面测试由用户完成，结果由用户反馈。

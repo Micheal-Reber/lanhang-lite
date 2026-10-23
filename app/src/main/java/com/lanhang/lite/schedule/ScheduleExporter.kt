@@ -21,8 +21,10 @@ object ScheduleExporter {
 
     data class ExportPayload(
         val ics: String,
+        val csv: String,
         val text: String,
-        val fileName: String,
+        /** 不含扩展名的基名，调用方自行拼 .ics / .csv */
+        val baseFileName: String,
         val courseCount: Int,
         val currentWeek: Int,
         val firstWeek: Int,
@@ -59,7 +61,7 @@ object ScheduleExporter {
         val endWeek = maxOf(termStart, termEnd)
         val currentWeek = resolveCurrentWeek(data, startWeek, endWeek)
         if (currentWeek > endWeek) return null
-        return Plan(currentWeek, startWeek, endWeek, currentWeek..endWeek)
+        return Plan(currentWeek, startWeek, endWeek, startWeek..endWeek)
     }
 
     fun build(data: ScheduleData, plan: Plan, weeks: Map<Int, ScheduleData>): ExportPayload? {
@@ -68,8 +70,9 @@ object ScheduleExporter {
         val currentMonday = LocalDate.now().with(DayOfWeek.MONDAY)
         return ExportPayload(
             ics = buildIcs(occurrences, plan.currentWeek, currentMonday),
+            csv = buildCsv(occurrences, plan.currentWeek, currentMonday),
             text = buildText(data, occurrences, plan, currentMonday),
-            fileName = "蓝航Lite课表_${LocalDate.now().format(fileDate)}.ics",
+            baseFileName = "蓝航Lite课表_${LocalDate.now().format(fileDate)}",
             courseCount = occurrences.map { it.name }.distinct().size,
             currentWeek = plan.currentWeek,
             firstWeek = plan.weeks.first,
@@ -192,6 +195,43 @@ object ScheduleExporter {
             line("END:VEVENT")
         }
         line("END:VCALENDAR")
+        return sb.toString()
+    }
+
+    /** CSV：每行一次实际开课；带 UTF-8 BOM 方便 Excel 识别中文 */
+    private fun buildCsv(
+        occurrences: List<Occurrence>,
+        currentWeek: Int,
+        currentMonday: LocalDate
+    ): String {
+        val sb = StringBuilder("\uFEFF")
+        fun cell(value: String): String {
+            val v = value.replace("\"", "\"\"")
+            return if (v.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"$v\"" else v
+        }
+        fun line(vararg cells: String) {
+            sb.append(cells.joinToString(",") { cell(it) }).append("\r\n")
+        }
+        line("周次", "星期", "日期", "开始节", "结束节", "开始时间", "结束时间", "课程", "教师", "教室")
+        for (item in occurrences) {
+            val date = currentMonday
+                .plusWeeks((item.week - currentWeek).toLong())
+                .plusDays((item.day - 1).toLong())
+            val startTime = periodTimes.getOrNull(item.start - 1)?.first ?: continue
+            val endTime = periodTimes.getOrNull(item.end - 1)?.second ?: continue
+            line(
+                "${item.week}",
+                dayNames[item.day - 1],
+                "${date.year}-${"%02d".format(date.monthValue)}-${"%02d".format(date.dayOfMonth)}",
+                "${item.start}",
+                "${item.end}",
+                startTime,
+                endTime,
+                item.name,
+                item.teacher,
+                item.room
+            )
+        }
         return sb.toString()
     }
 

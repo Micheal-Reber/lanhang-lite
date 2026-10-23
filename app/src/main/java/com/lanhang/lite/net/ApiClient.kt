@@ -9,7 +9,6 @@ import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 
 object ApiClient {
     const val BASE_URL = "https://nginx-1.app.nchu.edu.cn"
@@ -37,9 +36,6 @@ object ApiClient {
         debugContext = context.applicationContext
         cookieSp = context.getSharedPreferences("lanhang_cookies", Context.MODE_PRIVATE)
         loadCookies()
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
         http = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -63,7 +59,6 @@ object ApiClient {
                     return cookies.values.filter { it.matches(url) }
                 }
             })
-            .addInterceptor(logging)
             .build()
     }
 
