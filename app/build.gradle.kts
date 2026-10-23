@@ -29,7 +29,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.create("configuredRelease") {
                     storeFile = file(releaseStoreFile.get())
@@ -68,7 +73,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("io.coil-kt:coil:2.6.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
@@ -78,7 +82,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
     // AndroidLiquidGlass：backdrop 模糊/透镜折射/色散
     implementation("io.github.kyant0:backdrop:1.0.6")
 }

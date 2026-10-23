@@ -1,7 +1,5 @@
 package com.lanhang.lite.settings
 
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
@@ -15,10 +13,10 @@ import android.content.Intent
 import android.text.TextUtils
 import android.widget.ScrollView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -28,6 +26,7 @@ import com.lanhang.lite.schedule.ScheduleData
 import com.lanhang.lite.schedule.ScheduleExporter
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.Session
+import com.lanhang.lite.ui.MainActivity
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -36,16 +35,25 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * 设置页（PocketDiary 同款：目录页 + 二级页）。
+ * 目录只有三行导航（外观 / 课表工具 / 关于），点进二级页后 Toolbar 切换为
+ * 返回箭头 + 子页标题；系统返回键回到目录。视图切换在本 Fragment 内完成，
+ * 避免与四 Tab hide/show 的 back stack 冲突。
+ */
 class SettingsFragment : Fragment() {
 
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
 
     private val themeOptions = listOf(
-        "light" to "亮色",
-        "dark" to "暗色",
-        "system" to "跟随系统"
+        "light" to R.string.settings_theme_light,
+        "dark" to R.string.settings_theme_dark,
+        "system" to R.string.settings_theme_system
     )
+
+    /** null = 目录页；PAGE_* = 当前二级页 */
+    private var detailPage: Int? = null
 
     private var pendingExport: ScheduleExporter.ExportPayload? = null
     private var exportJob: Job? = null
@@ -66,6 +74,12 @@ class SettingsFragment : Fragment() {
         saveDocument(uri, payload.csv.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.csv")
     }
 
+    private val backCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            closeDetail()
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -81,15 +95,139 @@ class SettingsFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        renderThemeRow()
-        binding.tvAccount.text = Session.name.ifEmpty { Session.username }.ifEmpty { "--" }
-        binding.tvVersion.text = runCatching {
-            requireContext().packageManager
-                .getPackageInfo(requireContext().packageName, 0).versionName
-        }.getOrNull() ?: "--"
-        binding.tvProto.text = "NchuApp/${Session.appVersion}"
-        binding.exportScheduleButton.setOnClickListener { showExportSchedule() }
-        binding.diagnosticsButton.setOnClickListener { showDiagnostics() }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+
+        binding.rowAppearance.setOnClickListener { openDetail(PAGE_APPEARANCE) }
+        binding.rowTools.setOnClickListener { openDetail(PAGE_TOOLS) }
+        binding.rowAbout.setOnClickListener { openDetail(PAGE_ABOUT) }
+        binding.tvAppearanceSummary.text = currentThemeLabel()
+        binding.tvAboutSummary.text = getString(
+            R.string.settings_about_version,
+            runCatching {
+                requireContext().packageManager
+                    .getPackageInfo(requireContext().packageName, 0).versionName
+            }.getOrNull() ?: "--"
+        )
+
+        val restored = savedInstanceState?.getInt(KEY_DETAIL, -1) ?: -1
+        if (restored == PAGE_APPEARANCE || restored == PAGE_TOOLS || restored == PAGE_ABOUT) {
+            openDetail(restored, syncToolbar = false)
+        }
+        syncToolbar()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        syncToolbar()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_DETAIL, detailPage ?: -1)
+    }
+
+    /** 与 MainActivity 对齐 Toolbar 状态（目录态 = 标题+无返回；二级页 = 返回箭头+子页标题）。 */
+    fun syncToolbar() {
+        val act = activity as? MainActivity ?: return
+        if (isHidden) return
+        val page = detailPage
+        if (page == null) {
+            act.showToolbarMain("设置")
+        } else {
+            act.showToolbarSub(detailTitle(page)) { closeDetail() }
+        }
+    }
+
+    private fun detailTitle(page: Int): String = when (page) {
+        PAGE_APPEARANCE -> getString(R.string.settings_appearance)
+        PAGE_TOOLS -> getString(R.string.settings_schedule_tools)
+        else -> getString(R.string.settings_about_app)
+    }
+
+    private fun openDetail(page: Int, syncToolbar: Boolean = true) {
+        val b = _binding ?: return
+        val layout = when (page) {
+            PAGE_APPEARANCE -> R.layout.view_settings_appearance
+            PAGE_TOOLS -> R.layout.view_settings_tools
+            else -> R.layout.view_settings_about
+        }
+        b.detailContainer.removeAllViews()
+        val child = LayoutInflater.from(requireContext()).inflate(layout, b.detailContainer, false)
+        b.detailContainer.addView(child)
+        setupDetail(page, child)
+        detailPage = page
+        b.scrollDirectory.visibility = View.GONE
+        b.scrollDetail.visibility = View.VISIBLE
+        b.scrollDetail.scrollTo(0, 0)
+        backCallback.isEnabled = true
+        if (syncToolbar) syncToolbar()
+    }
+
+    private fun closeDetail() {
+        val b = _binding ?: return
+        detailPage = null
+        b.detailContainer.removeAllViews()
+        b.scrollDetail.visibility = View.GONE
+        b.scrollDirectory.visibility = View.VISIBLE
+        backCallback.isEnabled = false
+        syncToolbar()
+    }
+
+    private fun setupDetail(page: Int, root: View) {
+        when (page) {
+            PAGE_APPEARANCE -> {
+                root.findViewById<TextView>(R.id.tvThemeSummary).text = currentThemeLabel()
+                root.findViewById<View>(R.id.rowTheme).setOnClickListener { showThemeDialog() }
+            }
+            PAGE_TOOLS -> {
+                root.findViewById<View>(R.id.exportScheduleButton)
+                    .setOnClickListener { showExportSchedule() }
+            }
+            else -> {
+                root.findViewById<TextView>(R.id.tvAccount).text =
+                    Session.name.ifEmpty { Session.username }.ifEmpty { "--" }
+                root.findViewById<TextView>(R.id.tvVersion).text = runCatching {
+                    requireContext().packageManager
+                        .getPackageInfo(requireContext().packageName, 0).versionName
+                }.getOrNull() ?: "--"
+                root.findViewById<TextView>(R.id.tvProto).text = "NchuApp/${Session.appVersion}"
+                root.findViewById<View>(R.id.diagnosticsButton)
+                    .setOnClickListener { showDiagnostics() }
+            }
+        }
+    }
+
+    private fun currentThemeLabel(): String =
+        themeOptions.firstOrNull { it.first == Session.themeMode }
+            ?.let { getString(it.second) }
+            ?: getString(R.string.settings_theme_system)
+
+    private fun showThemeDialog() {
+        val labels = themeOptions.map { getString(it.second) }.toTypedArray()
+        val checked = themeOptions.indexOfFirst { it.first == Session.themeMode }.coerceAtLeast(0)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_theme_title)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                val mode = themeOptions[which].first
+                dialog.dismiss()
+                if (mode != Session.themeMode) {
+                    Session.themeMode = mode
+                    applyTheme(mode)
+                }
+            }
+            .setNegativeButton(R.string.schedule_export_cancel, null)
+            .show()
+    }
+
+    private fun applyTheme(mode: String) {
+        AppCompatDelegate.setDefaultNightMode(
+            when (mode) {
+                "light" -> AppCompatDelegate.MODE_NIGHT_NO
+                "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            }
+        )
+        context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
     }
 
     private fun showExportSchedule() {
@@ -318,7 +456,7 @@ class SettingsFragment : Fragment() {
             layoutParams = ViewGroup.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.55f).toInt())
         }
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("诊断信息")
+            .setTitle(R.string.settings_diagnostics)
             .setView(scroll)
             .setNegativeButton("关闭", null)
             .setPositiveButton("分享") { _, _ ->
@@ -332,56 +470,10 @@ class SettingsFragment : Fragment() {
             .show()
     }
 
-    private fun renderThemeRow() {
-        val row = binding.themeRow
-        row.removeAllViews()
-        val ctx = requireContext()
-        val padH = (4 * resources.displayMetrics.density).toInt()
-        val padV = (10 * resources.displayMetrics.density).toInt()
-        for ((mode, label) in themeOptions) {
-            val tv = TextView(ctx).apply {
-                text = label
-                gravity = Gravity.CENTER
-                setPadding(padH, padV, padH, padV)
-                textSize = 13f
-                minHeight = (40 * resources.displayMetrics.density).toInt()
-            }
-            val bg = ContextCompat.getDrawable(ctx, R.drawable.bg_week_pill)!!.mutate() as GradientDrawable
-            val selected = mode == Session.themeMode
-            if (selected) {
-                bg.setColor(ContextCompat.getColor(ctx, R.color.week_pill_bg))
-                tv.setTextColor(ContextCompat.getColor(ctx, R.color.week_pill_text))
-                tv.typeface = android.graphics.Typeface.DEFAULT_BOLD
-            } else {
-                bg.setColor(Color.TRANSPARENT)
-                tv.setTextColor(ContextCompat.getColor(ctx, R.color.icon_muted))
-                tv.typeface = android.graphics.Typeface.DEFAULT
-            }
-            tv.background = bg
-            tv.setOnClickListener {
-                if (Session.themeMode != mode) {
-                    Session.themeMode = mode
-                    applyTheme(mode)
-                    renderThemeRow()
-                }
-            }
-            val lp = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-            row.addView(tv, lp)
-        }
-    }
-
-    private fun applyTheme(mode: String) {
-        AppCompatDelegate.setDefaultNightMode(
-            when (mode) {
-                "light" -> AppCompatDelegate.MODE_NIGHT_NO
-                "dark" -> AppCompatDelegate.MODE_NIGHT_YES
-                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-            }
-        )
-        context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
+    companion object {
+        private const val PAGE_APPEARANCE = 0
+        private const val PAGE_TOOLS = 1
+        private const val PAGE_ABOUT = 2
+        private const val KEY_DETAIL = "settings_detail_page"
     }
 }

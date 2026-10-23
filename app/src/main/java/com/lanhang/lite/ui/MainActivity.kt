@@ -48,6 +48,12 @@ class MainActivity : AppCompatActivity() {
     /** 底栏选中态（Compose 状态，switchTab 与底栏共同读写） */
     private val tabState = mutableIntStateOf(TAB_SCHEDULE)
 
+    /** 设置二级页的返回动作；null = 目录/主 Tab 态 */
+    private var toolbarBackAction: (() -> Unit)? = null
+
+    /** 二级页态时隐藏「调试/退出登录」菜单 */
+    private var toolbarSubMode = false
+
     /** 底栏玻璃的模糊底图：fragmentContainer 在底栏矩形外扩 margin 的区域截图 */
     private val onContentScrolled = android.view.ViewTreeObserver.OnScrollChangedListener {
         binding.bottomNav.invalidate()
@@ -62,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
+        binding.toolbar.setNavigationOnClickListener { toolbarBackAction?.invoke() }
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -158,12 +165,12 @@ class MainActivity : AppCompatActivity() {
                 else -> TAB_SCHEDULE
             }
             tabState.intValue = restored
-            binding.toolbar.title = when (restored) {
+            showToolbarMain(when (restored) {
                 TAB_MOMENTS -> "工作圈"
                 TAB_SETTINGS -> "设置"
                 TAB_GRADES -> "成绩"
                 else -> getString(R.string.app_name)
-            }
+            })
         }
         handleWidgetIntent(intent)
     }
@@ -202,26 +209,55 @@ class MainActivity : AppCompatActivity() {
         when (tab) {
             TAB_GRADES -> {
                 tx.hide(s).hide(m).hide(st).show(g)
-                binding.toolbar.title = "成绩"
+                showToolbarMain("成绩")
             }
             TAB_MOMENTS -> {
                 tx.hide(s).hide(g).hide(st).show(m)
-                binding.toolbar.title = "工作圈"
+                showToolbarMain("工作圈")
                 (m as? MomentsFragment)?.onTabSelected()
             }
             TAB_SETTINGS -> {
                 tx.hide(s).hide(g).hide(m).show(st)
-                binding.toolbar.title = "设置"
+                showToolbarMain("设置")
             }
             else -> {
                 tx.hide(g).hide(m).hide(st).show(s)
-                binding.toolbar.title = getString(R.string.app_name)
+                showToolbarMain(getString(R.string.app_name))
             }
         }
         // Finish show/hide before sampling; otherwise the next frame can still contain
         // the previous fragment and leave that image in the glass backdrop.
         tx.commitNow()
         binding.bottomNav.invalidate()
+        // 设置页可能停在二级页（如主题切换 recreate 后），切回时把 Toolbar 对齐到其内部状态。
+        if (tab == TAB_SETTINGS) {
+            (settingsFragment as? com.lanhang.lite.settings.SettingsFragment)?.syncToolbar()
+        }
+    }
+
+    /** 主 Tab 态：标题 + 无返回箭头。 */
+    fun showToolbarMain(title: String) {
+        toolbarSubMode = false
+        toolbarBackAction = null
+        binding.toolbar.navigationIcon = null
+        binding.toolbar.title = title
+        invalidateOptionsMenu()
+    }
+
+    /** 设置二级页态：返回箭头 + 子页标题（对应 PocketDiary 的 DetailScaffold）。 */
+    fun showToolbarSub(title: String, onBack: () -> Unit) {
+        toolbarSubMode = true
+        toolbarBackAction = onBack
+        binding.toolbar.navigationIcon =
+            androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_back)
+        binding.toolbar.title = title
+        invalidateOptionsMenu()
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.action_debug_schedule)?.isVisible = !toolbarSubMode
+        menu.findItem(R.id.action_logout)?.isVisible = !toolbarSubMode
+        return super.onPrepareOptionsMenu(menu)
     }
 
     private fun forwardTouchOutsideBar(event: android.view.MotionEvent): Boolean {

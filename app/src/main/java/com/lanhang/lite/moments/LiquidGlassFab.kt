@@ -31,6 +31,7 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.Shadow
+import com.lanhang.lite.R
 
 /** 与底栏同款液态玻璃的圆形悬浮按钮（玻璃参数照抄 LiquidGlassBottomBar 层一） */
 @Composable
@@ -88,7 +89,7 @@ fun LiquidGlassFab(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            ImageVector.vectorResource(com.lanhang.lite.R.drawable.ic_add),
+            ImageVector.vectorResource(R.drawable.ic_add),
             contentDescription = contentDescription,
             tint = iconColor,
             modifier = Modifier.size(26.dp),
