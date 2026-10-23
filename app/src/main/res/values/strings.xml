@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">蓝航Lite</string>
+    <string name="login_subtitle">轻量课表</string>
+    <string name="username_hint">学号</string>
+    <string name="password_hint">密码</string>
+    <string name="login">登录</string>
+    <string name="tab_schedule">课表</string>
+    <string name="action_logout">退出登录</string>
+    <string name="widget_schedule_name">全周课表</string>
+    <string name="widget_schedule_description">显示当前教学周的全周课程</string>
+    <string name="widget_week_format">第 %1$d 周</string>
+    <string name="widget_schedule_empty_online">打开同步课表</string>
+    <string name="widget_schedule_empty_offline">点击登录同步课表</string>
+    <string name="widget_open_description">打开蓝航Lite课表</string>
+    <string name="widget_empty_sync">打开应用同步课表</string>
+    <string name="widget_empty_login">打开应用登录并同步</string>
+    <string name="widget_empty_hint">点击此处打开课程表</string>
+    <string name="widget_no_course_week">本周暂无课程</string>
+    <string name="settings_schedule_tools">课表工具</string>
+    <string name="settings_export_schedule">导出课表</string>
+    <string name="settings_export_schedule_subtitle">保存为日历文件或分享课表文本</string>
+    <string name="schedule_export_title">导出课表</string>
+    <string name="schedule_export_message">共 %1$d 门课程 · 第 %2$d-%3$d 周\n可保存为 .ics 日历文件，或直接分享文本。</string>
+    <string name="schedule_export_ics">保存日历文件（.ics）</string>
+    <string name="schedule_export_share">分享课表文本</string>
+    <string name="schedule_export_saved">已导出：%1$s</string>
+    <string name="schedule_export_failed">导出失败，请重试</string>
+    <string name="schedule_export_no_data">暂无可导出的课表，请先同步课表</string>
+    <string name="schedule_export_chooser">分享课表</string>
+    <string name="schedule_export_subject">蓝航Lite课表</string>
+    <string name="schedule_export_sync_needed">需要同步缺少的 %1$d 个周次，是否继续？</string>
+    <string name="schedule_export_preparing">正在准备课表…</string>
+    <string name="schedule_export_syncing">正在同步第 %1$d 周\n已完成 %2$d/%3$d</string>
+    <string name="schedule_export_cancel">取消</string>
+    <string name="schedule_export_start_sync">开始同步</string>
+</resources>

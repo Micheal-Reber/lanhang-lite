@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#084168</color>
+    <color name="primary_dark">#052B45</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="primary_container">#D4E9F7</color>
+    <color name="on_primary_container">#052F4A</color>
+    <color name="secondary_container">#D4E9F7</color>
+    <color name="on_secondary_container">#052F4A</color>
+    <color name="gray">#9E9E9E</color>
+    <color name="week_pill_bg">#D4E9F7</color>
+    <color name="week_pill_text">#084168</color>
+    <color name="week_pill_bg_dim">#99D4E9F7</color>
+    <color name="week_pill_text_dim">#084168</color>
+    <color name="like_red">#E53935</color>
+    <color name="icon_muted">#6A6A6E</color>
+    <color name="link">#1F6FDE</color>
+    <color name="moment_interact">#F1F5F9</color>
+    <color name="nav_checked">#084168</color>
+    <color name="nav_unchecked">#6A6A6E</color>
+    <!-- 应用图标 -->
+    <color name="ic_launcher_background">#084168</color>
+    <!-- 液态玻璃底栏 -->
+    <color name="nav_glass">#A6F3EDF7</color>
+    <color name="nav_glass_stroke">#1F49454F</color>
+    <color name="nav_indicator">#26084168</color>
+    <color name="nav_indicator_stroke">#40084168</color>
+</resources>

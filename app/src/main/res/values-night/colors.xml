@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="link">#8AB4F8</color>
+    <color name="moment_interact">#252A31</color>
+    <color name="primary_container">#103D58</color>
+    <color name="on_primary_container">#C7E9FA</color>
+    <color name="secondary_container">#103D58</color>
+    <color name="on_secondary_container">#C7E9FA</color>
+    <color name="week_pill_bg">#103D58</color>
+    <color name="week_pill_text">#8ED8F8</color>
+    <color name="week_pill_bg_dim">#99103D58</color>
+    <color name="week_pill_text_dim">#8ED8F8</color>
+    <color name="nav_checked">#8ED8F8</color>
+    <color name="nav_unchecked">#9E9E9E</color>
+    <!-- 液态玻璃底栏 -->
+    <color name="nav_glass">#A6211F26</color>
+    <color name="nav_glass_stroke">#33FFFFFF</color>
+    <color name="nav_indicator">#3D8ED8F8</color>
+    <color name="nav_indicator_stroke">#598ED8F8</color>
+</resources>
