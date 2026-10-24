@@ -269,9 +269,11 @@ class SettingsFragment : Fragment() {
                 dialog.dismiss()
                 if (mode != Session.language) {
                     Session.language = mode
-                    // AppCompat 会自动重建 Activity 让新语言生效；小部件文案是渲染时写死的，需重刷
+                    // 见 LocaleHelper：不再用系统的 per-app locale（它会系统级 relaunch，
+                    // 过程中有 0.4s 纯黑帧）。改完自己 recreate()，界面立刻换语言且不黑屏
                     AppLanguage.apply(mode)
                     context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
+                    requireActivity().recreate()
                 }
             }
             .setNegativeButton(R.string.common_cancel, null)

@@ -9,8 +9,16 @@ import androidx.appcompat.app.AppCompatActivity
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityOaWebviewBinding
 import com.lanhang.lite.session.Session
+import android.content.Context
+import com.lanhang.lite.util.LocaleHelper
 
 class OaWebViewActivity : AppCompatActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        // 语言切换见 LocaleHelper：用 createConfigurationContext 包 base context，
+        // 切语言时由设置页显式 recreate()，不走系统的 per-app locale（会黑屏）
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
 
     companion object {
         private const val EXTRA_URL = "url"

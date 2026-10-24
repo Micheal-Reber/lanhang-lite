@@ -153,7 +153,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 底部：左「第 N 周」胶囊 + 右「◀ ⟳ ▶」（与真实布局一致，空格用 weight 撑开） -->
+    <!-- 底部：左「第 N 周」胶囊 + 右「◀ ▶」（与真实布局一致，空格用 weight 撑开）。
+         预览即「今天」状态，所以**没有中间的 ⟳**：它只在翻到别的日期后才出现。 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="22dp"
@@ -163,7 +164,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="18dp"
-            android:background="@drawable/widget_preview_pill"
+            android:background="@drawable/widget_pill_light"
             android:gravity="center"
             android:maxLines="1"
             android:paddingStart="5dp"
@@ -180,31 +181,26 @@
 
         <ImageView
             android:layout_width="24dp"
-            android:layout_height="22dp"
+            android:layout_height="18dp"
             android:layout_marginEnd="4dp"
             android:background="@drawable/widget_nav_button_light"
             android:contentDescription="@string/widget_nav_prev"
-            android:padding="6dp"
+            android:paddingStart="6dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="4dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_nav_left" />
 
-        <!-- 中间：回到今天（预览即今天，所以用禁用态图标） -->
         <ImageView
             android:layout_width="24dp"
-            android:layout_height="22dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/widget_nav_button_light"
-            android:contentDescription="@string/widget_nav_reset_disabled"
-            android:padding="5dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_nav_reset_dim" />
-
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="22dp"
+            android:layout_height="18dp"
             android:background="@drawable/widget_nav_button_light"
             android:contentDescription="@string/widget_nav_next"
-            android:padding="6dp"
+            android:paddingStart="6dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="4dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_nav_right" />
     </LinearLayout>

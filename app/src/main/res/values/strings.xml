@@ -30,7 +30,6 @@
     <string name="widget_nav_prev">前一天</string>
     <string name="widget_nav_next">后一天</string>
     <string name="widget_nav_reset">回到今天</string>
-    <string name="widget_nav_reset_disabled">已经在今天</string>
     <!-- 选择器预览占位内容（不是真实课程数据，仅供 previewLayout 展示结构） -->
     <string name="widget_preview_today_title">今天 · 周一</string>
     <string name="widget_preview_today_date">8/31</string>

@@ -32,7 +32,6 @@
     <string name="widget_nav_prev">Previous day</string>
     <string name="widget_nav_next">Next day</string>
     <string name="widget_nav_reset">Back to today</string>
-    <string name="widget_nav_reset_disabled">Already showing today</string>
     <!-- Picker preview placeholders (layout structure only, not real data) -->
     <string name="widget_preview_today_title">Today · Mon</string>
     <string name="widget_preview_today_date">8/31</string>

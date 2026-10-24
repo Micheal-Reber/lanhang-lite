@@ -1,21 +1,23 @@
 package com.lanhang.lite.session
 
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import com.lanhang.lite.R
+import com.lanhang.lite.util.LocaleHelper
 
 /**
  * 界面语言：跟随系统 / 简体中文 / English。
  *
- * 用 AppCompat 的 per-app language（`setApplicationLocales`）实现：
- * Android 13+ 交给系统的应用语言设置，12 及以下由 AppCompat 在进程内切换。
- * 由于低版本系统不保存该选择，偏好一律存在 [Session.language]，每次启动重新应用。
+ * 不再走 AppCompat 的 per-app language（`setApplicationLocales`）——它会触发系统的
+ * Activity 重启，切换过程有约 0.4s 的纯黑帧（见 [LocaleHelper] 的说明）。
+ * 现在只做两件事：把偏好存到 [Session.language]、调 [LocaleHelper.prime] 让新语言
+ * 对后续创建的 Context 生效；让当前界面立刻变语言靠 `Activity.recreate()`（设置页调）。
+ *
+ * 偏好存在 [Session.language]，每次启动由 [com.lanhang.lite.App.onCreate] 重新 prime。
  */
 object AppLanguage {
 
-    const val SYSTEM = "system"
-    const val ZH = "zh"
-    const val EN = "en"
+    const val SYSTEM = LocaleHelper.SYSTEM
+    const val ZH = LocaleHelper.ZH
+    const val EN = LocaleHelper.EN
 
     /** 设置页展示顺序 */
     val options = listOf(SYSTEM, ZH, EN)
@@ -26,15 +28,13 @@ object AppLanguage {
         else -> R.string.settings_language_system
     }
 
-    /** 把偏好应用到全局；与当前生效值一致时不做任何事（避免多余重建）。 */
+    /**
+     * 让 [mode] 对**之后**创建的 Context 生效。
+     *
+     * 当前 Activity 不会因此自己刷新语言，需要调用方显式 `Activity.recreate()`
+     * （见 [com.lanhang.lite.settings.SettingsFragment.showLanguageDialog]）。
+     */
     fun apply(mode: String) {
-        val target = when (mode) {
-            ZH -> LocaleListCompat.forLanguageTags("zh-CN")
-            EN -> LocaleListCompat.forLanguageTags("en")
-            else -> LocaleListCompat.getEmptyLocaleList()
-        }
-        if (AppCompatDelegate.getApplicationLocales().toLanguageTags() != target.toLanguageTags()) {
-            AppCompatDelegate.setApplicationLocales(target)
-        }
+        LocaleHelper.prime(mode)
     }
 }

@@ -36,8 +36,16 @@ import com.lanhang.lite.ui.navigation.LiquidGlassBottomBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.Context
+import com.lanhang.lite.util.LocaleHelper
 
 class MainActivity : AppCompatActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        // 语言切换见 LocaleHelper：用 createConfigurationContext 包 base context，
+        // 切语言时由设置页显式 recreate()，不走系统的 per-app locale（会黑屏）
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
 
     private lateinit var binding: ActivityMainBinding
 

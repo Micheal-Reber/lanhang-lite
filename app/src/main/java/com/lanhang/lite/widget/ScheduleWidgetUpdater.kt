@@ -20,6 +20,7 @@ import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.LoginActivity
 import com.lanhang.lite.ui.MainActivity
+import com.lanhang.lite.util.LocaleHelper
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -56,6 +57,9 @@ object ScheduleWidgetUpdater {
     private const val PREVIEW_PUSH_INTERVAL_MS = 12L * 60L * 60L * 1000L
     private const val PREVIEW_SMALL_DP = 154
     private const val PREVIEW_WEEK_DP = 320
+
+    /** 底栏按「窄尺寸」处理：低于该宽度胶囊换无空格短文案（第8周 / 明天 / +1 天） */
+    private const val NARROW_WIDTH_DP = 150
 
     /** 全部已注册变体（组件 → isSmall）— 刷新广播/更新统一遍历 */
     private val allVariants = listOf(
@@ -205,9 +209,16 @@ object ScheduleWidgetUpdater {
                 val views = RemoteViews(context.packageName, R.layout.widget_schedule_week)
                 views.setImageViewBitmap(R.id.widget_bitmap, bitmap)
                 if (isSmall) {
-                    // 预览也要带 ◀ ⟳ ▶，否则选择器里看到的和真实放置后不一致
-                    // 预览即「今天」，所以复位按钮按禁用态呈现（与真实放置初始状态一致）
-                    bindNavButtons(context, views, 0, true, navigated = false)
+                    // 预览也要带胶囊 + ◀ ▶，否则选择器里看到的和真实放置后不一致
+                    // 预览即「今天」，所以不给中间的 ⟳（与真实放置初始状态一致）
+                    bindFooter(
+                        context, views, 0,
+                        visible = true,
+                        navigated = false,
+                        week = snapshot.week,
+                        target = LocalDate.now(),
+                        compact = false
+                    )
                 }
                 manager.setWidgetPreview(
                     ComponentName(context, cls),
@@ -254,87 +265,127 @@ object ScheduleWidgetUpdater {
                 R.id.widget_bitmap,
                 ScheduleWidgetRenderer.renderToday(context, daySnapshot, wDp, hDp, targetDate)
             )
-            val showNav = daySnapshot != null &&
-                hDp >= ScheduleWidgetRenderer.TODAY_NAV_MIN_HEIGHT_DP
-            // 已经翻到别的日期 → 复位按钮高亮可点；就在今天 → 置灰禁用
+            val showFooter = daySnapshot != null &&
+                hDp >= ScheduleWidgetRenderer.FOOTER_MIN_HEIGHT_DP
+            // 已经翻到别的日期 → 中间多出「回到今天」；就在今天 → 只有 ◀ ▶
             val navigated = targetDate != LocalDate.now()
-            bindNavButtons(context, views, appWidgetId, showNav, navigated)
+            bindFooter(
+                context, views, appWidgetId,
+                visible = showFooter,
+                navigated = navigated,
+                week = daySnapshot?.week ?: snapshot?.week ?: 0,
+                target = targetDate,
+                // 2×2 在部分桌面（vivo）实测只有 110~130dp 宽，用无空格短文案
+                compact = wDp < NARROW_WIDTH_DP
+            )
         } else {
             views.setImageViewBitmap(
                 R.id.widget_bitmap,
                 ScheduleWidgetRenderer.render(context, snapshot, wDp, hDp)
             )
-            views.setViewVisibility(R.id.widget_nav_prev, View.GONE)
-            views.setViewVisibility(R.id.widget_nav_reset, View.GONE)
-            views.setViewVisibility(R.id.widget_nav_next, View.GONE)
+            // 周视图没有底栏：胶囊和按钮一起隐藏
+            bindFooter(
+                context, views, appWidgetId, visible = false, navigated = false,
+                week = 0, target = LocalDate.now(), compact = false
+            )
         }
         views.setOnClickPendingIntent(R.id.widget_bitmap, clickPendingIntent(context, appWidgetId))
         views.setContentDescription(
             R.id.widget_bitmap,
-            context.getString(R.string.widget_open_description)
+            // 文案跟着应用语言走（这里不是 Activity context），见 LocaleHelper
+            LocaleHelper.wrap(context).getString(R.string.widget_open_description)
         )
         manager.updateAppWidget(appWidgetId, views)
     }
 
     /**
-     * 绑定右下角 ◀ ⟳ ▶ 三个点击区：
-     * 圆角底色画在位图里（见 [ScheduleWidgetRenderer.drawNavButtons]），这里只切图标
-     * （浅/深 × 复位可用/禁用）并挂 PendingIntent。每个按钮用 (实例 id, 序号) 生成唯一
-     * requestCode，否则会互相覆盖。
+     * 绑定底栏：左侧胶囊 + 右侧 ◀ ⟳ ▶。
      *
-     * @param navigated 该实例是否已翻到别的日期。复位按钮在「就在今天」时是禁用态：
-     *   图标置灰 + 点击不做任何事（见 [handleNavAction]），但**仍然挂热区**，
-     *   否则点它会穿透到底图去打开 App，与「禁用」的观感矛盾。
+     * **底栏整体都是布局里的真实 View**（`widget_schedule_week.xml`），位图只负责给它留高度。
+     * 这不是风格问题，是必须：位图由应用进程按自己的 `displayMetrics.density` 绘制，
+     * 而布局由桌面进程 inflate、dp 走桌面的 Configuration。两边 density 一旦不同
+     * （vivo/OriginOS 会给桌面小部件套独立缩放），画在位图里的底板就会和布局里的图标错开——
+     * 越靠左偏得越多（vivo 实测：最左的 ◀ 底板上是空的、⟳ 骑在两个底板中间）。
+     * 现在底板/图标/点击热区是同一个 View，桌面怎么缩放都不可能错位。
+     *
+     * 浅/深两套各占一组 View，这里只切 `setViewVisibility`（不用 setInt 反射调
+     * `setBackgroundResource` / `setTextColor`，launcher 端可能静默拒绝）。
+     */
+    private fun bindFooter(
+        context: Context,
+        views: RemoteViews,
+        appWidgetId: Int,
+        visible: Boolean,
+        navigated: Boolean,
+        week: Int,
+        target: LocalDate,
+        compact: Boolean
+    ) {
+        val dark = ScheduleWidgetRenderer.isDark(context)
+        // 窄尺寸又翻走时：3 个按钮就要 80dp，胶囊塞不下 → 干脆不显示（标题行已经有「明天 · 周六 10/25」），
+        // 比留一个「第…」半截胶囊干净
+        val pillVisible = visible && !(compact && navigated)
+        views.setViewVisibility(
+            R.id.widget_week_pill,
+            if (pillVisible && !dark) View.VISIBLE else View.GONE
+        )
+        views.setViewVisibility(
+            R.id.widget_week_pill_dark,
+            if (pillVisible && dark) View.VISIBLE else View.GONE
+        )
+        if (pillVisible) {
+            val label = ScheduleWidgetRenderer.footerLabel(context, week, target, compact)
+            // 两套都写同一份文案：切换主题时不用等下一次刷新
+            views.setTextViewText(R.id.widget_week_pill, label)
+            views.setTextViewText(R.id.widget_week_pill_dark, label)
+        }
+        bindNavButtons(context, views, appWidgetId, visible, navigated, dark)
+    }
+
+    /**
+     * 绑定右下角「翻天」按钮：◀ 前一天 │ ⟳ 回到今天 │ ▶ 后一天。
+     * 底板、图标、点击热区全在布局里（浅/深各一组 View），这里只切可见性 + 挂 PendingIntent。
+     * 每个按钮用 (实例 id, 序号) 生成唯一 requestCode，否则会互相覆盖。
+     *
+     * @param navigated 该实例是否已翻到别的日期。**中间的 ⟳ 只在翻了之后才出现**：
+     *   当天本来就在今天，显示它既没用又挤占左侧胶囊宽度，所以直接 GONE
+     *   （布局里 ⟳ 两边各留 4dp marginStart，隐藏后两组箭头自然贴合成 52dp）。
      */
     private fun bindNavButtons(
         context: Context,
         views: RemoteViews,
         appWidgetId: Int,
         visible: Boolean,
-        navigated: Boolean
+        navigated: Boolean,
+        dark: Boolean
     ) {
-        val visibility = if (visible) View.VISIBLE else View.GONE
-        views.setViewVisibility(R.id.widget_nav_prev, visibility)
-        views.setViewVisibility(R.id.widget_nav_reset, visibility)
-        views.setViewVisibility(R.id.widget_nav_next, visibility)
+        val lightGroup = if (visible && !dark) View.VISIBLE else View.GONE
+        val darkGroup = if (visible && dark) View.VISIBLE else View.GONE
+        val lightReset = if (visible && !dark && navigated) View.VISIBLE else View.GONE
+        val darkReset = if (visible && dark && navigated) View.VISIBLE else View.GONE
+        views.setViewVisibility(R.id.widget_nav_group, lightGroup)
+        views.setViewVisibility(R.id.widget_nav_group_dark, darkGroup)
+        views.setViewVisibility(R.id.widget_nav_prev, lightGroup)
+        views.setViewVisibility(R.id.widget_nav_next, lightGroup)
+        views.setViewVisibility(R.id.widget_nav_reset, lightReset)
+        views.setViewVisibility(R.id.widget_nav_prev_dark, darkGroup)
+        views.setViewVisibility(R.id.widget_nav_next_dark, darkGroup)
+        views.setViewVisibility(R.id.widget_nav_reset_dark, darkReset)
         if (!visible) return
 
-        val dark = ScheduleWidgetRenderer.isDark(context)
-        views.setImageViewResource(
-            R.id.widget_nav_prev,
-            if (dark) R.drawable.ic_widget_nav_left_on_dark else R.drawable.ic_widget_nav_left
-        )
-        views.setImageViewResource(
-            R.id.widget_nav_next,
-            if (dark) R.drawable.ic_widget_nav_right_on_dark else R.drawable.ic_widget_nav_right
-        )
-        views.setImageViewResource(
-            R.id.widget_nav_reset,
-            when {
-                navigated && dark -> R.drawable.ic_widget_nav_reset_on_dark
-                navigated -> R.drawable.ic_widget_nav_reset
-                dark -> R.drawable.ic_widget_nav_reset_dim_on_dark
-                else -> R.drawable.ic_widget_nav_reset_dim
-            }
-        )
-        views.setContentDescription(
-            R.id.widget_nav_reset,
-            context.getString(
-                if (navigated) R.string.widget_nav_reset else R.string.widget_nav_reset_disabled
-            )
-        )
-        views.setOnClickPendingIntent(
-            R.id.widget_nav_prev,
-            navPendingIntent(context, appWidgetId, ACTION_PREV_DAY, 0)
-        )
-        views.setOnClickPendingIntent(
-            R.id.widget_nav_reset,
-            navPendingIntent(context, appWidgetId, ACTION_RESET_DAY, 2)
-        )
-        views.setOnClickPendingIntent(
-            R.id.widget_nav_next,
-            navPendingIntent(context, appWidgetId, ACTION_NEXT_DAY, 1)
-        )
+        // 浅/深两组都要挂上点击：切主题时不必重新绑定
+        val prev = navPendingIntent(context, appWidgetId, ACTION_PREV_DAY, 0)
+        val next = navPendingIntent(context, appWidgetId, ACTION_NEXT_DAY, 1)
+        val reset = navPendingIntent(context, appWidgetId, ACTION_RESET_DAY, 2)
+        for (id in intArrayOf(R.id.widget_nav_prev, R.id.widget_nav_prev_dark)) {
+            views.setOnClickPendingIntent(id, prev)
+        }
+        for (id in intArrayOf(R.id.widget_nav_next, R.id.widget_nav_next_dark)) {
+            views.setOnClickPendingIntent(id, next)
+        }
+        for (id in intArrayOf(R.id.widget_nav_reset, R.id.widget_nav_reset_dark)) {
+            views.setOnClickPendingIntent(id, reset)
+        }
     }
 
     private fun navPendingIntent(

@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import androidx.core.graphics.ColorUtils
 import com.lanhang.lite.schedule.PeriodClock
 import com.lanhang.lite.session.Session
+import com.lanhang.lite.util.LocaleHelper
 import com.lanhang.lite.widget.ScheduleWidgetData.CourseBlock
 import com.lanhang.lite.widget.ScheduleWidgetData.WeekSnapshot
 import java.time.LocalDate
@@ -28,11 +29,13 @@ object ScheduleWidgetRenderer {
     private val todayDateFormatter = DateTimeFormatter.ofPattern("M/d")
 
     fun render(
-        context: Context,
+        appContext: Context,
         snapshot: WeekSnapshot?,
         widthDp: Int,
         heightDp: Int
     ): Bitmap {
+        // 小部件文案跟着应用语言走（桌面进程默认给的是系统语言），见 LocaleHelper
+        val context = LocaleHelper.wrap(appContext)
         val density = context.resources.displayMetrics.density
         val width = (widthDp * density).roundToInt().coerceAtLeast(1)
         val height = (heightDp * density).roundToInt().coerceAtLeast(1)
@@ -86,11 +89,11 @@ object ScheduleWidgetRenderer {
         )
     }
 
-    /** 2×2 底部导航条（◀ ⟳ ▶）占用的高度阈值：低于该高度不显示按钮 */
-    const val TODAY_NAV_MIN_HEIGHT_DP = 130
+    /** 2×2 底栏（胶囊 ◀ ⟳ ▶）占用的高度阈值：低于该高度完全不显示底栏 */
+    const val FOOTER_MIN_HEIGHT_DP = 130
 
-    /** 底部导航条高度（与 [TodayRenderer] 的 footerH 一致） */
-    const val TODAY_NAV_BAR_HEIGHT_DP = 22
+    /** 底栏高度：位图要在内容区里给它留出这么高，布局里的底栏也正好这么高 */
+    const val FOOTER_HEIGHT_DP = 22
 
     /**
      * 今日课程最多同时显示的节数。
@@ -100,25 +103,69 @@ object ScheduleWidgetRenderer {
      */
     const val MAX_TODAY_ROWS = 3
 
+    /* ---------- 4×4 周视图：课程名排版（竖排、最多两列、整组居中） ---------- */
+
+    /** 课程名字号上限（块够高够宽时用这个） */
+    private const val NAME_MAX_SIZE_DP = 13f
+
+    /** 课程名字号下限：再小就糊成一团，宁可用「…」截断 */
+    private const val NAME_MIN_SIZE_DP = 7f
+
     /**
-     * 底部「翻天」按钮组的几何（dp）。
-     * 3 个按钮等宽等高、间距 4dp：◀（前一天）│ ⟳（回到今天）│ ▶（后一天）。
-     * **必须与 `layout/widget_schedule_week.xml` 里的三个 ImageView 完全一致**，
-     * 因为圆角底画在位图里、图标和点击热区在布局里，两边错 1dp 就会露馅。
+     * 竖排行距倍数（相对字号）：一个字一行的字距。
+     *
+     * 课程名是竖排的（用户要求「竖着两排」）——横排会把色块左右撑满，
+     * 竖排只占两个字宽，块内两侧都留白。
+     *
+     * 1.14 而不是 1.0：汉字字形高约 1.0em，但基线以下还有 descent（约 0.22em），
+     * 行距太紧最后一行会压到底部的教室行上。
      */
-    const val TODAY_NAV_BUTTON_WIDTH_DP = 24
-    const val TODAY_NAV_BUTTON_HEIGHT_DP = 22
-    const val TODAY_NAV_GAP_DP = 4
+    private const val NAME_ROW_SPACING = 1.14f
 
-    /** 按钮组距离小部件右边缘的留白（= outerPad 9dp） */
-    const val TODAY_NAV_END_PAD_DP = 9
+    /** 竖排列间距（相对字号）：两列之间留这么多空，0.12 字宽既不挤也不散 */
+    private const val NAME_COL_GAP = 0.12f
 
-    /** 按钮组总宽：24×3 + 4×2 = 80dp */
-    const val TODAY_NAV_GROUP_WIDTH_DP =
-        TODAY_NAV_BUTTON_WIDTH_DP * 3 + TODAY_NAV_GAP_DP * 2
+    /** 课程名最多排几列：固定两列，再多就不是「竖着两排」了 */
+    private const val NAME_MAX_COLS = 2
 
-    /** 当前主题是否为深色（按钮底色/图标颜色与此保持一致） */
+    /** 课程名左右内边距（窄列里必须小，否则字数的余量全被 pad 吃掉） */
+    private const val NAME_PAD_H_DP = 2.5f
+
+    /** 课程名上下内边距 */
+    private const val NAME_PAD_V_DP = 2f
+
+    /** 当前主题是否为深色（胶囊/按钮底色、图标颜色与此保持一致） */
     fun isDark(context: Context): Boolean = palette(context).isDark
+
+    /**
+     * 底栏胶囊文案：今天「第 N 周」，翻走后「明天 / 昨天 / +N 天」。
+     *
+     * 胶囊现在是布局里的 TextView（位图不再画画它），所以文案由这里出、由
+     * [ScheduleWidgetUpdater] 绑上去；放不下时交给 TextView 自己 ellipsize。
+     *
+     * @param compact 窄尺寸（vivo 等桌面的 2×2 实测只有 110~130dp）用无空格短排版，
+     *   同样的宽度能多显示一两个字，避免退化成「…」
+     */
+    fun footerLabel(appContext: Context, week: Int, target: LocalDate, compact: Boolean): String {
+        val context = LocaleHelper.wrap(appContext)
+        val offset = ChronoUnit.DAYS.between(LocalDate.now(), target)
+        return when (offset) {
+            0L -> context.getString(
+                if (compact) {
+                    com.lanhang.lite.R.string.widget_week_compact
+                } else {
+                    com.lanhang.lite.R.string.widget_week_format
+                },
+                week
+            )
+            1L -> context.getString(com.lanhang.lite.R.string.widget_today_tomorrow)
+            -1L -> context.getString(com.lanhang.lite.R.string.widget_today_yesterday)
+            else -> context.getString(
+                com.lanhang.lite.R.string.widget_day_offset_format,
+                if (offset > 0) "+$offset" else "$offset"
+            )
+        }
+    }
 
     /**
      * 「课表 · 小」2×2 紧凑档：今日课程列表。
@@ -133,13 +180,15 @@ object ScheduleWidgetRenderer {
      * @param now 渲染时刻（默认取系统时间；抽出参数便于测试与预览）
      */
     fun renderToday(
-        context: Context,
+        appContext: Context,
         snapshot: WeekSnapshot?,
         widthDp: Int,
         heightDp: Int,
         targetDate: LocalDate? = null,
         now: LocalDateTime = LocalDateTime.now()
     ): Bitmap {
+        // 同 render：小部件文案跟着应用语言走
+        val context = LocaleHelper.wrap(appContext)
         val density = context.resources.displayMetrics.density
         val width = (widthDp * density).roundToInt().coerceAtLeast(1)
         val height = (heightDp * density).roundToInt().coerceAtLeast(1)
@@ -259,8 +308,9 @@ object ScheduleWidgetRenderer {
         fun draw() {
             drawHeader()
             val contentTop = outerPad + headerH + headerGap
-            val footerH = if (height >= dp(TODAY_NAV_MIN_HEIGHT_DP.toFloat())) {
-                dp(TODAY_NAV_BAR_HEIGHT_DP.toFloat())
+            // 底栏（胶囊 + ◀ ⟳ ▶）是布局里的真实 View，位图只负责给它留出高度
+            val footerH = if (height >= dp(FOOTER_MIN_HEIGHT_DP.toFloat())) {
+                dp(FOOTER_HEIGHT_DP.toFloat())
             } else {
                 0f
             }
@@ -274,7 +324,6 @@ object ScheduleWidgetRenderer {
                 filterByClock && all.isNotEmpty() -> drawDayDone(contentTop, contentH)
                 else -> drawNoCourse(contentTop, contentH)
             }
-            if (footerH > 0f) drawFooter(height - outerPad - footerH, footerH)
         }
 
         /** 这节课还没下课（下课时间严格晚于现在） */
@@ -480,107 +529,6 @@ object ScheduleWidgetRenderer {
             )
         }
 
-        /**
-         * 底部：左侧胶囊（今天显示「第 N 周」，翻天时显示「昨天 / 明天 / ±N 天」），
-         * 右侧是布局里的 ◀ ⟳ ▶ 三个按钮，所以胶囊的可用宽度必须扣掉整个按钮组，
-         * 否则文字会被按钮压住。
-         */
-        private fun drawFooter(top: Float, footerH: Float) {
-            val label = when (offsetDays) {
-                0L -> context.getString(com.lanhang.lite.R.string.widget_week_format, snapshot.week)
-                1L -> context.getString(com.lanhang.lite.R.string.widget_today_tomorrow)
-                -1L -> context.getString(com.lanhang.lite.R.string.widget_today_yesterday)
-                else -> context.getString(
-                    com.lanhang.lite.R.string.widget_day_offset_format,
-                    if (offsetDays > 0) "+$offsetDays" else "$offsetDays"
-                )
-            }
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            paint.textSize = dp(10f)
-            // 胶囊右边界 = 按钮组左边界 - 6dp；再扣掉胶囊自身左右内边距（各 5dp）
-            val navLeft = width - outerPad - dp(TODAY_NAV_GROUP_WIDTH_DP.toFloat())
-            val maxTextW = (navLeft - dp(6f) - outerPad - dp(10f)).coerceAtLeast(dp(8f))
-            // 2×2 用 154dp 宽度时，「第 4 周」放不下 → 退成「第4周」，再不够才省略号
-            val text = if (paint.measureText(label) <= maxTextW) {
-                label
-            } else {
-                val compact = if (offsetDays == 0L) {
-                    context.getString(com.lanhang.lite.R.string.widget_week_compact, snapshot.week)
-                } else {
-                    label
-                }
-                ellipsize(compact, maxTextW)
-            }
-            val labelW = paint.measureText(text) + dp(10f)
-            val pillH = minOf(dp(18f), footerH)
-            val pillTop = top + (footerH - pillH) / 2f
-            paint.color = palette.today
-            canvas.drawRoundRect(
-                RectF(outerPad, pillTop, outerPad + labelW, pillTop + pillH),
-                pillH / 2f,
-                pillH / 2f,
-                paint
-            )
-            paint.color = palette.primary
-            paint.textAlign = Paint.Align.CENTER
-            canvas.drawText(
-                text,
-                outerPad + labelW / 2f,
-                pillTop + pillH / 2f + paint.textSize * 0.35f,
-                paint
-            )
-            paint.textAlign = Paint.Align.LEFT
-            drawNavButtons(top, footerH)
-        }
-
-        /**
-         * 右下角三个「翻天」按钮的圆角底色：◀ 前一天 │ ⟳ 回到今天 │ ▶ 后一天。
-         *
-         * - 两侧箭头只有静态底色；三角图标由布局里的 ImageView 提供（浅/深两套 drawable）
-         * - 中间复位按钮有状态：**已经翻走**时用主色淡底（可点、有存在感），
-         *   **就在今天**时与两侧同底色、图标置灰（禁用态），点击不产生任何变化
-         *
-         * 这里只画底板，所以几何常量必须与 `layout/widget_schedule_week.xml` 保持一致：
-         * 24×22dp、间距 4dp、右边距 9dp（= outerPad）、垂直居中于底部条。
-         */
-        private fun drawNavButtons(top: Float, footerH: Float) {
-            val btnW = dp(TODAY_NAV_BUTTON_WIDTH_DP.toFloat())
-            val btnH = dp(TODAY_NAV_BUTTON_HEIGHT_DP.toFloat())
-            val gap = dp(TODAY_NAV_GAP_DP.toFloat())
-            val endPad = outerPad
-            val btnTop = top + (footerH - btnH) / 2f
-            val r = dp(7f)
-            val nextRight = width - endPad
-            val nextLeft = nextRight - btnW
-            val resetRight = nextLeft - gap
-            val resetLeft = resetRight - btnW
-            val prevRight = resetLeft - gap
-            val prevLeft = prevRight - btnW
-            paint.style = Paint.Style.FILL
-            paint.alpha = 255
-            val neutral = if (palette.isDark) 0x33FFFFFF else 0x17000000
-            paint.color = neutral
-            canvas.drawRoundRect(
-                RectF(prevLeft, btnTop, prevRight, btnTop + btnH), r, r, paint
-            )
-            canvas.drawRoundRect(
-                RectF(nextLeft, btnTop, nextRight, btnTop + btnH), r, r, paint
-            )
-            // 复位按钮：翻走 = 主色淡底高亮；在今天就 = 与两侧一致的静态底（图标另行置灰）
-            paint.color = if (offsetDays != 0L) {
-                withAlpha(palette.primary, if (palette.isDark) 0x3D else 0x2E)
-            } else {
-                neutral
-            }
-            canvas.drawRoundRect(
-                RectF(resetLeft, btnTop, resetRight, btnTop + btnH), r, r, paint
-            )
-        }
-
-        /** 只替换 alpha，保留 RGB（用于主色淡底） */
-        private fun withAlpha(color: Int, alpha: Int): Int =
-            (color and 0x00FFFFFF) or (alpha shl 24)
-
         /** 节次时间区间，如「08:00-11:40」；单节为整段「08:00-08:45」 */
         private fun timeRange(course: CourseBlock): String =
             PeriodClock.rangeText(course.start.coerceIn(1, 11), course.end.coerceIn(1, 11))
@@ -764,7 +712,6 @@ object ScheduleWidgetRenderer {
 
         private fun drawCourses(layouts: List<CourseLayout>) {
             if (layouts.isEmpty()) return
-            val nameSize = unifiedNameSize(layouts)
             for (layout in layouts) {
                 val baseColor = courseColor(layout.course.name)
                 val radius = minOf(dp(10f), minOf(layout.width, layout.height) / 2f)
@@ -801,67 +748,124 @@ object ScheduleWidgetRenderer {
                 paint.strokeWidth = 0f
                 paint.alpha = 255
                 val textColor = Color.WHITE
+                // 字号**按块自适应**：4×4 里同一周既有整列宽的块，也有并排分成两半的窄块，
+                // 取全网格最小值会把整周的字一起压到下限（并行块只有半列宽）。
+                val nameSize = fitNameSize(layout, NAME_MAX_SIZE_DP * density)
                 drawCourseName(layout, nameSize, textColor)
                 drawCourseRoom(layout, nameSize, textColor)
             }
         }
 
-        private fun unifiedNameSize(layouts: List<CourseLayout>): Float {
-            var size = dp(13f)
-            for (layout in layouts) {
-                val tokens = tokenize(layout.course.name)
-                val units = tokens.sumOf { it.units.toDouble() }.toFloat().coerceAtLeast(1f)
-                val roomReserve = roomReserve(layout)
-                val available = (layout.height - dp(8f) - roomReserve).coerceAtLeast(1f)
-                val ideal = minOf(available / units, layout.width * 0.78f)
-                if (ideal < size) size = ideal
+        /**
+         * 该块能**完整放下**课程名的最大字号。
+         *
+         * 课程名是**竖排**（一个字一行），一列排不下就折到右边的第二列，
+         * 最多 [NAME_MAX_COLS] 列，整组在色块里水平 + 垂直居中。
+         * 判定：① 列数不超过两列 ② 每列行数 × 行距不超可用高度 ③ 两列总宽不超块宽。
+         */
+        private fun fitNameSize(layout: CourseLayout, start: Float): Float {
+            val count = nameCharCount(layout.course.name)
+            if (count == 0) return start
+            val availW = nameMaxWidth(layout)
+            val availH = nameAvailHeight(layout)
+            var size = start
+            while (size > NAME_MIN_SIZE_DP * density) {
+                if (fitsColumns(count, size, availW, availH)) return size
+                size -= 0.5f * density
             }
-            return size.coerceIn(dp(7f), dp(13f))
+            return NAME_MIN_SIZE_DP * density
         }
 
+        /** 该字号下能否排进最多 [NAME_MAX_COLS] 列，且两列总宽、每列高度都够 */
+        private fun fitsColumns(count: Int, size: Float, availW: Float, availH: Float): Boolean {
+            val rows = rowsPerColumn(size, availH)
+            val cols = ceilDiv(count, rows)
+            if (cols > NAME_MAX_COLS) return false
+            return groupWidth(cols, size) <= availW + 0.01f
+        }
+
+        /** 一列最多放几个字（按可用高度与竖排行距算） */
+        private fun rowsPerColumn(size: Float, availH: Float): Int =
+            (availH / (size * NAME_ROW_SPACING)).toInt().coerceAtLeast(1)
+
+        /** 整组文字的宽度：列宽 = 一个字宽，列间留 [NAME_COL_GAP] 个字的间隙 */
+        private fun groupWidth(cols: Int, size: Float): Float {
+            if (cols <= 1) return size
+            return cols * size + (cols - 1) * size * NAME_COL_GAP
+        }
+
+        private fun ceilDiv(a: Int, b: Int): Int = (a + b - 1) / b
+
+        /** 课程名逐字拆开（竖排一格一个字），空格丢弃 */
+        private fun nameChars(name: String): List<String> =
+            name.filterNot { it == '\n' || it == ' ' || it == '\u3000' }.map { it.toString() }
+
+        private fun nameCharCount(name: String): Int =
+            name.count { it != '\n' && it != ' ' && it != '\u3000' }
+
+        /** 课程名可用的横向空间（扣掉左右内边距） */
+        private fun nameMaxWidth(layout: CourseLayout): Float =
+            (layout.width - NAME_PAD_H_DP * density * 2f).coerceAtLeast(1f)
+
+        /** 课程名可用的纵向空间（扣掉上下内边距与底部的教室行） */
+        private fun nameAvailHeight(layout: CourseLayout): Float =
+            (layout.height - NAME_PAD_V_DP * density * 2f - roomReserve(layout)).coerceAtLeast(1f)
+
+        /**
+         * 底部教室行要预留的高度。
+         *
+         * 不能只留 7dp：教室字号约 7dp、基线距底约 5.6dp，字形顶部实际到距底 ~12dp，
+         * 预留不足会让最后一行课程名和教室叠在一起（vivo 200% 字体缩放下更明显）。
+         * 块太矮（单节）时按比例缩，最多占 32%。
+         */
         private fun roomReserve(layout: CourseLayout): Float {
             if (layout.course.room.isBlank() || layout.height < dp(14f)) return 0f
-            return minOf(dp(7f), layout.height * 0.28f)
+            return minOf(dp(12f), layout.height * 0.32f)
         }
 
+        /**
+         * 课程名：**竖排、最多两列、整组在色块正中间**。
+         *
+         * 一个字一行往下排，一列排满就折到右边第二列（左列从「第一个字」开始，
+         * 右列承接剩下的）——这样只占两个字的宽度，块里左右都留白，
+         * 不会像横排那样把整块宽度撑满。两列整体水平居中、整体垂直居中。
+         */
         private fun drawCourseName(layout: CourseLayout, nameSize: Float, textColor: Int) {
-            val tokens = tokenize(layout.course.name)
-            if (tokens.isEmpty()) return
-            val pad = dp(4f)
-            val roomReserve = roomReserve(layout)
-            val available = (layout.height - pad * 2f - roomReserve).coerceAtLeast(1f)
-            val blockUnits = tokens.sumOf { it.units.toDouble() }.toFloat()
-            val maxUnits = available / nameSize
-            val truncated = blockUnits > maxUnits + 0.01f
-            val limit = if (truncated) (maxUnits - 1f).coerceAtLeast(0f) else maxUnits
-            val visibleUnits = if (truncated) maxUnits else blockUnits
-            var y = layout.top + pad + ((available - visibleUnits * nameSize).coerceAtLeast(0f) / 2f)
-            var used = 0f
-            val centerX = layout.left + layout.width / 2f
+            val chars = nameChars(layout.course.name)
+            if (chars.isEmpty()) return
+            val availH = nameAvailHeight(layout)
+            val rowH = nameSize * NAME_ROW_SPACING
+            val rowsByHeight = rowsPerColumn(nameSize, availH)
+            var shown = chars.size
+            var cols = ceilDiv(chars.size, rowsByHeight)
+            if (cols > NAME_MAX_COLS) {
+                // 字号已到下限还排不下：固定在两列，多余的截断
+                cols = NAME_MAX_COLS
+                shown = minOf(chars.size, cols * rowsByHeight)
+            }
+            // 字数装得下一列就只排一列（短课名不该被硬拆成两列）
+            cols = minOf(cols, ceilDiv(shown, rowsByHeight))
+            val rows = ceilDiv(shown, cols)
+            val truncated = shown < chars.size
+            val drawable = if (truncated) (shown - 1).coerceAtLeast(1) else shown
+            val totalW = groupWidth(cols, nameSize)
+            val totalH = rows * rowH
+            val groupLeft = layout.left + (layout.width - totalW) / 2f
+            val groupTop = layout.top + NAME_PAD_V_DP * density + (availH - totalH) / 2f
+            val colStep = nameSize * (1f + NAME_COL_GAP)
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.textAlign = Paint.Align.CENTER
             paint.color = textColor
             paint.alpha = 255
-            for (token in tokens) {
-                if (used + token.units > limit + 0.01f) break
-                val tokenH = token.units * nameSize
-                if (token.rotated) {
-                    canvas.save()
-                    canvas.translate(centerX, y + tokenH / 2f)
-                    canvas.rotate(90f)
-                    paint.textSize = nameSize
-                    canvas.drawText(token.text, 0f, nameSize * 0.35f, paint)
-                    canvas.restore()
-                } else {
-                    paint.textSize = nameSize
-                    canvas.drawText(token.text, centerX, y + nameSize * 0.82f, paint)
-                }
-                y += tokenH
-                used += token.units
-            }
-            if (truncated && used + 1f <= maxUnits + 0.01f) {
-                paint.textSize = nameSize
-                canvas.drawText("…", centerX, y + nameSize * 0.82f, paint)
+            paint.textSize = nameSize
+            for (index in 0 until shown) {
+                val col = index / rows
+                val row = index % rows
+                val text = if (truncated && index >= drawable) "…" else chars[index]
+                val centerX = groupLeft + col * colStep + nameSize / 2f
+                // 基线用 0.78em：字形上方留 0.78、下方 descent 约 0.22，正好填满一行
+                val baseline = groupTop + row * rowH + nameSize * 0.78f
+                canvas.drawText(text, centerX, baseline, paint)
             }
         }
 
@@ -944,36 +948,6 @@ object ScheduleWidgetRenderer {
 
         private fun blockAlpha(): Int = if (palette.isDark) 220 else 205
 
-        private fun tokenize(name: String): List<TextToken> {
-            val source = name.filter { it != '\n' && it != ' ' }
-            if (source.isEmpty()) return emptyList()
-            val tokens = mutableListOf<TextToken>()
-            val latin = StringBuilder()
-            fun flushLatin() {
-                if (latin.isEmpty()) return
-                val text = latin.toString()
-                val units = if (text.length > 1) {
-                    paint.textSize = 1f
-                    paint.measureText(text)
-                } else {
-                    1f
-                }
-                tokens.add(TextToken(text, text.length > 1, units))
-                latin.clear()
-            }
-            for (char in source) {
-                val isLatin = char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9'
-                if (isLatin) {
-                    latin.append(char)
-                } else {
-                    flushLatin()
-                    tokens.add(TextToken(char.toString(), false, 1f))
-                }
-            }
-            flushLatin()
-            return tokens
-        }
-
         private fun dp(value: Float): Float = value * density
     }
 
@@ -989,12 +963,6 @@ object ScheduleWidgetRenderer {
         val course: CourseBlock,
         val lane: Int,
         val laneCount: Int
-    )
-
-    private data class TextToken(
-        val text: String,
-        val rotated: Boolean,
-        val units: Float
     )
 
     private data class Palette(

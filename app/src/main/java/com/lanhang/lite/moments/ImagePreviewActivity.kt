@@ -13,9 +13,16 @@ import androidx.viewpager2.widget.ViewPager2
 import coil.load
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityImagePreviewBinding
+import com.lanhang.lite.util.LocaleHelper
 
 /** 工作圈图片全屏预览：左右滑动多图，双指/双击缩放，单击关闭 */
 class ImagePreviewActivity : AppCompatActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        // 语言切换见 LocaleHelper：用 createConfigurationContext 包 base context，
+        // 切语言时由设置页显式 recreate()，不走系统的 per-app locale（会黑屏）
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
 
     private lateinit var binding: ActivityImagePreviewBinding
     private val urls by lazy { intent.getStringArrayListExtra(EXTRA_URLS).orEmpty() }

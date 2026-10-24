@@ -151,9 +151,10 @@ object ScheduleWidgetData {
             for (course in period.courses.orEmpty()) {
                 if (!course.isWeekValid(week) || !course.isOddEvenValid(week)) continue
                 val name = course.name?.trim().orEmpty().ifEmpty {
-                    com.lanhang.lite.schedule.AppContext.instance.getString(
-                        com.lanhang.lite.R.string.schedule_unnamed_course
-                    )
+                    // 兜底文案跟着应用语言走（这里是 Application context），见 LocaleHelper
+                    com.lanhang.lite.util.LocaleHelper.wrap(
+                        com.lanhang.lite.schedule.AppContext.instance
+                    ).getString(com.lanhang.lite.R.string.schedule_unnamed_course)
                 }
                 items.add(
                     CourseBlock(
