@@ -189,6 +189,18 @@ adb shell run-as com.lanhang.lite cat files/moments_last.json            # 工�
 - `MiniappApi.getScheduleRaw` 每次把返回体写 `filesDir/schedule_wcur.json`
 - 菜单 `action_debug_schedule` 手动触发握手+拉课表并保存
 
+### 临时文件与调试产物（2026-10-24）
+**仓库根目录只放源码、构建脚本、文档和长期参考资料；一切测试/调试产物必须写进 `.workbuddy/tmp/`。**
+
+- **唯一临时目录**：`.workbuddy/tmp/`，按用途分子目录：
+  - `.workbuddy/tmp/dumps/` —— 抓包与响应 dump（`w1..w20.json`、`cfg_dump*`、`sched_*`、`moments_last*`）、会话快照（`cookies*.xml`、`sp_*.xml`）、`ui*.xml`（uiautomator）、日志（`*.log`、`build_log.txt`）、一次性分析脚本（`analyze_sched.ps1`、`scan_dead_code.py`）、`loc*.mp4` 录屏。
+  - `.workbuddy/tmp/screenshots/` —— adb/真机截图、离线渲染出的对照图（`fab*.png`、`rt*.png`、`shot_*.png`、`band_*.png` 等）。
+  - `.workbuddy/tmp/*.py` —— 离线排版/预览生成脚本（`preview_week4x4.py`、`gen_widget_preview.py`），保留可复现性，但仍在临时目录内。
+- **禁止**：在仓库根目录新建 `*.png` / `*.json` / `*.xml` / `*.txt` / `*.mp4` / 临时 `.py` `.ps1`；不要用 `.workbuddy/` 根或 `app/` 下任何位置当草稿区。
+- **统一清理**：`rm -rf .workbuddy/tmp`（Windows：`Remove-Item -Recurse -Force .workbuddy\\tmp`）即可一次清空全部临时文件；**`.workbuddy/memory/`、`.workbuddy/` 下的配置与项目数据不在此列，禁止一并删除**。
+- **为什么**：`.workbuddy/` 已整体被 `.gitignore` 排除（含真机截图里的真实姓名/学号），放在里面既不会误提交，也能一个目录删干净；此前 86 个调试文件（54MB）散落在仓库根目录，既干扰阅读又有隐私泄漏风险。
+- 设备侧 dump（`files/schedule_wcur.json` 等）仍在 App 私有目录，需要时用 `adb shell run-as com.lanhang.lite cat …` 读取，落到本机时放 `.workbuddy/tmp/dumps/`。
+
 ---
 
 ## 5. 约定与红线
@@ -233,3 +245,4 @@ adb shell run-as com.lanhang.lite cat files/moments_last.json            # 工�
 - 图标用官方 Material Symbols（如 `drawable/ic_calendar.xml` = Material Symbols Rounded `calendar_month` 原版路径 + `translateY=960` 转换），配 `?attr/colorPrimary` 着色。
 - 课表数据只存本机（filesDir 缓存 + SP），不外传；密码仅在登录时 RSA 加密上送。
 - **每次功能实现完必须安装（2026-10-23）**：任何功能（新特性/修改）实现完成后，流程固定为「构建 → adb 安装到设备（上文 push + `pm install -r`）→ 非界面测试（启动/崩溃/logcat/构建校验）→ 交付」，**不允许只构建不安装就交付**；滑动、点击、截图等表面测试由用户完成，结果由用户反馈。
+- **临时文件只进 `.workbuddy/tmp/`（2026-10-24，用户明确要求）**：截图、抓包 dump、会话快照、日志、一次性脚本一律放 `.workbuddy/tmp/{screenshots,dumps}/`，**仓库根目录保持干净**（根目录只留 `AGENTS.md` / `README.md` / `LICENSE` / `build.gradle.kts` / `settings.gradle.kts` / `gradle.properties` / `local.properties` / `.gitignore` 与 `app/`、`.workbuddy/memory/`、`decompiled/`、`tools/`、`_pocketdiary/`、`_backdrop/` 等目录）。清理时只删 `.workbuddy/tmp`，不得连带删除 `.workbuddy/memory` 或其他项目数据。细则见第 4 节「临时文件与调试产物」。
