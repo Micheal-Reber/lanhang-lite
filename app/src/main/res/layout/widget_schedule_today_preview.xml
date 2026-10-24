@@ -51,7 +51,7 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- 第 1 行：正在上课 → 右侧「剩 N 分」（卡片统一白字，与真实渲染一致） -->
+        <!-- 第 1 行：正在上课 → 右侧「剩 N 分」倒计时胶囊（蓝字，≤10 分钟转红，与真实渲染一致） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -77,9 +77,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
+                android:background="@drawable/widget_preview_countdown_badge"
                 android:maxLines="1"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="1dp"
                 android:text="@string/widget_preview_countdown"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#FF4FC3F7"
                 android:textSize="9sp"
                 android:textStyle="bold" />
         </LinearLayout>

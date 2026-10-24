@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「剩 N 分」倒计时胶囊：压暗卡底色，让蓝/红字在任意课程色上都够对比（与真实渲染一致） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="8dp" />
+    <solid android:color="#42000000" />
+</shape>
