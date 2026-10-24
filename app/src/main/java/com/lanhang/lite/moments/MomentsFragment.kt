@@ -1,17 +1,23 @@
 package com.lanhang.lite.moments
 
 import android.content.res.Configuration
+import android.graphics.Outline
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
+import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.HorizontalScrollView
 import android.net.Uri
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -28,6 +35,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.FragmentMomentsBinding
@@ -53,14 +62,21 @@ class MomentsFragment : Fragment() {
     private var publishing = false
     private val selectedImages = mutableListOf<Uri>()
     private var publishImagesRow: LinearLayout? = null
-    private var publishImageCount: TextView? = null
+
+    /** 发布面板当前状态的刷新入口（字数、按钮可用性），面板关闭后置空 */
+    private var publishRefreshState: (() -> Unit)? = null
 
     private val imagePicker = registerForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(9)
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PUBLISH_IMAGES)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            selectedImages.clear()
-            selectedImages.addAll(uris.take(9))
+            // 追加而不是替换：再次点「添加」不能把已经选好的图冲掉。
+            // 同一个 Uri 重复选中只保留一份，总数仍受 9 张上限约束。
+            uris.forEach { uri ->
+                if (selectedImages.size < MAX_PUBLISH_IMAGES && selectedImages.none { it == uri }) {
+                    selectedImages.add(uri)
+                }
+            }
             renderSelectedImages()
         }
     }
@@ -255,105 +271,215 @@ class MomentsFragment : Fragment() {
 
     private fun showPublishDialog() {
         selectedImages.clear()
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.moments_publish_hint)
-            setPadding(48, 32, 48, 16)
-            minLines = 4
-            gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
-        val imageCount = TextView(requireContext()).apply {
-            textSize = 13f
-            setTextColor(requireContext().getColor(com.google.android.material.R.color.material_on_surface_emphasis_medium))
-            setPadding(16, 8, 16, 4)
-        }
-        val imageRow = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 4, 12, 8)
-        }
-        val imageScroller = HorizontalScrollView(requireContext()).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(imageRow, FrameLayout.LayoutParams(-1, -2))
-        }
+        val ctx = requireContext()
+        val content = layoutInflater.inflate(R.layout.dialog_publish_moment, null)
+        val input = content.findViewById<EditText>(R.id.etContent)
+        val counter = content.findViewById<TextView>(R.id.tvCounter)
+        val imageRow = content.findViewById<LinearLayout>(R.id.imageRow)
+        val btnCancel = content.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnPublish = content.findViewById<MaterialButton>(R.id.btnPublish)
+        val btnClose = content.findViewById<ImageButton>(R.id.btnClose)
         publishImagesRow = imageRow
-        publishImageCount = imageCount
-        val addImages = TextView(requireContext()).apply {
-            text = getString(R.string.moments_add_image)
-            textSize = 14f
-            setTextColor(requireContext().getColor(com.lanhang.lite.R.color.primary))
-            setPadding(16, 12, 16, 12)
-            setOnClickListener {
-                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
+
+        val limit = PUBLISH_MAX_LENGTH
+        val colorVariant = MaterialColors.getColor(
+            counter,
+            com.google.android.material.R.attr.colorOnSurfaceVariant
+        )
+        val colorError = MaterialColors.getColor(
+            counter,
+            com.google.android.material.R.attr.colorError
+        )
+
+        // 字数与主按钮可用性一起刷新：空内容时「发表」置灰，不靠点击后弹提示
+        val refreshState = {
+            val length = input.text.length
+            counter.text = getString(R.string.moments_publish_counter, length, limit)
+            counter.setTextColor(if (length >= limit) colorError else colorVariant)
+            btnPublish.isEnabled = length > 0 || selectedImages.isNotEmpty()
         }
-        val content = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(input, LinearLayout.LayoutParams(-1, -2))
-            addView(imageCount, LinearLayout.LayoutParams(-1, -2))
-            addView(imageScroller, LinearLayout.LayoutParams(-1, -2))
-            addView(addImages, LinearLayout.LayoutParams(-1, -2))
-        }
-        val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.moments_publish_title)
-            .setView(content)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.moments_publish, null)
+        publishRefreshState = refreshState
+
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(
+                s: CharSequence?,
+                start: Int,
+                count: Int,
+                after: Int
+            ) = Unit
+
+            override fun onTextChanged(
+                s: CharSequence?,
+                start: Int,
+                before: Int,
+                count: Int
+            ) = Unit
+
+            override fun afterTextChanged(s: Editable?) = refreshState()
+        })
+
+        renderSelectedImages()
+        refreshState()
+
+        val dialog = MaterialAlertDialogBuilder(ctx)
+            .setView(content, 0, 0, 0, 0)
             .create()
-        dialog.setOnShowListener {
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val text = input.text.toString().trim()
-                val images = selectedImages.toList()
-                if (text.isEmpty() && images.isEmpty()) {
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+        btnClose.setOnClickListener { dialog.dismiss() }
+        btnPublish.setOnClickListener {
+            val text = input.text.toString().trim()
+            val images = selectedImages.toList()
+            when {
+                text.isEmpty() && images.isEmpty() ->
                     toast(getString(R.string.moments_publish_empty))
-                    return@setOnClickListener
-                }
-                if (text.length > 2000) {
+
+                text.length > limit ->
                     toast(getString(R.string.moments_publish_too_long))
-                    return@setOnClickListener
+
+                else -> {
+                    dialog.dismiss()
+                    publish(text, images)
                 }
-                dialog.dismiss()
-                publish(text, images)
             }
+        }
+
+        dialog.setOnShowListener {
+            dialog.window?.apply {
+                setLayout(
+                    (resources.displayMetrics.widthPixels * 0.93f).toInt(),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                // 键盘弹出时压缩面板高度，而不是把整块顶到屏幕外
+                setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            }
+        }
+        dialog.setOnDismissListener {
+            publishImagesRow = null
+            publishRefreshState = null
         }
         dialog.show()
     }
 
+    /** 缩略图 + 末尾的「添加」方块；选满 9 张后添加方块自动消失 */
     private fun renderSelectedImages() {
         val row = publishImagesRow ?: return
         row.removeAllViews()
+        val ctx = requireContext()
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val tileSize = dp(78)
+        val radius = 14f * density
+        // 用随明暗主题切换的强调色（日间深蓝 / 夜间浅蓝），
+        // colorPrimary 在夜间仍是 #084168，压在深色面板上会看不清
+        val accent = ContextCompat.getColor(ctx, R.color.week_pill_text)
+
         selectedImages.forEachIndexed { index, uri ->
-            val tile = FrameLayout(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams(72.dp, 72.dp).apply { marginEnd = 8.dp }
+            val tile = FrameLayout(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(tileSize, tileSize).apply {
+                    marginEnd = dp(10)
+                }
+                isClickable = true
+                isFocusable = true
+                // 点缩略图看大图：复用工作圈的全屏预览（多图可左右滑、双击缩放、单击关闭）
+                setOnClickListener {
+                    if (index in selectedImages.indices) {
+                        ImagePreviewActivity.start(
+                            ctx,
+                            selectedImages.map { it.toString() },
+                            index
+                        )
+                    }
+                }
             }
-            val image = ImageView(requireContext()).apply {
+            val image = ImageView(ctx).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, radius)
+                    }
+                }
+                clipToOutline = true
                 load(uri)
             }
             tile.addView(image, FrameLayout.LayoutParams(-1, -1))
-            val remove = TextView(requireContext()).apply {
-                text = "×"
-                textSize = 18f
-                gravity = android.view.Gravity.CENTER
-                setTextColor(android.graphics.Color.WHITE)
-                setBackgroundColor(0x99000000.toInt())
+
+            val remove = ImageView(ctx).apply {
+                setImageResource(R.drawable.ic_close)
+                setColorFilter(android.graphics.Color.WHITE)
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(0xC2000000.toInt())
+                }
+                contentDescription = getString(R.string.moments_remove_image)
                 setOnClickListener {
-                    selectedImages.removeAt(index)
-                    renderSelectedImages()
+                    if (index in selectedImages.indices) {
+                        selectedImages.removeAt(index)
+                        renderSelectedImages()
+                    }
                 }
             }
-            tile.addView(remove, FrameLayout.LayoutParams(24.dp, 24.dp, android.view.Gravity.TOP or android.view.Gravity.END))
+            tile.addView(
+                remove,
+                FrameLayout.LayoutParams(
+                    dp(22),
+                    dp(22),
+                    android.view.Gravity.TOP or android.view.Gravity.END
+                ).apply {
+                    topMargin = dp(4)
+                    marginEnd = dp(4)
+                }
+            )
             row.addView(tile)
         }
-        publishImageCount?.text = if (selectedImages.isEmpty()) {
-            getString(R.string.moments_image_hint)
-        } else {
-            getString(R.string.moments_image_selected, selectedImages.size)
-        }
-    }
 
-    private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
+        if (selectedImages.size < MAX_PUBLISH_IMAGES) {
+            val add = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                background = ContextCompat.getDrawable(ctx, R.drawable.bg_publish_add_tile)
+                layoutParams = LinearLayout.LayoutParams(tileSize, tileSize)
+                isClickable = true
+                isFocusable = true
+                contentDescription = getString(R.string.moments_add_image_short)
+                setOnClickListener {
+                    imagePicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+            }
+            add.addView(
+                ImageView(ctx).apply {
+                    setImageResource(R.drawable.ic_add)
+                    setColorFilter(accent)
+                },
+                LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                    gravity = android.view.Gravity.CENTER_HORIZONTAL
+                }
+            )
+            add.addView(
+                TextView(ctx).apply {
+                    text = getString(R.string.moments_add_image_short)
+                    textSize = 11f
+                    gravity = android.view.Gravity.CENTER
+                    setTextColor(accent)
+                    setPadding(0, dp(4), 0, 0)
+                },
+                // 显式居中：文字与上面的加号保持同一条竖直中线
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = android.view.Gravity.CENTER_HORIZONTAL
+                }
+            )
+            row.addView(add)
+        }
+
+        // 图片增减会影响「发表」按钮的可用性
+        publishRefreshState?.invoke()
+    }
 
     private fun publish(text: String, images: List<Uri>) {
         if (publishing) return
@@ -376,7 +502,7 @@ class MomentsFragment : Fragment() {
                 toast(getString(R.string.moments_publish_failed, e.message.orEmpty()))
             } finally {
                 publishImagesRow = null
-                publishImageCount = null
+                publishRefreshState = null
                 publishing = false
                 binding.progress.isVisible = false
             }
@@ -467,5 +593,13 @@ class MomentsFragment : Fragment() {
 
     private fun toast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    private companion object {
+        /** 一次最多 9 张图（与朋友圈一致） */
+        const val MAX_PUBLISH_IMAGES = 9
+
+        /** 正文上限，与服务端校验保持一致 */
+        const val PUBLISH_MAX_LENGTH = 2000
     }
 }
