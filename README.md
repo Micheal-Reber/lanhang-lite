@@ -1,5 +1,7 @@
 # 蓝航Lite（LanhangLite）
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 南昌航空大学「蓝航」App 的第三方轻量客户端（`com.lanhang.lite`）。
 
 > 本项目与南昌航空大学及官方「蓝航」App 无关，接口协议来自公开抓包与逆向分析，仅供学习交流。
@@ -56,4 +58,4 @@ lanhangReleaseKeyPassword=***
 
 ## 许可证
 
-[GPL-3.0](LICENSE)
+[MIT](LICENSE)
