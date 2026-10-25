@@ -14,14 +14,18 @@
 - 工作圈：融云圈动态浏览、点赞、评论、图片预览
 - 桌面小组件（课表）
 - 亮色 / 暗色 / 跟随系统主题
+- 界面基于 [Miuix](https://github.com/compose-miuix-ui/miuix)（HyperOS 设计语言）构建
 
 ## 构建
 
 环境要求：
 
 - JDK 17
-- Android SDK（compileSdk 36，minSdk 26）
-- AGP 8.5.2 / Kotlin 1.9.24
+- Android SDK（compileSdk 37，minSdk 26）
+- AGP 8.13.2 / Kotlin 2.3.21
+
+> compileSdk 37 尚未被 AGP 8.13 正式支持，`gradle.properties` 里已带
+> `android.suppressUnsupportedCompileSdk=37`；这是 Miuix 0.9.1 的 AAR 元数据要求。
 
 ```powershell
 gradle assembleDebug
@@ -41,6 +45,24 @@ lanhangReleaseKeyAlias=***
 lanhangReleaseKeyPassword=***
 ```
 
+## 代码结构
+
+```
+app/src/main/java/com/lanhang/lite/
+├── ui/            # 外壳（MainActivity + 顶栏/底栏 ComposeView）
+│   ├── miuix/     # Miuix 主题、对话框封装（MiuixDialog）
+│   └── shell/     # 外壳状态与顶栏/底栏 Composable
+├── schedule/      # 课表：自绘网格（View）+ Compose 页头
+├── grades/        # 成绩（Compose）
+├── moments/       # 工作圈（Compose）+ 图片预览（Activity）
+├── settings/      # 设置（Compose）
+├── net/ session/  # 接口与登录态（未改动）
+└── widget/        # 桌面小组件（未改动）
+```
+
+界面分层约定：每个页面一个 Compose 屏，页面根节点保持不透明；弹窗统一走
+`ui/miuix/MiuixDialog.kt`；外壳只切换内容区，切页只有一层在动。
+
 ## 数据来源
 
 | 端点 | 用途 |
@@ -53,6 +75,7 @@ lanhangReleaseKeyPassword=***
 
 ## 致谢
 
+- UI 设计语言：[Miuix](https://github.com/compose-miuix-ui/miuix)（Apache-2.0）
 - UI 设计风格参考 [sleepy](https://github.com/lingion/sleepy)（GPL-3.0）
 - 液态玻璃底栏实验参考 PocketDiary
 

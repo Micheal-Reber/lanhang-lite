@@ -6,28 +6,19 @@ import android.graphics.drawable.GradientDrawable
 import com.google.android.material.R as MaterialR
 
 /**
- * 课表配色令牌。两套来源：
- * - [fromTheme]：没有自定义背景时，完全沿用 Material 主题色（原有外观不变）。
- * - [fromBackdrop]：有自定义背景时，由 [ScheduleBackdrop.Analysis] 推导，
- *   文字/卡片/分割线全部按背景明暗与主色调重新计算，与系统明暗主题解耦。
+ * 课表配色令牌，全部由应用主题（Miuix 语义色 / Material 属性）派生，
+ * 保证课表与 Compose 页面在浅色、深色下都是同一套观感。
  */
 class ScheduleStyle(
-    val custom: Boolean,
     val onBackground: Int,
     val onBackgroundVariant: Int,
-    val onBackgroundFaint: Int,
     val outline: Int,
     val divider: Int,
     val cardFill: Int,
     val chipFill: Int,
-    val circleFill: Int,
-    val panelFill: Int,
     val accent: Int,
     val accentFill: Int,
-    val onAccentFill: Int,
-    val bandFill: Int,
-    val veilColor: Int,
-    val veilAlpha: Float
+    val onAccentFill: Int
 ) {
 
     /** 圆角矩形；fill 可带透明度（自定义背景下的半透明卡片） */
@@ -41,11 +32,6 @@ class ScheduleStyle(
         cornerRadius = radiusDp * density
         setColor(fill)
         if (strokeDp > 0f) setStroke((strokeDp * density).toInt().coerceAtLeast(1), strokeColor)
-    }
-
-    fun circle(density: Float, fill: Int): GradientDrawable = GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(fill)
     }
 
     /**
@@ -64,11 +50,42 @@ class ScheduleStyle(
         withAlpha(onBackground, 0.10f)
     }
 
+    /**
+     * 课程块底色（Miuix 化，2026-10-24）：不用满色块，改成「同色相低透明度染色」，
+     * 与 Miuix / HyperOS 日历的染色卡片是同一套观感；深色底自动提高透明度以保持可见。
+     */
+    fun courseFill(color: Int): Int =
+        if (cardIsLight) pastel(color, 0.62f, 0.90f) else pastel(color, 0.40f, 0.26f)
+
+    /**
+     * 染底块上的文字与左侧色条：浅底用同色相高饱和深色，深底用提亮的同色，
+     * 保证「块内文字」和「浅色底」始终是同一色相的两档明度（参考截图的做法）。
+     */
+    fun onCourseTint(color: Int): Int =
+        if (cardIsLight) pastel(color, 0.72f, 0.38f) else pastel(color, 0.55f, 0.80f)
+
+    /** 取原色色相，换成指定饱和/明度的 HSL 色（同色系浅底 + 深字） */
+    private fun pastel(color: Int, s: Float, l: Float): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        return androidx.core.graphics.ColorUtils.HSLToColor(floatArrayOf(hsv[0], s, l))
+    }
+
+    /** 当前卡片底是浅色吗（决定染色深浅与文字取色方向） */
+    private val cardIsLight: Boolean
+        get() {
+            val c = cardFill
+            val r = Color.red(c) / 255f
+            val g = Color.green(c) / 255f
+            val b = Color.blue(c) / 255f
+            return (0.299f * r + 0.587f * g + 0.114f * b) > 0.5f
+        }
+
     companion object {
         val DARK_TEXT = 0xFF12181D.toInt()
         val LIGHT_TEXT = 0xFFFFFFFF.toInt()
 
-        private const val FALLBACK_PRIMARY = 0xFF084168.toInt()
+        private const val FALLBACK_PRIMARY = 0xFF3482FF.toInt()
 
         /**
          * 课程配色：HSL 黄金角分布，同课同色、不同课色相差约 137°。
@@ -109,49 +126,21 @@ class ScheduleStyle(
             val variant = themeColor(context, MaterialR.attr.colorOnSurfaceVariant, onBackground)
             val night = isNight(context)
             return ScheduleStyle(
-                custom = false,
                 onBackground = onBackground,
                 onBackgroundVariant = variant,
-                onBackgroundFaint = withAlpha(variant, 0.78f),
                 outline = themeColor(context, MaterialR.attr.colorOutline, variant),
                 divider = withAlpha(onBackground, if (night) 0.16f else 0.10f),
                 cardFill = themeColor(context, MaterialR.attr.colorSurfaceContainerLow, onBackground),
                 chipFill = themeColor(context, MaterialR.attr.colorSurfaceContainer, onBackground),
-                circleFill = themeColor(context, MaterialR.attr.colorSurfaceContainerHigh, onBackground),
-                panelFill = themeColor(context, MaterialR.attr.colorSurfaceContainerHigh, onBackground),
                 accent = themeColor(context, MaterialR.attr.colorPrimary, FALLBACK_PRIMARY),
-                accentFill = themeColor(context, MaterialR.attr.colorSecondaryContainer, variant),
-                onAccentFill = themeColor(context, MaterialR.attr.colorOnSecondaryContainer, onBackground),
-                bandFill = themeColor(context, MaterialR.attr.colorSurfaceContainerHigh, onBackground),
-                veilColor = Color.TRANSPARENT,
-                veilAlpha = 0f
-            )
-        }
-
-        fun fromBackdrop(analysis: ScheduleBackdrop.Analysis): ScheduleStyle {
-            val veil = analysis.veilColor
-            val cardAlpha = (analysis.veilAlpha + 0.18f).coerceIn(0.30f, 0.95f)
-            val onBackground = if (analysis.darkText) DARK_TEXT else LIGHT_TEXT
-            val variant = if (analysis.darkText) 0xFF3C454D.toInt() else 0xFFD9E2EA.toInt()
-            val accentFill = mix(veil, analysis.accent, 0.20f)
-            val onAccentFill = ensureContrast(analysis.accent, accentFill, analysis.darkText, 4.3)
-            return ScheduleStyle(
-                custom = true,
-                onBackground = onBackground,
-                onBackgroundVariant = variant,
-                onBackgroundFaint = withAlpha(variant, 0.72f),
-                outline = withAlpha(onBackground, 0.42f),
-                divider = withAlpha(onBackground, 0.16f),
-                cardFill = withAlpha(veil, cardAlpha),
-                chipFill = withAlpha(veil, (cardAlpha - 0.06f).coerceAtLeast(0.20f)),
-                circleFill = withAlpha(veil, cardAlpha),
-                panelFill = withAlpha(veil, cardAlpha),
-                accent = onAccentFill,
-                accentFill = accentFill,
-                onAccentFill = onAccentFill,
-                bandFill = withAlpha(veil, cardAlpha),
-                veilColor = veil,
-                veilAlpha = analysis.veilAlpha
+                // 2026-10-25 用户要求：当天必须「蓝色文字 + 蓝色底」强调。
+                // 原来用 secondaryContainer / onSecondaryContainer，在 Miuix 主题里是灰色，
+                // 看起来像「禁用」而不是「今天」。现在由主色派生：淡蓝底 + 主色文字。
+                accentFill = withAlpha(
+                    themeColor(context, MaterialR.attr.colorPrimary, FALLBACK_PRIMARY),
+                    if (night) 0.24f else 0.14f,
+                ),
+                onAccentFill = themeColor(context, MaterialR.attr.colorPrimary, FALLBACK_PRIMARY),
             )
         }
 
@@ -193,32 +182,5 @@ class ScheduleStyle(
             return Color.argb(a, Color.red(color), Color.green(color), Color.blue(color))
         }
 
-        /** sRGB 空间线性混合（与 Android 的 alpha 合成/渐变插值一致） */
-        fun mix(base: Int, target: Int, ratio: Float): Int {
-            val t = ratio.coerceIn(0f, 1f)
-            return Color.rgb(
-                (Color.red(base) + (Color.red(target) - Color.red(base)) * t).toInt(),
-                (Color.green(base) + (Color.green(target) - Color.green(base)) * t).toInt(),
-                (Color.blue(base) + (Color.blue(target) - Color.blue(base)) * t).toInt()
-            )
-        }
-
-        /** 保持色相/饱和度，仅调明度直到与 [against] 达到 [target] 对比度 */
-        fun ensureContrast(color: Int, against: Int, darkText: Boolean, target: Double): Int {
-            if (contrast(color, against) >= target) return color
-            val hsv = FloatArray(3)
-            Color.colorToHSV(color, hsv)
-            var value = hsv[2]
-            var current = color
-            repeat(26) {
-                value = if (darkText) (value - 0.035f).coerceAtLeast(0.06f)
-                else (value + 0.035f).coerceAtMost(1f)
-                current = Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], value))
-                if (contrast(current, against) >= target) return current
-                if (darkText && value <= 0.06f) return current
-                if (!darkText && value >= 1f) return current
-            }
-            return current
-        }
     }
 }

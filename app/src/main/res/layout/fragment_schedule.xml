@@ -3,30 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
-
-    <!-- 自定义背景三层：底色/图片 → 自适应遮罩 → 内容 -->
-    <View
-        android:id="@+id/bgSolidLayer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
-
-    <ImageView
-        android:id="@+id/bgImageLayer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:importantForAccessibility="no"
-        android:scaleType="centerCrop"
-        android:visibility="gone" />
-
-    <View
-        android:id="@+id/bgVeil"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:importantForAccessibility="no"
-        android:visibility="gone" />
+    android:background="@color/page_bg">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -38,75 +15,11 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <!-- 顶栏：左日历 | 居中 < 第N周 > | 右视图切换 -->
-            <FrameLayout
+            <!-- 顶栏：Miuix 的周次胶囊 + 网格/周视图分段控件（见 schedule/ScheduleHeader.kt） -->
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/scheduleHeader"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:paddingHorizontal="12dp">
-
-                <ImageButton
-                    android:id="@+id/btnCalendar"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_gravity="start|center_vertical"
-                    android:background="@drawable/bg_circle_button"
-                    android:contentDescription="@string/schedule_jump_week"
-                    android:src="@drawable/ic_calendar"
-                    android:padding="6dp"
-                    app:tint="?attr/colorPrimary" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageButton
-                        android:id="@+id/btnPrevWeek"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:background="@drawable/bg_circle_button"
-                        android:contentDescription="@string/schedule_prev_week"
-                        android:src="@drawable/ic_chevron_left"
-                        android:padding="6dp"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/tvWeekPill"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="8dp"
-                        android:background="@drawable/bg_week_pill"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="4dp"
-                        android:text="@string/ph_week"
-                        android:textColor="@color/week_pill_text"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <ImageButton
-                        android:id="@+id/btnNextWeek"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:background="@drawable/bg_circle_button"
-                        android:contentDescription="@string/schedule_next_week"
-                        android:src="@drawable/ic_chevron_right"
-                        android:padding="6dp"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <ImageButton
-                    android:id="@+id/btnViewToggle"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_gravity="end|center_vertical"
-                    android:background="@drawable/bg_circle_button"
-                    android:contentDescription="@string/schedule_switch_to_week"
-                    android:src="@drawable/ic_view_week"
-                    android:padding="6dp"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-            </FrameLayout>
+                android:layout_height="wrap_content" />
 
             <!-- 周视图内容 -->
             <FrameLayout
@@ -127,7 +40,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:paddingBottom="96dp">
+                        android:paddingBottom="16dp">
 
                         <!-- 7天摘要条 -->
                         <LinearLayout
@@ -165,16 +78,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:layout_margin="8dp"
-                android:background="@drawable/bg_grid_panel"
-                android:padding="8dp">
+                android:layout_marginHorizontal="2dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="8dp"
+                android:background="@android:color/transparent"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="6dp">
 
                 <androidx.core.widget.NestedScrollView
                     android:id="@+id/gridScroll"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"
-                    android:paddingBottom="96dp"
+                    android:paddingBottom="2dp"
                     android:scrollbars="none">
 
                     <LinearLayout

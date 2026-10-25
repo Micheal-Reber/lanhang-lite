@@ -38,6 +38,13 @@ object Diagnostics {
             .map { redact(context, it) }
             .toList()
             .takeLast(250)
+        val crash = runCatching {
+            context.filesDir.listFiles { _, name -> name.startsWith("crash-") }
+                ?.maxByOrNull { it.name }
+                ?.takeIf { it.exists() }
+                ?.readText()
+                ?.take(6000)
+        }.getOrNull()
         val appErrors = runCatching {
             java.io.File(context.filesDir, "diagnostics.log")
                 .takeIf { it.exists() }
@@ -68,6 +75,12 @@ object Diagnostics {
             appendLine(context.getString(R.string.diagnostics_scope))
             appendLine(context.getString(R.string.diagnostics_app_errors))
             appErrors.forEach(::appendLine)
+            // 崩溃现场（2026-10-24 加）：App 的未捕获异常会落到 filesDir/crash-*.txt，
+            // 这里带进报告，用户「设置 → 诊断与日志 → 分享」就能把堆栈发出来。
+            if (!crash.isNullOrBlank()) {
+                appendLine(context.getString(R.string.diagnostics_crash))
+                appendLine(crash)
+            }
             appendLine(context.getString(R.string.diagnostics_log_begin))
             safeLines.forEach(::appendLine)
             appendLine(context.getString(R.string.diagnostics_log_end))

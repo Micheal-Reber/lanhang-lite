@@ -13,6 +13,7 @@ import com.lanhang.lite.session.Session
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        installCrashLogger()
         ApiClient.init(this)
         MiniappApi.init(this)
         MomentsApi.init(this)
@@ -30,6 +31,33 @@ class App : Application() {
         AppContext.init(this)
         ScheduleRepository.init(this)
         GradesRepository.init(this)
+    }
+
+    /**
+     * 未捕获异常落盘：`filesDir/crash-<时间>.txt`（只留最近 5 个）。
+     * adb 取：`adb shell run-as com.lanhang.lite cat files/crash-<时间>.txt`
+     * 2026-10-24 加：切页/对话框崩溃现场靠它定位，别再靠猜。
+     */
+    private fun installCrashLogger() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            runCatching {
+                val text = android.util.Log.getStackTraceString(throwable)
+                android.util.Log.e("LanhangCrash", text)
+                val name = "crash-" + System.currentTimeMillis() + ".txt"
+                val dir = filesDir
+                java.io.File(dir, name).writeText(text, Charsets.UTF_8)
+                // 同时写一份到 /sdcard/Android/data/<包名>/files/，用户在文件管理器里能直接拿到
+                runCatching {
+                    getExternalFilesDir(null)?.let { ext -> java.io.File(ext, name).writeText(text, Charsets.UTF_8) }
+                }
+                dir.listFiles { _, name -> name.startsWith("crash-") }
+                    ?.sortedByDescending { it.name }
+                    ?.drop(5)
+                    ?.forEach { it.delete() }
+            }
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 
     private fun applyTheme() {

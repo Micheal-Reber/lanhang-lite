@@ -25,6 +25,10 @@ class ZoomImageView @JvmOverloads constructor(
     /** 单击（onSingleTapConfirmed，双击不触发） */
     var onTap: (() -> Unit)? = null
 
+    /** 是否处于放大状态：放大时要让位给平移手势，不允许上滑关闭（见 DragDismissLayout） */
+    val isZoomed: Boolean
+        get() = drawableReady && curScale > baseScale * 1.01f
+
     private val matrixHelper = Matrix()
     private var baseScale = 1f
     private var curScale = 1f
@@ -129,6 +133,25 @@ class ZoomImageView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 图片「fitCenter」后在**视图坐标系**里的矩形（缩放/位移都为 0 时）。
+     * 共享元素动画（从缩略图放大 / 缩回缩略图）用它算起止缩放比。
+     */
+    /** drawable 已就绪（可安全 reset/取 baseScale） */
+    fun hasDrawable(): Boolean = drawableReady && drawable != null
+
+    fun fittedRect(out: RectF): Boolean {
+        val d = drawable ?: return false
+        if (!drawableReady || d.intrinsicWidth <= 0 || d.intrinsicHeight <= 0) return false
+        if (width <= 0 || height <= 0) return false
+        val w = d.intrinsicWidth * baseScale
+        val h = d.intrinsicHeight * baseScale
+        val l = (width - w) / 2f
+        val t = (height - h) / 2f
+        out.set(l, t, l + w, t + h)
+        return true
+    }
+
     private fun applyMatrix() {
         imageMatrix = matrixHelper
     }
@@ -160,7 +183,9 @@ class ZoomImageView @JvmOverloads constructor(
         }
         scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
-        return if (scaleDetector.isInProgress) true else super.onTouchEvent(event)
+        // 必须始终吃下事件：ImageView 未置 clickable 时 super.onTouchEvent 返回 false，
+        // 手势会被 ViewPager2 的 RecyclerView 接管，`onTap`（单击关闭）永远不触发。
+        return true
     }
 
     companion object {

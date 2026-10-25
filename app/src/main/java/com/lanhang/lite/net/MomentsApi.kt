@@ -163,6 +163,15 @@ object MomentsApi {
         call("/comment/$feedId/$commentId", "DELETE", null, authorized = true, retry = true)
     }
 
+    /**
+     * 删除自己发布的动态（2026-10-25 新增）。
+     * 协议与官方 App 一致：`DELETE /feed/{feed_id}`，成功码仍是 20000。
+     * 服务端只允许删自己的动态，删别人的会返回非 20000 的业务错，由调用方提示。
+     */
+    fun deleteFeed(feedId: String) {
+        call("/feed/$feedId", "DELETE", null, authorized = true, retry = true)
+    }
+
     // GET /feed/{id}?with_comments=true... 单条动态（评论回刷用）
     fun getFeed(feedId: String): MomentFeed? {
         val q = "?with_comments=true&comment_size=50&with_likes=true&like_size=50"

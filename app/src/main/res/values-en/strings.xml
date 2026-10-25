@@ -7,6 +7,15 @@
     <string name="login">Sign in</string>
     <string name="tab_schedule">Schedule</string>
     <string name="action_logout">Sign out</string>
+    <string name="common_back">Back</string>
+    <string name="common_more">More</string>
+    <string name="grades_semester">Semester</string>
+    <string name="moments_loading">Loading…</string>
+    <string name="moments_load_more">Load more</string>
+    <string name="moments_no_more">No more</string>
+    <string name="settings_account_section">Account</string>
+    <string name="settings_general_section">General</string>
+    <string name="settings_about_section">About</string>
 
     <!-- Widgets -->
     <string name="widget_schedule_name">Whole week</string>
@@ -93,39 +102,6 @@
     <string name="schedule_export_period_range">Periods %1$d-%2$d</string>
 
     <!-- Schedule background -->
-    <string name="settings_schedule_background">Schedule background</string>
-    <string name="schedule_bg_title">Schedule background</string>
-    <string name="schedule_bg_back">Back</string>
-    <string name="schedule_bg_section_solid">Solid</string>
-    <string name="schedule_bg_section_gradient">Gradient</string>
-    <string name="schedule_bg_section_image">Photo</string>
-    <string name="schedule_bg_pick_image">Choose a photo</string>
-    <string name="schedule_bg_image_pending">New photo selected — tap Apply</string>
-    <string name="schedule_bg_image_in_use">Using a photo from your library</string>
-    <string name="schedule_bg_image_supported">JPG / PNG / WEBP with clear light and dark areas work best</string>
-    <string name="schedule_bg_image_failed">Couldn\'t load that photo, please try another</string>
-    <string name="schedule_bg_apply">Apply</string>
-    <string name="schedule_bg_remove">Remove background</string>
-    <string name="schedule_bg_applied">Background applied</string>
-    <string name="schedule_bg_removed">Back to the theme background</string>
-    <string name="schedule_bg_hint">Text color adapts to the background brightness and dominant hue, with a contrast-checked veil, so course names, rooms and periods stay readable on any background. The same background looks identical in light and dark themes.</string>
-    <string name="schedule_bg_tone_none">Current: following the theme palette</string>
-    <string name="schedule_bg_tone_dark_text">Adapted: light background with dark text (contrast checked)</string>
-    <string name="schedule_bg_tone_light_text">Adapted: dark background with light text (contrast checked)</string>
-    <string name="schedule_bg_follow_theme">Theme default</string>
-    <string name="schedule_bg_custom_image">Custom photo</string>
-    <string name="schedule_bg_solid_mist">Solid · Mist</string>
-    <string name="schedule_bg_solid_blue">Solid · Pale blue</string>
-    <string name="schedule_bg_solid_sand">Solid · Sand</string>
-    <string name="schedule_bg_solid_navy">Solid · Ink blue</string>
-    <string name="schedule_bg_solid_graphite">Solid · Graphite</string>
-    <string name="schedule_bg_solid_forest">Solid · Pine</string>
-    <string name="schedule_bg_grad_dawn">Gradient · Dawn</string>
-    <string name="schedule_bg_grad_sunset">Gradient · Sunset</string>
-    <string name="schedule_bg_grad_haze">Gradient · Haze</string>
-    <string name="schedule_bg_grad_deep">Gradient · Deep sea</string>
-    <string name="schedule_bg_grad_dusk">Gradient · Dusk</string>
-    <string name="schedule_bg_grad_forest">Gradient · Forest</string>
 
     <!-- Common -->
     <string name="common_cancel">Cancel</string>
@@ -163,6 +139,7 @@
     <string name="schedule_break_evening">Break</string>
     <string name="schedule_unnamed_course">Untitled course</string>
     <string name="schedule_week_menu_format">Week %1$d</string>
+    <string name="schedule_day_count_format">%1$d</string>
     <plurals name="schedule_day_count">
         <item quantity="one">%1$d class</item>
         <item quantity="other">%1$d classes</item>
@@ -231,6 +208,11 @@
     <string name="moments_delete_item">Delete: %1$s</string>
     <string name="moments_my_comments">My comments</string>
     <string name="moments_delete_confirm">Delete this comment?</string>
+    <string name="moments_delete">Delete</string>
+    <string name="moments_delete_post">Delete this post</string>
+    <string name="moments_delete_post_confirm">Delete this post? This cannot be undone.</string>
+    <string name="moments_my_post">My post</string>
+    <string name="moments_not_my_post">You can only delete your own posts</string>
     <string name="moments_deleted">Deleted</string>
     <string name="moments_delete_failed">Delete failed: %1$s</string>
     <string name="moments_anonymous">User</string>
@@ -301,7 +283,20 @@
     <string name="ph_day_name">Mon</string>
     <string name="ph_day_count">4 classes</string>
     <string name="ph_week">Week 1</string>
-    <string name="moments_publish_counter">%1$d/%2$d</string>
-    <string name="moments_add_image_short">Add photos</string>
-    <string name="moments_remove_image">Remove this photo</string>
+    <string name="settings_logout_confirm">Signing out clears the local session and caches; you will need to sign in again.</string>
+    <string name="settings_logout_summary">Clear the local session and caches</string>
+    <string name="settings_debug_summary">Re-handshake and fetch raw schedule data once</string>
+    <string name="schedule_view_grid">Grid</string>
+    <string name="schedule_view_week">Week</string>
+    <string name="common_ok">OK</string>
+    <string name="schedule_back_to_today">Back to this week</string>
+    <string name="refresh_pull">Pull down to refresh</string>
+    <string name="refresh_release">Release to refresh</string>
+    <string name="refresh_refreshing">Refreshing…</string>
+    <string name="refresh_done">Refreshed</string>
+    <string name="diagnostics_crash">Latest crash</string>
+    <string name="moments_images_full">You can pick up to %1$d images</string>
+    <string name="moments_delete_comment">Delete comment</string>
+    <string name="moments_delete_comment_confirm">This cannot be undone. Delete this comment?</string>
+    <string name="moments_delete_comment_own_only">You can only delete your own comments</string>
 </resources>

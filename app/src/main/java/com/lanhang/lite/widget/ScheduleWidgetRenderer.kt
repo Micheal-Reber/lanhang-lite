@@ -245,42 +245,6 @@ object ScheduleWidgetRenderer {
      */
     private const val MIN_CARD_WHITE_CONTRAST = 3.2
 
-    /** 倒计时进入「快下课」的阈值（分钟）：≤10 分钟转红提醒 */
-    private const val COUNTDOWN_URGENT_MINUTES = 10
-
-    /** 倒计时常态色：亮蓝，避免整行白字过于单调 */
-    private const val COUNTDOWN_CALM_COLOR = 0xFF4FC3F7.toInt()
-
-    /** 倒计时紧急色：亮红，与课程卡的暖色系区分明显 */
-    private const val COUNTDOWN_URGENT_COLOR = 0xFFFF5252.toInt()
-
-    /** 倒计时胶囊的压暗比例（把卡片色压深，蓝/红字才够对比） */
-    private const val COUNTDOWN_BADGE_DEPTH = 0.26f
-
-    /** 倒计时文字的对比度下限（9~10sp 加粗，WCAG AA 小字取 3:1） */
-    private const val MIN_COUNTDOWN_CONTRAST = 3.0
-
-    /**
-     * 倒计时文字色：常态蓝、≤[COUNTDOWN_URGENT_MINUTES] 分钟转红。
-     * 与胶囊底色对比不足时逐步提亮（保留色相），最差回落白色，保证任何卡片色都读得清。
-     */
-    private fun countdownTextColor(countdown: Int, badgeColor: Int): Int {
-        val base = if (countdown <= COUNTDOWN_URGENT_MINUTES) {
-            COUNTDOWN_URGENT_COLOR
-        } else {
-            COUNTDOWN_CALM_COLOR
-        }
-        if (ColorUtils.calculateContrast(base, badgeColor) >= MIN_COUNTDOWN_CONTRAST) return base
-        var current = base
-        repeat(6) {
-            current = ColorUtils.blendARGB(current, Color.WHITE, 0.20f)
-            if (ColorUtils.calculateContrast(current, badgeColor) >= MIN_COUNTDOWN_CONTRAST) {
-                return current
-            }
-        }
-        return Color.WHITE
-    }
-
     /**
      * 保持色相/饱和度，仅降低明度直到白字可读；下限 0.24 防止压成黑色。
      * 半透明卡片按叠底后的实际颜色算对比度，否则白字会算得比看起来亮。
@@ -455,17 +419,13 @@ object ScheduleWidgetRenderer {
                 twoLine -> null
                 else -> room.ifBlank { null }
             }
-            // 倒计时做成小胶囊，文字两侧各留 [badgePadH]；上限放宽到 62%，
-            // 保证「剩 105 分」这类三位数分钟也能完整显示（课程名有 ellipsize 兜底）
-            val badgePadH = if (countdown != null) dp(5f) else 0f
             var statusW = 0f
             if (!status.isNullOrEmpty()) {
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 paint.textSize = metaSize
-                val maxStatusW = (textW * 0.62f - badgePadH * 2f).coerceAtLeast(dp(10f))
-                statusW = minOf(paint.measureText(status), maxStatusW)
+                statusW = minOf(paint.measureText(status), textW * 0.5f)
             }
-            val nameAvail = (textW - if (statusW > 0f) statusW + badgePadH * 2f + dp(6f) else 0f)
+            val nameAvail = (textW - if (statusW > 0f) statusW + dp(6f) else 0f)
                 .coerceAtLeast(dp(10f))
 
             val blockH = nameSize + if (twoLine) dp(2f) + metaSize else 0f
@@ -487,34 +447,11 @@ object ScheduleWidgetRenderer {
                 }
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 paint.textSize = metaSize
-                val shown = ellipsize(status, statusW)
-                if (countdown != null) {
-                    // 「剩 N 分」先垫一块压暗的胶囊：蓝/红字在任何课程色卡片上都够对比，
-                    // 也不会因为卡片恰好是蓝色系而糊在一起。
-                    val badgeColor = ColorUtils.blendARGB(cardColor, Color.BLACK, COUNTDOWN_BADGE_DEPTH)
-                    val badgeH = (metaSize + dp(4f)).coerceAtMost(rowH * 0.92f)
-                    val badgeW = paint.measureText(shown) + badgePadH * 2f
-                    val centerY = statusBaseline - metaSize * 0.35f
-                    paint.color = badgeColor
-                    canvas.drawRoundRect(
-                        RectF(
-                            textRight - badgeW,
-                            centerY - badgeH / 2f,
-                            textRight,
-                            centerY + badgeH / 2f
-                        ),
-                        badgeH / 2f,
-                        badgeH / 2f,
-                        paint
-                    )
-                    paint.color = countdownTextColor(countdown, badgeColor)
-                } else {
-                    paint.color = metaColor
-                }
+                paint.color = metaColor
                 paint.textAlign = Paint.Align.RIGHT
                 canvas.drawText(
-                    shown,
-                    textRight - badgePadH,
+                    ellipsize(status, statusW),
+                    textRight,
                     statusBaseline,
                     paint
                 )

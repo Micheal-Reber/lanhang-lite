@@ -4,7 +4,15 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="7dp"
     android:orientation="horizontal"
-    android:padding="9dp">
+    android:paddingStart="8dp"
+    android:paddingEnd="9dp"
+    android:paddingVertical="9dp">
+
+    <View
+        android:id="@+id/vAccent"
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="9dp" />
 
     <TextView
         android:id="@+id/tvTimeLabel"
@@ -12,7 +20,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
         android:text="@string/ph_period"
-        android:textColor="#FFFFFF"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="12sp"
         android:textStyle="bold" />
 
@@ -28,7 +36,7 @@
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:text="@string/ph_course_name"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -38,7 +46,7 @@
             android:layout_height="wrap_content"
             android:alpha="0.8"
             android:text="@string/ph_lesson_meta"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="11sp" />
 
     </LinearLayout>

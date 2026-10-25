@@ -58,14 +58,9 @@
             android:exported="false" />
 
         <activity
-            android:name=".schedule.ScheduleBackgroundActivity"
-            android:exported="false"
-            android:label="@string/schedule_bg_title" />
-
-        <activity
             android:name=".moments.ImagePreviewActivity"
             android:exported="false"
-            android:theme="@style/Theme.LanhangLite.Fullscreen" />
+            android:theme="@style/Theme.LanhangLite.ImagePreview" />
     </application>
 
 </manifest>

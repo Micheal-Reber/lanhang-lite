@@ -17,7 +17,8 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.lanhang.lite"
-    compileSdk = 36
+    // Miuix 0.9.1 的 AAR 元数据要求调用方 compileSdk >= 37
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.lanhang.lite"
@@ -77,11 +78,21 @@ dependencies {
     implementation("io.coil-kt:coil:2.6.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
 
-    // Compose（液态玻璃底栏，照抄 PocketDiary）
+    // Compose：2026-10-24 起承载 Miuix 设计体系的界面（用户指定引入 miuix）
     implementation(platform("androidx.compose:compose-bom:2026.01.01"))
     implementation("androidx.activity:activity-compose:1.9.2")
+    // Miuix 的 OverlayDialog 依赖 androidx.navigationevent（返回键处理）。它本来就在
+    // miuix-ui 的运行时依赖里，只是不作为 api 暴露；这里仅 compileOnly 引用，
+    // 不往 APK 里加任何东西，作用是给 ComposeView 补一个 LocalNavigationEventDispatcherOwner。
+    compileOnly("androidx.navigationevent:navigationevent-compose:1.1.1")
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    // AndroidLiquidGlass：backdrop 模糊/透镜折射/色散
-    implementation("io.github.kyant0:backdrop:1.0.6")
+    // coil 的 Compose 扩展（与既有 coil 2.6.0 同版本，不引入新的图片加载栈）
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    // Miuix：用户指定的设计库（github.com/compose-miuix-ui/miuix）
+    // 0.9.1 = 与项目 Kotlin 2.3.21 / Compose 1.11 对齐的版本
+    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.1")
+    implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.1")
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.1")
 }

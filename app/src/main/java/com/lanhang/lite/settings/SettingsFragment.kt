@@ -15,21 +15,30 @@ import android.widget.ScrollView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.compose.ui.platform.LocalContext
 import com.lanhang.lite.R
-import com.lanhang.lite.databinding.FragmentSettingsBinding
-import com.lanhang.lite.schedule.ScheduleBackdrop
-import com.lanhang.lite.schedule.ScheduleBackgroundActivity
+import com.lanhang.lite.ui.miuix.MiuixDialogSpec
+import com.lanhang.lite.ui.miuix.showMiuixConfirm
+import com.lanhang.lite.ui.miuix.showMiuixDialog
+import com.lanhang.lite.ui.miuix.showMiuixPicker
+import com.lanhang.lite.ui.miuix.MiuixProgressDialog
+import com.lanhang.lite.ui.miuix.showMiuixProgress
 import com.lanhang.lite.schedule.ScheduleData
 import com.lanhang.lite.schedule.ScheduleExporter
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.MainActivity
+import com.lanhang.lite.ui.miuix.LanhangMiuixTheme
+import com.lanhang.lite.ui.miuix.isNightMode
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -46,8 +55,11 @@ import kotlinx.coroutines.withContext
  */
 class SettingsFragment : Fragment() {
 
-    private var _binding: FragmentSettingsBinding? = null
-    private val binding get() = _binding!!
+    /**
+     * Compose 侧读取的 UI 状态。视觉层已换成 Miuix（见 [SettingsScreen]），
+     * 这里只保留数据与动作；改完状态要调 [render] 触发重组。
+     */
+    private var uiState by mutableStateOf(SettingsUiState())
 
     private val themeOptions = listOf(
         "light" to R.string.settings_theme_light,
@@ -68,11 +80,6 @@ class SettingsFragment : Fragment() {
         if (uri == null || payload == null) return@registerForActivityResult
         saveDocument(uri, payload.ics.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.ics")
     }
-    private val openBackgroundSettings = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        refreshBackgroundSummary()
-    }
     private val createCsvDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -92,49 +99,57 @@ class SettingsFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentSettingsBinding.inflate(inflater, container, false)
-        return binding.root
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    ): View = ComposeView(requireContext()).apply {
+        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        setContent {
+            LanhangMiuixTheme(darkTheme = LocalContext.current.isNightMode()) {
+                SettingsScreen(
+                    state = uiState,
+                    onOpenAppearance = { openDetail(PAGE_APPEARANCE) },
+                    onOpenTools = { openDetail(PAGE_TOOLS) },
+                    onOpenAbout = { openDetail(PAGE_ABOUT) },
+                    onTheme = { showThemeDialog() },
+                    onLanguage = { showLanguageDialog() },
+                    onExport = { showExportSchedule() },
+                    onDiagnostics = { showDiagnostics() },
+                    onDebugSchedule = { (activity as? com.lanhang.lite.ui.MainActivity)?.debugSchedule() },
+                    onLogout = { confirmLogout() },
+                )
+            }
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
-        binding.rowAppearance.setOnClickListener { openDetail(PAGE_APPEARANCE) }
-        binding.rowTools.setOnClickListener { openDetail(PAGE_TOOLS) }
-        binding.rowAbout.setOnClickListener { openDetail(PAGE_ABOUT) }
-        binding.tvAppearanceSummary.text = currentThemeLabel()
-        binding.tvAboutSummary.text = getString(
-            R.string.settings_about_version,
-            runCatching {
-                requireContext().packageManager
-                    .getPackageInfo(requireContext().packageName, 0).versionName
-            }.getOrNull() ?: "--"
-        )
-
         val restored = savedInstanceState?.getInt(KEY_DETAIL, -1) ?: -1
         if (restored == PAGE_APPEARANCE || restored == PAGE_TOOLS || restored == PAGE_ABOUT) {
-            openDetail(restored, syncToolbar = false)
+            detailPage = restored
+            backCallback.isEnabled = true
         }
+        render()
         syncToolbar()
+    }
+
+    /** 把 Fragment 侧的数据整理成 [SettingsUiState] 交给 Compose 渲染。 */
+    private fun render() {
+        val version = runCatching {
+            requireContext().packageManager
+                .getPackageInfo(requireContext().packageName, 0).versionName
+        }.getOrNull() ?: "--"
+        uiState = SettingsUiState(
+            page = detailPage ?: SettingsUiState.PAGE_NONE,
+            themeLabel = currentThemeLabel(),
+            languageLabel = currentLanguageLabel(),
+            account = Session.name.ifEmpty { Session.username }.ifEmpty { "--" },
+            version = version,
+            proto = "NchuApp/${Session.appVersion}",
+        )
     }
 
     override fun onResume() {
         super.onResume()
         syncToolbar()
-        refreshBackgroundSummary()
-    }
-
-    /** 背景页返回后刷新摘要（纯色/渐变/自定义图片） */
-    private fun refreshBackgroundSummary() {
-        val b = _binding ?: return
-        b.detailContainer.findViewById<TextView>(R.id.tvScheduleBackgroundSummary)?.text =
-            ScheduleBackdrop.summary(requireContext())
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -143,14 +158,26 @@ class SettingsFragment : Fragment() {
     }
 
     /** 与 MainActivity 对齐 Toolbar 状态（目录态 = 标题+无返回；二级页 = 返回箭头+子页标题）。 */
+    /**
+     * 顶栏横移方向：+1 = 从右侧推入（进入二级页），-1 = 从左侧回位（返回上级）。
+     *
+     * 2026-10-25 用户反馈「设置-外观的返回动画，顶栏向左、内容向右」：
+     * 之前返回时这里调的是 `showToolbarMain(标题)`（slideDir = 0，只做淡切），
+     * 而内容侧是「子页向右退出、目录页从左侧回位」，两者方向对不上。
+     * 现在返回统一给 -1，和内容一起向右回位。
+     */
+    private var toolbarDir = 0
+
     fun syncToolbar() {
         val act = activity as? MainActivity ?: return
         if (isHidden) return
         val page = detailPage
+        val dir = toolbarDir
+        toolbarDir = 0
         if (page == null) {
-            act.showToolbarMain(getString(R.string.tab_settings))
+            act.showToolbarMain(getString(R.string.tab_settings), slideDir = dir)
         } else {
-            act.showToolbarSub(detailTitle(page)) { closeDetail() }
+            act.showToolbarSub(detailTitle(page), onBack = { closeDetail() }, slideDir = dir)
         }
     }
 
@@ -161,66 +188,19 @@ class SettingsFragment : Fragment() {
     }
 
     private fun openDetail(page: Int, syncToolbar: Boolean = true) {
-        val b = _binding ?: return
-        val layout = when (page) {
-            PAGE_APPEARANCE -> R.layout.view_settings_appearance
-            PAGE_TOOLS -> R.layout.view_settings_tools
-            else -> R.layout.view_settings_about
-        }
-        b.detailContainer.removeAllViews()
-        val child = LayoutInflater.from(requireContext()).inflate(layout, b.detailContainer, false)
-        b.detailContainer.addView(child)
-        setupDetail(page, child)
         detailPage = page
-        b.scrollDirectory.visibility = View.GONE
-        b.scrollDetail.visibility = View.VISIBLE
-        b.scrollDetail.scrollTo(0, 0)
+        toolbarDir = 1
         backCallback.isEnabled = true
+        render()
         if (syncToolbar) syncToolbar()
     }
 
     private fun closeDetail() {
-        val b = _binding ?: return
         detailPage = null
-        b.detailContainer.removeAllViews()
-        b.scrollDetail.visibility = View.GONE
-        b.scrollDirectory.visibility = View.VISIBLE
+        toolbarDir = -1
         backCallback.isEnabled = false
+        render()
         syncToolbar()
-    }
-
-    private fun setupDetail(page: Int, root: View) {
-        when (page) {
-            PAGE_APPEARANCE -> {
-                root.findViewById<TextView>(R.id.tvThemeSummary).text = currentThemeLabel()
-                root.findViewById<View>(R.id.rowTheme).setOnClickListener { showThemeDialog() }
-                root.findViewById<TextView>(R.id.tvScheduleBackgroundSummary).text =
-                    ScheduleBackdrop.summary(requireContext())
-                root.findViewById<View>(R.id.rowScheduleBackground).setOnClickListener {
-                    openBackgroundSettings.launch(
-                        Intent(requireContext(), ScheduleBackgroundActivity::class.java)
-                    )
-                }
-                root.findViewById<TextView>(R.id.tvLanguageSummary).text = currentLanguageLabel()
-                root.findViewById<View>(R.id.rowLanguage)
-                    .setOnClickListener { showLanguageDialog() }
-            }
-            PAGE_TOOLS -> {
-                root.findViewById<View>(R.id.exportScheduleButton)
-                    .setOnClickListener { showExportSchedule() }
-            }
-            else -> {
-                root.findViewById<TextView>(R.id.tvAccount).text =
-                    Session.name.ifEmpty { Session.username }.ifEmpty { "--" }
-                root.findViewById<TextView>(R.id.tvVersion).text = runCatching {
-                    requireContext().packageManager
-                        .getPackageInfo(requireContext().packageName, 0).versionName
-                }.getOrNull() ?: "--"
-                root.findViewById<TextView>(R.id.tvProto).text = "NchuApp/${Session.appVersion}"
-                root.findViewById<View>(R.id.diagnosticsButton)
-                    .setOnClickListener { showDiagnostics() }
-            }
-        }
     }
 
     private fun currentThemeLabel(): String =
@@ -229,20 +209,22 @@ class SettingsFragment : Fragment() {
             ?: getString(R.string.settings_theme_system)
 
     private fun showThemeDialog() {
-        val labels = themeOptions.map { getString(it.second) }.toTypedArray()
+        val labels = themeOptions.map { getString(it.second) }
         val checked = themeOptions.indexOfFirst { it.first == Session.themeMode }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_theme_title)
-            .setSingleChoiceItems(labels, checked) { dialog, which ->
-                val mode = themeOptions[which].first
-                dialog.dismiss()
+        showMiuixPicker(
+            context = requireContext(),
+            title = getString(R.string.settings_theme_title),
+            items = labels,
+            selectedIndex = checked,
+            cancelText = getString(R.string.schedule_export_cancel),
+            onPick = { which ->
+                val mode = themeOptions.getOrNull(which)?.first ?: return@showMiuixPicker
                 if (mode != Session.themeMode) {
                     Session.themeMode = mode
                     applyTheme(mode)
                 }
-            }
-            .setNegativeButton(R.string.schedule_export_cancel, null)
-            .show()
+            },
+        )
     }
 
     private fun applyTheme(mode: String) {
@@ -260,13 +242,16 @@ class SettingsFragment : Fragment() {
         getString(AppLanguage.labelRes(Session.language))
 
     private fun showLanguageDialog() {
-        val labels = AppLanguage.options.map { getString(AppLanguage.labelRes(it)) }.toTypedArray()
+        val labels = AppLanguage.options.map { getString(AppLanguage.labelRes(it)) }
         val checked = AppLanguage.options.indexOf(Session.language).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_language)
-            .setSingleChoiceItems(labels, checked) { dialog, which ->
-                val mode = AppLanguage.options[which]
-                dialog.dismiss()
+        showMiuixPicker(
+            context = requireContext(),
+            title = getString(R.string.settings_language),
+            items = labels,
+            selectedIndex = checked,
+            cancelText = getString(R.string.common_cancel),
+            onPick = { which ->
+                val mode = AppLanguage.options.getOrNull(which) ?: return@showMiuixPicker
                 if (mode != Session.language) {
                     Session.language = mode
                     // 见 LocaleHelper：不再用系统的 per-app locale（它会系统级 relaunch，
@@ -275,9 +260,8 @@ class SettingsFragment : Fragment() {
                     context?.applicationContext?.let { ScheduleWidgetUpdater.updateAll(it) }
                     requireActivity().recreate()
                 }
-            }
-            .setNegativeButton(R.string.common_cancel, null)
-            .show()
+            },
+        )
     }
 
     private fun showExportSchedule() {
@@ -293,14 +277,14 @@ class SettingsFragment : Fragment() {
         }
         val missing = missingWeeks(data, plan)
         if (missing > 0) {
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.schedule_export_title)
-                .setMessage(getString(R.string.schedule_export_sync_needed, missing))
-                .setNegativeButton(R.string.schedule_export_cancel, null)
-                .setPositiveButton(R.string.schedule_export_start_sync) { _, _ ->
-                    startExport(data, plan)
-                }
-                .show()
+            showMiuixConfirm(
+                context = requireContext(),
+                title = getString(R.string.schedule_export_title),
+                message = getString(R.string.schedule_export_sync_needed, missing),
+                confirmText = getString(R.string.schedule_export_start_sync),
+                dismissText = getString(R.string.schedule_export_cancel),
+                onConfirm = { startExport(data, plan) },
+            )
         } else {
             startExport(data, plan)
         }
@@ -329,11 +313,13 @@ class SettingsFragment : Fragment() {
                         done++
                         if (progress != null) {
                             withContext(Dispatchers.Main) {
-                                progress.text.text = getString(
-                                    R.string.schedule_export_syncing,
-                                    week,
-                                    done,
-                                    total
+                                progress.setText(
+                                    getString(
+                                        R.string.schedule_export_syncing,
+                                        week,
+                                        done,
+                                        total
+                                    )
                                 )
                             }
                         }
@@ -365,136 +351,47 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showExportOptions(payload: ScheduleExporter.ExportPayload) {
-        val ctx = requireContext()
-        val density = resources.displayMetrics.density
-        fun dp(value: Int): Int = (value * density).toInt()
-
-        fun themeColor(attr: Int): Int {
-            val a = ctx.obtainStyledAttributes(intArrayOf(attr))
-            val c = a.getColor(0, 0)
-            a.recycle()
-            return c
-        }
-
-        // AppCompat AlertController 中 setMessage 与 setItems 互斥（设了 message
-        // 列表就永不挂载），因此说明文字与选项行都放进自定义 view。
-        val onSurface = themeColor(com.google.android.material.R.attr.colorOnSurface)
-        val container = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-
-        val message = TextView(ctx).apply {
-            text = getString(
-                R.string.schedule_export_message,
-                payload.courseCount,
-                payload.firstWeek,
-                payload.lastWeek
-            )
-            val ta = ctx.obtainStyledAttributes(
-                intArrayOf(com.google.android.material.R.attr.materialAlertDialogBodyTextStyle)
-            )
-            val styleId = ta.getResourceId(0, 0)
-            ta.recycle()
-            if (styleId != 0) setTextAppearance(ctx, styleId)
-            setTextColor(onSurface)
-            setPadding(dp(20), 0, dp(20), dp(12))
-        }
-        container.addView(
-            message,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        val labels = arrayOf(
+        val labels = listOf(
             getString(R.string.schedule_export_ics),
             getString(R.string.schedule_export_csv),
             getString(R.string.schedule_export_share)
         )
-        val rows = labels.map { label ->
-            TextView(ctx).apply {
-                text = label
-                textSize = 16f
-                setTextColor(onSurface)
-                gravity = Gravity.CENTER_VERTICAL
-                minHeight = dp(48)
-                setPadding(dp(20), dp(12), dp(20), dp(12))
-                val tvAttrs =
-                    ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
-                val ripple = tvAttrs.getDrawable(0)
-                tvAttrs.recycle()
-                if (ripple != null) background = ripple
-            }
-        }
-        rows.forEach {
-            container.addView(
-                it,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-
-        val dialog = MaterialAlertDialogBuilder(ctx)
-            .setTitle(R.string.schedule_export_title)
-            .setView(container)
-            .setNegativeButton(R.string.schedule_export_cancel, null)
-            .create()
-        rows.forEachIndexed { index, row ->
-            row.setOnClickListener {
-                dialog.dismiss()
-                when (index) {
-                    0 -> {
-                        pendingExport = payload
-                        createIcsDocument.launch("${payload.baseFileName}.ics")
+        showMiuixDialog(
+            requireContext(),
+            MiuixDialogSpec(
+                title = getString(R.string.schedule_export_title),
+                summary = getString(
+                    R.string.schedule_export_message,
+                    payload.courseCount,
+                    payload.firstWeek,
+                    payload.lastWeek
+                ),
+                items = labels,
+                onItemClick = { index ->
+                    when (index) {
+                        0 -> {
+                            pendingExport = payload
+                            createIcsDocument.launch("${payload.baseFileName}.ics")
+                        }
+                        1 -> {
+                            pendingExport = payload
+                            createCsvDocument.launch("${payload.baseFileName}.csv")
+                        }
+                        2 -> shareSchedule(payload.text)
                     }
-                    1 -> {
-                        pendingExport = payload
-                        createCsvDocument.launch("${payload.baseFileName}.csv")
-                    }
-                    2 -> shareSchedule(payload.text)
-                }
-            }
-        }
-        dialog.show()
-    }
-
-    private fun createExportProgress(): ExportProgress {
-        val ctx = requireContext()
-        val density = resources.displayMetrics.density
-        fun dp(value: Int): Int = (value * density).toInt()
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(12))
-        }
-        val bar = ProgressBar(ctx).apply { isIndeterminate = true }
-        layout.addView(bar, LinearLayout.LayoutParams(dp(32), dp(32)))
-        val text = TextView(ctx).apply {
-            setText(R.string.schedule_export_preparing)
-            textSize = 14f
-            setPadding(dp(16), 0, 0, 0)
-        }
-        layout.addView(
-            text,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                },
+                actions = listOf(getString(R.string.schedule_export_cancel) to {}),
+            ),
         )
-        val dialog = MaterialAlertDialogBuilder(ctx)
-            .setTitle(R.string.schedule_export_title)
-            .setView(layout)
-            .setNegativeButton(R.string.schedule_export_cancel, null)
-            .create()
-        dialog.setCancelable(false)
-        dialog.setCanceledOnTouchOutside(false)
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-                exportJob?.cancel()
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
-        return ExportProgress(dialog, text)
     }
+
+    private fun createExportProgress(): MiuixProgressDialog = showMiuixProgress(
+        context = requireContext(),
+        title = getString(R.string.schedule_export_title),
+        initialText = getString(R.string.schedule_export_preparing),
+        cancelText = getString(R.string.schedule_export_cancel),
+        onCancel = { exportJob?.cancel() },
+    )
 
     private fun missingWeeks(data: ScheduleData, plan: ScheduleExporter.Plan): Int {
         val baseIsCurrent = weekInBase(data, plan.currentWeek)
@@ -517,11 +414,6 @@ class SettingsFragment : Fragment() {
         if (!termId.isNullOrBlank() && data.termId != termId) return null
         return data
     }
-
-    private data class ExportProgress(
-        val dialog: AlertDialog,
-        val text: TextView
-    )
 
     private fun saveDocument(uri: Uri, bytes: ByteArray, displayName: String) {
         val ctx = context ?: return
@@ -553,32 +445,41 @@ class SettingsFragment : Fragment() {
         startActivity(Intent.createChooser(send, getString(R.string.schedule_export_chooser)))
     }
 
+    /** 退出登录（原顶栏「更多」菜单项，2026-10-24 用户要求删掉三点菜单后移到这里） */
+    private fun confirmLogout() {
+        showMiuixConfirm(
+            context = requireContext(),
+            title = getString(R.string.action_logout),
+            message = getString(R.string.settings_logout_confirm),
+            confirmText = getString(R.string.action_logout),
+            dismissText = getString(R.string.common_cancel),
+            onConfirm = { (activity as? com.lanhang.lite.ui.MainActivity)?.logout() },
+        )
+    }
+
     private fun showDiagnostics() {
         val report = Diagnostics.report(requireContext())
-        val preview = TextView(requireContext()).apply {
-            text = report
-            textSize = 12f
-            setTextIsSelectable(true)
-            setPadding(20, 12, 20, 12)
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val scroll = ScrollView(requireContext()).apply {
-            addView(preview)
-            layoutParams = ViewGroup.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.55f).toInt())
-        }
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_diagnostics)
-            .setView(scroll)
-            .setNegativeButton(R.string.common_close, null)
-            .setPositiveButton(R.string.common_share) { _, _ ->
-                val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.settings_diagnostics_subject))
-                    putExtra(Intent.EXTRA_TEXT, report)
-                }
-                startActivity(Intent.createChooser(send, getString(R.string.settings_diagnostics_chooser)))
-            }
-            .show()
+        showMiuixDialog(
+            requireContext(),
+            MiuixDialogSpec(
+                title = getString(R.string.settings_diagnostics),
+                summary = report,
+                scrollableSummary = true,
+                actions = listOf(
+                    getString(R.string.common_close) to {},
+                    getString(R.string.common_share) to {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, getString(R.string.settings_diagnostics_subject))
+                            putExtra(Intent.EXTRA_TEXT, report)
+                        }
+                        startActivity(
+                            Intent.createChooser(send, getString(R.string.settings_diagnostics_chooser))
+                        )
+                    },
+                ),
+            ),
+        )
     }
 
     companion object {

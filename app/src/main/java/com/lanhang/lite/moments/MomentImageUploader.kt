@@ -22,8 +22,14 @@ import java.util.concurrent.TimeUnit
 
 /** Uploads a selected photo to the same media service used by the official app. */
 object MomentImageUploader {
-    private const val FALLBACK_MAX_BYTES = 10L * 1024 * 1024
-    private const val MAX_DIMENSION = 2048
+    private const val FALLBACK_MAX_BYTES = 2L * 1024 * 1024
+    private const val MIN_MAX_BYTES = 64L * 1024
+    private const val HARD_MAX_BYTES = 10L * 1024 * 1024
+    // 朋友圈图片没必要留 2048：1600 长边在手机屏幕上看不出差别，体积小一半以上，
+    // 更容易过服务器限制（用户 2026-10-25：发图提示「图片大小超过服务器限制」）。
+    private const val MAX_DIMENSION = 1600
+    private const val MIN_DIMENSION = 320
+    private const val MIN_QUALITY = 40
     private val uploadHttp = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -34,7 +40,7 @@ object MomentImageUploader {
         val config = RceApi.configurationAll().features?.mediaServer
         val token = RceApi.getImageUploadToken()
         val fileName = "moment_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg"
-        val maxBytes = config?.maxFileSize?.takeIf { it > 0 } ?: FALLBACK_MAX_BYTES
+        val maxBytes = resolveMaxBytes(config?.maxFileSize)
         val imageFile = File(context.cacheDir, fileName)
         val sourceFile = File(context.cacheDir, "source_$fileName")
         try {
@@ -89,6 +95,22 @@ object MomentImageUploader {
         }
     }
 
+    /**
+     * 服务器下发的 `max_file_size` 单位并不统一：融云媒体的配置里有的是 KB、有的是字节。
+     * 以前直接当字节用，遇到「2048」这种 KB 值就变成 2KB 上限，压缩到 320px 也进不去，
+     * 于是每次都报「图片超过服务器大小限制」（用户 2026-10-25 反馈的真实原因）。
+     * 规则：<=0 用兜底值；< 100000 视为 KB；否则视为字节；最后夹到 [64KB, 10MB]。
+     */
+    private fun resolveMaxBytes(raw: Long?): Long {
+        val value = raw ?: 0L
+        val bytes = when {
+            value <= 0L -> FALLBACK_MAX_BYTES
+            value < 100_000L -> value * 1024L
+            else -> value
+        }
+        return bytes.coerceIn(MIN_MAX_BYTES, HARD_MAX_BYTES)
+    }
+
     private fun compress(context: Context, source: File, destination: File, maxBytes: Long) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
@@ -119,6 +141,8 @@ object MomentImageUploader {
         var current = oriented
         try {
             while (true) {
+                // 质量阶梯放宽到 40（以前下限 56，压不到限制就直接报错）：
+                // 先降质量（肉眼看不出）、再缩尺寸，绝大多数图第一轮就能过。
                 var quality = 88
                 var bytes: ByteArray
                 do {
@@ -126,14 +150,14 @@ object MomentImageUploader {
                     current.compress(Bitmap.CompressFormat.JPEG, quality, output)
                     bytes = output.toByteArray()
                     quality -= 8
-                } while (bytes.size > maxBytes && quality >= 56)
+                } while (bytes.size > maxBytes && quality >= MIN_QUALITY)
                 if (bytes.size <= maxBytes) {
                     destination.writeBytes(bytes)
                     return
                 }
-                val nextWidth = (current.width * 0.8f).toInt()
-                val nextHeight = (current.height * 0.8f).toInt()
-                if (minOf(nextWidth, nextHeight) < 320) {
+                val nextWidth = (current.width * 0.82f).toInt()
+                val nextHeight = (current.height * 0.82f).toInt()
+                if (minOf(nextWidth, nextHeight) < MIN_DIMENSION) {
                     error(context.getString(R.string.error_image_too_large))
                 }
                 val smaller = Bitmap.createScaledBitmap(current, nextWidth, nextHeight, true)
