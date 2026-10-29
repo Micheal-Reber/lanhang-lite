@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  课表页（2026-10-25 M3 化重写）
+
+  M3 化要点：
+  - 顶栏控件全部换成官方组件：日历/翻页用 MaterialButton.IconButton（48dp 触摸区 + 圆形涟漪），
+    周次用 TonalButton 胶囊，视图切换用 MaterialButtonToggleGroup 两段式分段按钮。
+    不再有 ImageButton + GradientDrawable 自绘圆形底。
+  - 网格面板由 FrameLayout + 自绘圆角背景改成 MaterialCardView（M3 filled 低层容器）。
+  - 进度由 ProgressBar 改成 M3 CircularProgressIndicator。
+  - 自定义背景三层（底色/图片/遮罩）保持不变：它是用户功能，配色令牌由 ScheduleStyle 提供，
+    M3 语义色只在"无自定义背景"时生效。
+  - 所有间距/字号/圆角走 @dimen token。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:clipChildren="false">
+
+    <!-- 自定义背景三层：底色/图片 → 自适应遮罩 → 内容 -->
+    <View
+        android:id="@+id/bgSolidLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/bgImageLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/bgVeil"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!--
+              工具条：左侧日历（跳转周次）、中间周次组、右侧视图切换。
+              周次组用 FrameLayout 的 center 定位而不是 weight 分割 —— 左右按钮宽度不同时也能绝对居中。
+              视图切换自 2026-10-25 由「两段式分段按钮」改为单个按钮点按切换（省出宽度给周次居中）。
+            -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/space_sm"
+                android:paddingTop="@dimen/space_xs"
+                android:paddingEnd="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_xs">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPrevWeek"
+                        style="@style/Widget.Lanhang.IconButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/schedule_prev_week"
+                        app:icon="@drawable/ic_chevron_left" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/tvWeekPill"
+                        style="@style/Widget.Lanhang.WeekPill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/ph_week" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnNextWeek"
+                        style="@style/Widget.Lanhang.IconButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/schedule_next_week"
+                        app:icon="@drawable/ic_chevron_right" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCalendar"
+                    style="@style/Widget.Lanhang.IconButton.Tonal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:contentDescription="@string/schedule_jump_week"
+                    app:icon="@drawable/ic_calendar" />
+
+                <!-- 单按钮切换：图标表示「点一下会切到的视图」，由 switchView 更新 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewSwitch"
+                    style="@style/Widget.Lanhang.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end|center_vertical"
+                    android:contentDescription="@string/schedule_switch_to_week"
+                    app:icon="@drawable/ic_view_week" />
+            </FrameLayout>
+
+            <!--
+              周次翻页容器（2026-10-27 由「网格/列表两个固定容器」改为动态页面）：
+              每一周都是一个独立视图树，横向拖动时相邻周并排跟着手指走，松手吸附。
+              页面内容由 ScheduleFragment.buildPage 生成，翻页物理见 ScheduleWeekPager。
+
+              网格视图的布局约定保持不变（2026-10-25 按参考设计重构）：
+              不套 MaterialCardView 外壳，表格线直接铺在页面/自定义背景上、左右贴边；
+              表头固定在滚动区之外（日期行始终可见，只有节次表格滚动），表头透明、背景能透上来。
+            -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <FrameLayout
+                    android:id="@+id/pagerHost"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <!--
+                  兜底提示：只在「一条课表数据都没有」（首载失败）时出现。
+                  周内无课、整周无课都由页面自己画，跟着页面一起翻走。
+                -->
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginHorizontal="@dimen/space_2xl"
+                    android:gravity="center"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- 首次加载：M3 圆形进度 -->
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone"
+        app:indicatorSize="@dimen/space_3xl" />
+
+</FrameLayout>

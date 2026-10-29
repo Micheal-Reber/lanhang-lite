@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      深色模式覆盖（2026-10-25）
+      Theme.LanhangLite 继承 Base.Theme.LanhangLite（定义在 values/themes.xml，昼夜共用），
+      这里只覆盖与明暗相关的条目，不再整份复制主题 —— 之前两份必须手工同步，极易漏改。
+      颜色类 token 不用在这里重复：它们指向的 @color/surface* 等资源本身就有 values-night 版本。
+    -->
+    <style name="Theme.LanhangLite" parent="Base.Theme.LanhangLite">
+        <!-- 深色底 → 状态栏图标用浅色 -->
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+</resources>

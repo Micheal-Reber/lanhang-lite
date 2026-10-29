@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:clipChildren="false">
+
+    <!--
+      绘制顺序 = 声明顺序，这里刻意把容器放在顶栏之前：
+      课表页的自定义背景会向上溢出盖住顶栏区域（见 ScheduleFragment.applyBackgroundOverflow），
+      顶栏必须画在它上面，否则透明的顶栏底下那层背景会把标题和菜单图标盖掉。
+      底栏 ComposeView 保持在最后，压在所有内容之上。
+    -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/fragmentContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipChildren="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbar" />
+
+    <!-- M3 small top app bar：surface 底 + onSurface 前景，高度不含状态栏（inset 在 MainActivity 补） -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Lanhang.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/top_app_bar_height"
+        android:minHeight="@dimen/top_app_bar_height"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:title="@string/tab_schedule" />
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/bottomNav"
+        android:layout_width="0dp"
+        android:layout_height="128dp"
+        android:layout_marginBottom="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

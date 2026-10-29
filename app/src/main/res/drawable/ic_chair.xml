@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  图书馆座位入口图标（座椅轮廓，手绘几何，不依赖第三方图标库）。
+  AGENTS.md 约定：图标用 Material Symbols 原版路径；此处为纯几何图形，
+  与 24dp 网格对齐，着色由使用处 app:tint="?attr/colorOnSurfaceVariant" 决定。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M7,3h10a2,2 0 0 1 2,2v8H5V5a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,14h16a1,1 0 0 1 1,1v3H3v-3a1,1 0 0 1 1,-1z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M5,18h2v3H5zM17,18h2v3h-2z" />
+</vector>

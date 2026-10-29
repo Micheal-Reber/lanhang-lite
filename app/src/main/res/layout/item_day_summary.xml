@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  周视图顶部的 7 天摘要格（M3 卡片，2026-10-25 重写）
+  底色由代码按 ScheduleStyle 覆盖：今天 = secondaryContainer，其余 = surfaceContainerLow。
+  门数徽标同样是代码画的 pill（需要跟当前配色联动）。
+  2026-10-25 二次简化：去掉下方的课程名预览，只留「周几 + N 门」——
+  课程内容在下面每天的课程卡里已经完整列出，摘要条重复一遍只是噪音，还把 7 张卡撑得高矮不一。
+-->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Lanhang.Card.Nested"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="@dimen/space_xs"
+    android:layout_weight="1"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/space_xs"
+        android:paddingTop="@dimen/space_sm"
+        android:paddingBottom="@dimen/space_sm">
+
+        <TextView
+            android:id="@+id/tvDayName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="@string/ph_day_name"
+            android:textAppearance="@style/TextAppearance.Lanhang.LabelLarge"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            android:id="@+id/tvCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xs"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingHorizontal="@dimen/space_xs"
+            android:paddingVertical="@dimen/space_xxs"
+            android:text="@string/ph_day_count"
+            android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  校园网小组件「下线」按钮底 · 深色主题。
+
+  M3 深色模式的 error 是**亮调** #FFB4AB，配深色字 #690005
+  （浅色模式的 error 是深调 #B3261E + 白字，深浅正好反过来）。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FFFFB4AB" />
+</shape>

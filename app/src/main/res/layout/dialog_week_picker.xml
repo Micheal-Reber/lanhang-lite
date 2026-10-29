@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  周次选择底部面板（M3 BottomSheet 内容，2026-10-25 由系统 PopupMenu 改造）
+
+  结构：拖拽条 → 标题 → 可滚动周次列表（代码按 startWeek..maxWeek 填充）。
+  面板本身（圆角、背景、遮罩、边缘到边缘）由 BottomSheetDialog 的 M3 主题提供，
+  这里不做任何自绘背景。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/space_lg">
+
+    <TextView
+        android:id="@+id/tvSheetTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/space_xl"
+        android:paddingTop="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_xl"
+        android:paddingBottom="@dimen/space_sm"
+        android:text="@string/schedule_week_picker_title"
+        android:textAppearance="@style/TextAppearance.Lanhang.TitleMedium"
+        android:textColor="?attr/colorOnSurface" />
+
+    <!--
+      必须是 NestedScrollView（不是系统 ScrollView）：
+      BottomSheetBehavior 只在「嵌套滚动子 View」里才把向下拖动先交给列表消费，
+      列表滚到顶部之后才轮到面板本身收起。用系统 ScrollView 会一拖就把面板关掉。
+    -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/weekPickerScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/weekList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

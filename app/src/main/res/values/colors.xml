@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ==================== 品牌色 ==================== -->
+    <color name="primary">#084168</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="primary_container">#D4E9F7</color>
+    <color name="on_primary_container">#052F4A</color>
+    <color name="secondary_container">#D4E9F7</color>
+    <color name="on_secondary_container">#052F4A</color>
+
+    <!--
+      ==================== M3 中性色阶（2026-10-25） ====================
+      由品牌蓝 #084168 推导的低饱和冷灰（而不是 Material3 默认的紫灰 #FFFBFE/#E6E0E9）。
+      M3 要求中性色阶必须从源色推导，直接用库默认值会带出与品牌无关的偏紫底。
+      层级顺序（浅色）：lowest(最亮) > low > container > high > highest(最暗)，
+      深色模式整体反转，见 values-night/colors.xml。
+      卡片 / 顶栏 / 列表项一律引用这些语义色，不要再写十六进制。
+    -->
+    <color name="surface">#F7F9FC</color>
+    <color name="surface_container_lowest">#FFFFFF</color>
+    <color name="surface_container_low">#F0F4F9</color>
+    <color name="surface_container">#EAF0F6</color>
+    <color name="surface_container_high">#E1E9F1</color>
+    <color name="surface_container_highest">#D9E2EC</color>
+    <color name="surface_variant">#DCE5EE</color>
+    <color name="on_surface">#10161C</color>
+    <color name="on_surface_variant">#43505C</color>
+    <color name="outline">#6F7C89</color>
+    <color name="outline_variant">#C0CAD5</color>
+
+    <!-- ==================== 其它 ==================== -->
+    <color name="like_red">#E53935</color>
+    <color name="icon_muted">#6A6A6E</color>
+    <color name="link">#1F6FDE</color>
+    <color name="nav_checked">#084168</color>
+    <!-- 应用图标 -->
+    <color name="ic_launcher_background">#084168</color>
+
+    <!--
+      通知图标的**底色**（NotificationCompat.setColor）：系统拿它填通知栏里图标背后的色块、
+      以及状态栏胶囊（Android 16 实时动态）左上角那个图标圆底。
+      **刻意不做 values-night 变体**：通知里的图标是白色单色（系统会把它涂白），
+      深色主题下若跟着变成浅蓝 #8ED8F8，白图标就洗没了。固定品牌深蓝，两种主题下都清楚。
+    -->
+    <color name="notification_accent">#084168</color>
+</resources>

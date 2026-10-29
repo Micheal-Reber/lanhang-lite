@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M3 设计 token —— 全项目唯一的设计常量来源（2026-10-25）
+  =========================================================
+  间距对齐 M3 的 4dp 网格，圆角对齐 M3 shape scale，字号对齐 M3 type scale。
+  新增/修改界面一律引用这里的 token，不要再在布局里直写 dp / sp。
+
+  例外（不受本文件约束）：
+  - widget_*.xml 与 view_schedule_preview.xml —— 小部件预览与真实 Canvas 渲染
+    （ScheduleWidgetRenderer）逐像素对齐，字号是几何计算的结果，改动会导致
+    选择器预览与放置后不一致（见 AGENTS.md 第 5 节）。
+  - 课表网格 ScheduleFragment.renderGrid 的 rowH/gapW/gapH/timeW/bandH —— 行列矩阵的几何常量，
+    必须是手算像素（见 AGENTS.md 3.3）。但**字号、圆角、内边距仍走本文件的 token**
+    （代码里用 `dimen(R.dimen.xxx)` 读，不直写 dp 数值）。
+-->
+<resources>
+
+    <!-- ==================== 间距：M3 4dp 网格 ==================== -->
+    <dimen name="space_none">0dp</dimen>
+    <dimen name="space_xxs">2dp</dimen>
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_sm">8dp</dimen>
+    <dimen name="space_md">12dp</dimen>
+    <dimen name="space_lg">16dp</dimen>
+    <dimen name="space_xl">24dp</dimen>
+    <dimen name="space_2xl">32dp</dimen>
+    <dimen name="space_3xl">48dp</dimen>
+    <dimen name="space_4xl">64dp</dimen>
+
+    <!-- ==================== 圆角：M3 shape scale ==================== -->
+    <dimen name="corner_xs">4dp</dimen>
+    <dimen name="corner_sm">8dp</dimen>
+    <dimen name="corner_md">12dp</dimen>
+    <dimen name="corner_lg">16dp</dimen>
+    <dimen name="corner_xl">28dp</dimen>
+    <dimen name="corner_full">999dp</dimen>
+    <!-- 大圆角卡片专用圆角（Hoshi 版式：设置分组卡 / 工作圈动态卡；M3 shape scale 无 24dp 档） -->
+    <dimen name="corner_card_large">24dp</dimen>
+
+    <!-- ==================== 字号：M3 type scale ==================== -->
+    <!-- Display：仅用于登录页品牌大标题等极端场景 -->
+    <dimen name="text_display_small">36sp</dimen>
+    <dimen name="text_headline_medium">28sp</dimen>
+    <dimen name="text_headline_small">24sp</dimen>
+    <!-- Title：顶栏标题、页面主标题、卡片主标题 -->
+    <dimen name="text_title_large">22sp</dimen>
+    <dimen name="text_title_medium">16sp</dimen>
+    <dimen name="text_title_small">14sp</dimen>
+    <!-- Body：正文、列表主文、说明文字 -->
+    <dimen name="text_body_large">16sp</dimen>
+    <dimen name="text_body_medium">14sp</dimen>
+    <dimen name="text_body_small">12sp</dimen>
+    <!-- Label：按钮、标签、辅助信息（最小 11sp，低于此不再使用） -->
+    <dimen name="text_label_large">14sp</dimen>
+    <dimen name="text_label_medium">12sp</dimen>
+    <dimen name="text_label_small">11sp</dimen>
+
+    <!-- ==================== 组件度量 ==================== -->
+    <!-- M3 small top app bar 高度（不含状态栏） -->
+    <dimen name="top_app_bar_height">64dp</dimen>
+    <!-- M3 最小触摸目标 -->
+    <dimen name="touch_target_min">48dp</dimen>
+    <!-- 图标标准尺寸 -->
+    <dimen name="icon_lg">24dp</dimen>
+    <dimen name="icon_md">20dp</dimen>
+    <dimen name="icon_sm">16dp</dimen>
+    <!-- 分割线 -->
+    <dimen name="divider_thickness">1dp</dimen>
+    <!-- 未读小红点直径（互动消息列表）：比 icon_sm 再小一号，只做弱提示 -->
+    <dimen name="badge_dot">8dp</dimen>
+    <!-- 二维码展示区边长（签到码 / 身份码这类整屏一码的页面） -->
+    <dimen name="qr_code_size">240dp</dimen>
+    <!-- 页面左右留白（M3 推荐 16dp） -->
+    <dimen name="screen_padding_h">16dp</dimen>
+
+    <!-- ==================== 卡片与列表（M3） ==================== -->
+    <!-- M3 卡片内容内边距 -->
+    <dimen name="card_padding">16dp</dimen>
+    <!-- 卡片之间的间距 -->
+    <dimen name="card_gap">12dp</dimen>
+    <!-- M3 双行列表项最小高度 -->
+    <dimen name="list_item_height_two_line">72dp</dimen>
+    <!-- M3 单行列表项最小高度（周次选择等） -->
+    <dimen name="list_item_height_single">56dp</dimen>
+    <!-- 列表项：图标与文字之间的间距（左 16 + 图标 24 + 本值 16 = 文字起点 56dp） -->
+    <dimen name="list_icon_gap">16dp</dimen>
+    <!-- 设置页账号行头像（M3 ListItem 双行 leading 位：比 24dp 图标大、小于 48dp 触摸目标） -->
+    <dimen name="avatar_settings">40dp</dimen>
+    <!-- 内容区底部留白：让内容滚到底时不被液态玻璃底栏遮住 -->
+    <dimen name="content_padding_bottom">112dp</dimen>
+
+    <!-- 发表页图片区：方形缩略图 + 右上角移除键 + 末尾添加方块 -->
+    <dimen name="publish_image_tile">78dp</dimen>
+    <dimen name="publish_image_radius">14dp</dimen>
+    <dimen name="publish_image_gap">10dp</dimen>
+    <dimen name="publish_image_remove">22dp</dimen>
+
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  校园网小组件「下线」按钮底 · 浅色主题。
+
+  下线是破坏性操作，底色用 M3 的 error 色（#B3261E）+ 白字，
+  和「一键认证」的蓝色形成语义区分：一眼能看出这个按钮会断网。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FFB3261E" />
+</shape>

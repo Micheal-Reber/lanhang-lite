@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M3 Motion 时长 token（单一来源）。
+  约定：代码里的动效时长一律取 @integer/motion_*，缓动一律取 @interpolator/m3_*；
+  液态玻璃底栏（ui/navigation/liquid/** 与 LiquidGlassFab 的玻璃参数）是豁免区，不接入本表。
+  数值来自 Material Design 3 Motion 官方 token（MDC 1.12.0 主题默认值）。
+-->
+<resources>
+    <!-- short1 50ms：极微交互 -->
+    <integer name="motion_short1">50</integer>
+    <!-- short2 100ms：简单状态切换 -->
+    <integer name="motion_short2">100</integer>
+    <!-- short3 150ms：小组件出现（Coil crossfade、Snackbar） -->
+    <integer name="motion_short3">150</integer>
+    <!-- short4 200ms：小范围展开/收起、元素淡入 -->
+    <integer name="motion_short4">200</integer>
+    <!-- medium1 250ms：面板展开、标准进入/退出 -->
+    <integer name="motion_medium1">250</integer>
+    <!-- medium2 300ms：卡片展开、标准转场（container transform、窗口转场） -->
+    <integer name="motion_medium2">300</integer>
+
+    <!-- fade through：旧内容淡出阶段 90ms -->
+    <integer name="motion_fade_through_out">90</integer>
+    <!-- fade through：新内容淡入阶段 210ms -->
+    <integer name="motion_fade_through_in">210</integer>
+</resources>

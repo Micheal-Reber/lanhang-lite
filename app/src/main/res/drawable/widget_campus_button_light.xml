@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  校园网小组件「一键认证」按钮底 · 浅色主题。
+
+  配色走项目 M3 规范（values/colors.xml）：
+  colorPrimary = #084168（品牌深蓝），colorOnPrimary = #FFFFFF。
+  圆角 18dp = 高度 36dp 的一半 → 胶囊形，和 App 内 M3 按钮的视觉重量一致。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FF084168" />
+</shape>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  周次选择：M3 列表项（被 dialog_week_picker.xml 动态填充）
+  选中态 = 主色文字 + 右侧对勾；未选中 = onSurface。
+  行高 56dp（M3 单行列表最小值），整行可点。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/list_item_height_single"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/space_xl"
+    android:paddingEnd="@dimen/space_xl">
+
+    <TextView
+        android:id="@+id/tvWeekOption"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/ph_week"
+        android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+        android:textColor="?attr/colorOnSurface" />
+
+    <ImageView
+        android:id="@+id/ivWeekCheck"
+        android:layout_width="@dimen/icon_md"
+        android:layout_height="@dimen/icon_md"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_check"
+        android:visibility="gone"
+        app:tint="?attr/colorPrimary" />
+</LinearLayout>

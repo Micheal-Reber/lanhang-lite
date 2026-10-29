@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  预览用的状态圆点 · 未认证（灰）。
+
+  颜色跟着 M3 语义色走（@color/outline 是中性灰，浅色 #6F7C89 / 深色 #88929C），
+  这样在系统深色下预览也会自动切到深色一档，不会出现「深色底上一颗灰点」
+  这种在浅色下写死的错配。真实渲染里的圆点颜色是按状态在
+  CampusNetWidgetRenderer.dotColor 里取的，预览只展示「未认证」这一态。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/outline" />
+</shape>

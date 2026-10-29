@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  校园网小组件（2×2）。
+
+  结构与课表小组件一致：**位图负责文字（标题/副标题/状态点），按钮用真实 View**。
+  原因：位图由应用进程按自己的 density 画，布局由桌面进程 inflate，
+  两边 density 不一致时（vivo/OriginOS 会给桌面套独立缩放）位图里的东西会和按钮错开。
+  按钮底板/图标/点击热区都在布局里，桌面怎么缩放都不可能错位。
+
+  浅/深 × 认证/下线 共 4 组 View，绑定时只切 setViewVisibility
+  （禁止 setInt 反射调 setBackgroundResource / setTextColor，launcher 端可能静默拒绝）。
+  四组的几何必须完全一致，只差配色。
+
+  按钮尺寸（2026-10-26 用户反馈「太小了」）：
+  26dp 高 / 12sp 字 → 36dp 高 / 14sp 字，通栏（左右各留 14dp 内边距）。
+  36dp 配 18dp 圆角 = 胶囊形，和 App 内 M3 按钮的视觉重量一致。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bitmap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:adjustViewBounds="false"
+        android:contentDescription="@string/widget_campus_description"
+        android:scaleType="fitXY" />
+
+    <!-- 认证按钮 · 浅色（品牌深蓝底 + 白字） -->
+    <TextView
+        android:id="@+id/widget_campus_button_auth_light"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/widget_campus_button_light"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="@string/widget_campus_button_auth"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <!-- 认证按钮 · 深色（规范 primary 亮蓝底 + 深字） -->
+    <TextView
+        android:id="@+id/widget_campus_button_auth_dark"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/widget_campus_button_dark"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="@string/widget_campus_button_auth"
+        android:textColor="#FF00344D"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- 下线按钮 · 浅色（error 底 + 白字） -->
+    <TextView
+        android:id="@+id/widget_campus_button_logout_light"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/widget_campus_button_logout_light"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="@string/widget_campus_button_offline"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- 下线按钮 · 深色（M3 深色 error：亮红底 + 深红字） -->
+    <TextView
+        android:id="@+id/widget_campus_button_logout_dark"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/widget_campus_button_logout_dark"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="@string/widget_campus_button_offline"
+        android:textColor="#FF690005"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+</FrameLayout>

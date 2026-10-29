@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      M3 主题（2026-10-25 收敛）
+      - 颜色全部走 M3 语义 token，未启用 dynamic color（品牌色 @color/primary 固定）
+      - 中性色阶（surface / onSurface / outline 系列）是从品牌蓝推导出来的冷灰，
+        不是 Material3 库默认的紫灰，见 values/colors.xml
+      - windowLightStatusBar 见 values-night/themes.xml（只覆盖这一个条目）
+    -->
+    <style name="Base.Theme.LanhangLite" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 品牌色 -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorOnSecondary">@color/on_primary</item>
+        <item name="colorSecondaryContainer">@color/secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/on_secondary_container</item>
+
+        <!-- M3 中性色阶：卡片 / 列表 / 分割线全部由这套 token 派生 -->
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_container_highest</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">@color/outline_variant</item>
+
+        <!-- M3 edge-to-edge：系统栏透明，内容绘制到系统栏下方，由各页 inset 让位 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 浅色底 → 状态栏图标用深色；深色模式在 values-night/themes.xml 覆盖为 false -->
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Theme.LanhangLite" parent="Base.Theme.LanhangLite" />
+
+    <!--
+      注意：点分样式名会被 AAPT 隐式推断父样式（`A.B.C` 的父是 `A.B`）。
+      所以这里每个 `Widget.Lanhang.*` / `TextAppearance.Lanhang.*` 都必须显式写 parent，
+      否则 AAPT 会去找不存在的 `Widget.Lanhang` / `TextAppearance.Lanhang` 并让资源链接整体失败。
+    -->
+
+    <!--
+      M3 small top app bar 的落地样式：直接继承官方的 Surface 变体（背景 = surface、阴影透明），
+      再补上前景色与标题字阶。所有页面的 MaterialToolbar 统一 `style="@style/Widget.Lanhang.Toolbar"`，
+      不要再各自写 android:background="?attr/colorPrimary"。
+    -->
+    <style name="Widget.Lanhang.Toolbar" parent="Widget.Material3.Toolbar.Surface">
+        <item name="titleTextColor">?attr/colorOnSurface</item>
+        <item name="navigationIconTint">?attr/colorOnSurface</item>
+        <item name="titleTextAppearance">@style/TextAppearance.Lanhang.ToolbarTitle</item>
+    </style>
+
+    <!-- M3 TitleLarge：22sp / Regular，中文不额外加粗 -->
+    <style name="TextAppearance.Lanhang.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textSize">@dimen/text_title_large</item>
+        <item name="android:textStyle">normal</item>
+    </style>
+
+    <!--
+      ==================== 卡片 ====================
+      M3 三种卡片只有这一处定义：Filled（填充卡片）。
+      官方 Widget.Material3.CardView.Filled 已经给全了规范值：
+        容器色 = ?attr/colorSurfaceContainerHighest
+        圆角   = shapeAppearanceCornerMedium（12dp）
+        海拔   = 0dp（M3 用色调分层，不用投影）
+        描边   = 0dp
+      因此这里不放任何 item —— 存在的意义是"全项目只有这一个卡片入口"，
+      布局里写 style="@style/Widget.Lanhang.Card"，不要再逐个写 cardBackgroundColor /
+      cardCornerRadius / cardElevation（散写正是之前卡片不一致的原因）。
+      要换卡片类型只改这一处 parent（Elevated / Outlined）。
+    -->
+    <style name="Widget.Lanhang.Card" parent="Widget.Material3.CardView.Filled" />
+
+    <!--
+      大圆角卡片（2026-10-26）：24dp 圆角，版式来自 Hoshi Reader 的 GroupCard
+      （features/settings/SettingsGroup.kt：RoundedCornerShape(24.dp) + Surface + tonalElevation 0）。
+      只多一个圆角，容器色/海拔仍走官方 Filled 卡片的规范值，所以不散写颜色、不写描边。
+      使用范围：设置目录页与关于页的分组卡、工作圈的动态卡（feed 单卡，不是分组）。
+      「一卡装多行」的分组列表只适合设置/定长清单；feed 里每条仍是独立一张卡。
+      其它页面继续用 Widget.Lanhang.Card（12dp），避免全局圆角被这一处带偏。
+    -->
+    <style name="Widget.Lanhang.Card.Large" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">@dimen/corner_card_large</item>
+    </style>
+
+    <!-- 卡片内嵌容器（如动态的点赞/评论区）：比卡片本身低一档，形成内凹层次 -->
+    <style name="Widget.Lanhang.Card.Nested" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerLow</item>
+        <item name="cardCornerRadius">@dimen/corner_md</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!--
+      ==================== 字阶（M3 type scale 的落地别名） ====================
+      只覆写 textSize（中文不设 letterSpacing），字重/行高沿用官方值。
+      卡片与列表项一律用 android:textAppearance 引用，不要再散写 textSize + textStyle="bold"
+      （裸 textStyle=bold 是合成加粗，M3 的强调字重是 medium）。
+    -->
+    <style name="TextAppearance.Lanhang.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textSize">@dimen/text_headline_small</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textSize">@dimen/text_title_medium</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.TitleSmall" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:textSize">@dimen/text_title_small</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">@dimen/text_body_large</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">@dimen/text_body_medium</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.BodySmall" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textSize">@dimen/text_body_small</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.LabelLarge" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">@dimen/text_label_large</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.LabelMedium" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textSize">@dimen/text_label_medium</item>
+    </style>
+
+    <style name="TextAppearance.Lanhang.LabelSmall" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">@dimen/text_label_small</item>
+    </style>
+
+    <!--
+      ==================== 课表页控件（2026-10-25 M3 化） ====================
+      课表顶栏原来是自绘：ImageButton + GradientDrawable 圆形底、TextView + 画出来的胶囊。
+      现在全部换成官方 M3 组件，触摸区/涟漪/禁用态/无障碍由库负责。
+    -->
+
+    <!-- M3 标准胶囊形（周次按钮、休息带） -->
+    <style name="ShapeAppearance.Lanhang.Pill" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- M3 图标按钮：官方已给 48dp 触摸区与圆形涟漪，这里只定图标尺寸与默认色 -->
+    <style name="Widget.Lanhang.IconButton" parent="Widget.Material3.Button.IconButton">
+        <item name="iconSize">@dimen/icon_lg</item>
+        <item name="iconTint">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- 日历按钮用 tonal 版本：它是"跳转到某周"的入口，比左右翻页更重 -->
+    <style name="Widget.Lanhang.IconButton.Tonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+        <item name="iconSize">@dimen/icon_lg</item>
+    </style>
+
+    <!--
+      周次按钮：M3 里"可点击的当前值"用 chip 形态（胶囊 + 短高度）。
+      TonalButton 自带 secondaryContainer 底与 onSecondaryContainer 字，
+      非当周时由代码改成描边/透明（见 ScheduleFragment.updateWeekPill）。
+    -->
+    <style name="Widget.Lanhang.WeekPill" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">@dimen/space_lg</item>
+        <item name="android:paddingEnd">@dimen/space_lg</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textAppearance">@style/TextAppearance.Lanhang.LabelLarge</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Lanhang.Pill</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!--
+      课程卡：周视图的课程行与网格视图的课程块共用。
+      底色是"每门课一种 tonal container"（代码 setCardBackgroundColor 覆盖），
+      所以这里只定形状与海拔，不写 cardBackgroundColor。
+      小圆角（8dp）：网格里边长只有 40dp 左右，12dp 会吃掉内容。
+    -->
+    <style name="Widget.Lanhang.CourseCard" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">@dimen/corner_sm</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!--
+      M3 filter chip（学期筛选）：官方样式已经处理了选中/未选中的容器色、描边色、涟漪与
+      最小 48dp 触摸区。这里只关掉选中态的对勾图标 —— 学期名较长，勾会在选中瞬间把
+      整行往右顶，视觉跳动明显；选中态靠容器色（secondaryContainer）区分已经足够。
+    -->
+    <style name="Widget.Lanhang.Chip.Filter" parent="Widget.Material3.Chip.Filter">
+        <item name="checkedIconVisible">false</item>
+    </style>
+
+    <!-- 图片预览：恒定黑底 -->
+    <style name="Theme.LanhangLite.Fullscreen" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

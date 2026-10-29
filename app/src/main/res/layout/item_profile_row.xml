@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 个人资料的一行：左标签 + 右值。用 <include android:id> 复用到 activity_user_profile.xml，
+     行可见性由 UserProfileActivity 按隐私权限位控制（见官方掩码矩阵）。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/list_item_height_single"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/card_padding"
+    android:paddingTop="@dimen/space_md"
+    android:paddingEnd="@dimen/card_padding"
+    android:paddingBottom="@dimen/space_md">
+
+    <TextView
+        android:id="@+id/tvRowLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="72dp"
+        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
+    <TextView
+        android:id="@+id/tvRowValue"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_lg"
+        android:layout_weight="1"
+        android:gravity="end"
+        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+        android:textColor="?attr/colorOnSurface" />
+</LinearLayout>

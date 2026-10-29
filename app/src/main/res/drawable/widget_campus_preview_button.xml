@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  预览用的「一键认证」按钮底。
+
+  与真实小组件的按钮分开是有原因的：
+  - 真实小组件的按钮底色**写死十六进制**，由代码切「浅/深」两套 View 来控制
+    （浅/深是 App 内的主题设置，跟系统不一定同步）；
+  - 预览由宿主 inflate，只能靠资源限定符自适应 —— 所以这里用 @color/primary，
+    values 里是品牌深蓝 #084168，values-night 里是规范亮蓝 #8ED8F8，
+    系统切深色时预览自动变成亮蓝，和真实小组件在深色下的样子对得上。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="@color/primary" />
+</shape>

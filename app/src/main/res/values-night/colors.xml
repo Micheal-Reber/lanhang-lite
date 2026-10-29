@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      M3 中性色阶 —— 深色模式。
+      深色下层级反转：surface 最暗，highest 最亮（越"高"的容器越浅）。
+      数值与浅色模式对应，见 values/colors.xml 的说明。
+    -->
+    <color name="surface">#111417</color>
+    <color name="surface_container_lowest">#0B0E10</color>
+    <color name="surface_container_low">#161A1E</color>
+    <color name="surface_container">#1B2025</color>
+    <color name="surface_container_high">#242A31</color>
+    <color name="surface_container_highest">#2E353D</color>
+    <color name="surface_variant">#39424B</color>
+    <color name="on_surface">#E3E8ED</color>
+    <color name="on_surface_variant">#BDC6D0</color>
+    <color name="outline">#88929C</color>
+    <color name="outline_variant">#3D444C</color>
+
+    <!--
+      强调色 —— 深色模式必须换成亮调（2026-10-25 补）。
+      M3 规范：深色主题的 primary 取 tone 80（浅亮的同色相），onPrimary 取 tone 20（深色），
+      而不是沿用浅色主题的 tone 40 / 白字。此前这里漏了覆写 primary，夜间仍是 #084168 深蓝，
+      凡是拿 ?attr/colorPrimary 当文字/图标色的地方（成绩页统计数字、课表「今天」、选周对勾、
+      发表页计数）压在深色容器上都几乎看不见。
+      数值与 ui/LanhangTheme.kt 的 DarkColors 保持一致，View 与 Compose 两套主题不再分叉。
+    -->
+    <color name="primary">#8ED8F8</color>
+    <color name="on_primary">#00344D</color>
+
+    <!-- 其它 -->
+    <color name="link">#8AB4F8</color>
+    <color name="primary_container">#103D58</color>
+    <color name="on_primary_container">#C7E9FA</color>
+    <color name="secondary_container">#103D58</color>
+    <color name="on_secondary_container">#C7E9FA</color>
+    <color name="nav_checked">#8ED8F8</color>
+</resources>

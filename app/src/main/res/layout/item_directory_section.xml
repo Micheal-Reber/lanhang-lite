@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小节标题 / 面包屑（当前部门全名）：一行灰色小字，两种用法共用 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tvSection"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:maxLines="1"
+    android:paddingStart="@dimen/screen_padding_h"
+    android:paddingTop="@dimen/space_sm"
+    android:paddingEnd="@dimen/screen_padding_h"
+    android:paddingBottom="@dimen/space_xs"
+    android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+    android:textColor="?attr/colorOnSurfaceVariant" />

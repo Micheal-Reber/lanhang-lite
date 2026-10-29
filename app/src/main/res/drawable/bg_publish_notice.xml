@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 发表页的「实名发言」提示卡：M3 filled 容器（浅色底 + 12dp 圆角），不用描边 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorSurfaceContainerLow" />
+    <corners android:radius="@dimen/corner_md" />
+</shape>

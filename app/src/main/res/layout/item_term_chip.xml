@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  学期筛选 chip 的模板（M3 filter chip）。
+  样式来自 Widget.Lanhang.Chip.Filter，选中/未选中的容器色、描边、涟漪、48dp 触摸区全部由官方样式提供，
+  不要在代码里再用 GradientDrawable 手画状态。
+-->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Lanhang.Chip.Filter"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="@dimen/space_sm"
+    app:checkedIconVisible="false"
+    app:ensureMinTouchTargetSize="true" />

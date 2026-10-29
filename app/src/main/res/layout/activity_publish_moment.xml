@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  发表动态（独立页面）。
+
+  结构对齐「专门页面」而不是弹窗：
+  - 顶栏沿用 Widget.Lanhang.Toolbar（返回 + 标题 + 右侧「发表」文字按钮），与其他页面一致
+  - 正文区可滚动：实名提示 → 输入框 → 图片行
+  - 底栏固定显示字数统计，不随内容滚动；底栏 padding 由 insets 让出导航栏
+
+  与设计规范对齐的要点：
+  - 间距/圆角/字号一律引用 @dimen token，不直写 dp / sp
+  - 颜色一律走 M3 语义 token（?attr/colorXxx），不硬编码色值
+  - 按钮用现成的 M3 TextButton 样式，禁用态由组件自己处理
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Lanhang.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/top_app_bar_height"
+        app:navigationContentDescription="@string/common_back"
+        app:navigationIcon="@drawable/ic_back"
+        app:title="@string/moments_publish_title">
+
+        <!-- 右端主操作：内容为空时禁用（M3 TextButton 自带禁用配色） -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPublish"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="@dimen/space_sm"
+            android:enabled="false"
+            android:text="@string/moments_publish" />
+    </com.google.android.material.appbar.MaterialToolbar>
+
+    <!-- 发布中的不确定进度条，比转圈遮罩轻，不打断阅读 -->
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/contentScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_padding_h"
+            android:paddingTop="@dimen/space_md"
+            android:paddingEnd="@dimen/screen_padding_h"
+            android:paddingBottom="@dimen/space_2xl">
+
+            <!-- 实名提示 -->
+            <TextView
+                android:id="@+id/tvNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_publish_notice"
+                android:lineSpacingExtra="@dimen/space_xs"
+                android:padding="@dimen/space_md"
+                android:text="@string/moments_publish_notice"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="@dimen/text_body_small" />
+
+            <!-- 输入区：无边框，与列表正文同字号 -->
+            <EditText
+                android:id="@+id/etContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_lg"
+                android:background="@null"
+                android:gravity="top|start"
+                android:hint="@string/moments_publish_hint"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine|textCapSentences"
+                android:lineSpacingExtra="6dp"
+                android:minLines="8"
+                android:paddingStart="0dp"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingEnd="0dp"
+                android:paddingBottom="@dimen/space_sm"
+                android:textColor="?attr/colorOnSurface"
+                android:textColorHint="?attr/colorOnSurfaceVariant"
+                android:textSize="@dimen/text_body_large" />
+
+            <!-- 图片区：缩略图 + 添加方块（由代码填充） -->
+            <HorizontalScrollView
+                android:id="@+id/imageScroller"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_sm"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/imageRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/divider_thickness"
+        android:background="?attr/colorOutlineVariant" />
+
+    <!-- 底栏：字数统计，固定不滚动；bottom padding 由 insets 追加 -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end|center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/screen_padding_h"
+        android:paddingTop="@dimen/space_sm"
+        android:paddingEnd="@dimen/screen_padding_h"
+        android:paddingBottom="@dimen/space_sm">
+
+        <TextView
+            android:id="@+id/tvCounter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="@dimen/text_body_small" />
+    </LinearLayout>
+</LinearLayout>

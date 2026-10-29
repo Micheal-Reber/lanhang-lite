@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_my_bookings"
+        android:icon="@drawable/ic_my_bookings"
+        android:title="@string/library_seat_my_bookings"
+        app:showAsAction="always" />
+</menu>

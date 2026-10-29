@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  单条评论：整行可点（回复该评论作者）。
+  本人评论在正文下方多一个蓝色「删除」；别人的评论不显示（MomentAdapter 控制）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="false"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/tvCommentLine"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingExtra="4dp"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="@dimen/text_body_medium" />
+
+    <TextView
+        android:id="@+id/tvCommentDelete"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:paddingTop="2dp"
+        android:paddingEnd="@dimen/space_sm"
+        android:paddingBottom="2dp"
+        android:text="@string/common_delete"
+        android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
+        android:textColor="@color/link"
+        android:visibility="gone" />
+</LinearLayout>

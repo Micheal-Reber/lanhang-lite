@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  校园网小组件（2×2）在选择器里的**可缩放预览布局**（API 31+ 优先于 previewImage）。
+
+  规范要点（developer.android.com/develop/ui/views/appwidgets/previews）：
+  - previewLayout 会被宿主按小部件默认尺寸缩放，因此**不能用固定 dp 偏移**画内容，
+    全部用 weight / 百分比排版。
+  - 只使用 RemoteViews 支持的控件（LinearLayout / TextView / ImageView）。
+
+  与真实小组件保持一致的结构：状态点 + 标题 → 副标题 → 底部**通栏**按钮。
+
+  配色全部走 @color/ 语义色引用（values / values-night 各一份），
+  这样系统切到深色时预览自动变成深色底 + **亮蓝按钮**（#8ED8F8），
+  不会停留在浅色那一套 —— 用户看到的必须和放置到桌面后长得一样。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface_container"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:background="@drawable/widget_campus_preview_dot" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/widget_campus_offline"
+            android:textColor="@color/on_surface"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:text="@string/widget_campus_offline_detail"
+        android:textColor="@color/on_surface_variant"
+        android:textSize="11sp" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:background="@drawable/widget_campus_preview_button"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="@string/widget_campus_button_auth"
+        android:textColor="@color/on_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

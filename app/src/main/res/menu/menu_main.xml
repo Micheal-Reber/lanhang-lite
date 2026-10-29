@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!--
+      顶栏右侧动作：搜索、消息、我的动态（仅工作圈 Tab，见 MainActivity.onPrepareOptionsMenu）。
+      调试课表接口已移到「设置 → 工具」，退出登录已移到「设置 → 账号卡下方」，
+      所以这里不需要「更多选项」三个点。
+
+      「我的动态」2026-10-28 从 never 改成 always：以前藏在「更多」三个点里，
+      用户反馈「要点两下太麻烦」——它是进自己动态的唯一入口，直出图标少一次点击。
+      图标用 ic_dynamic_feed（与个人主页「个人动态」行同一套语义），不要换成人像。
+      「always」保证窄屏被挤时也留在栏上；搜索/消息保持 ifRoom，空间不够时它们进溢出，
+      而不是把「我的动态」挤走。
+    -->
+    <item
+        android:id="@+id/action_moments_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/moments_search_title"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_moments_messages"
+        android:icon="@drawable/ic_notifications"
+        android:title="@string/moments_messages_title"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_my_moments"
+        android:icon="@drawable/ic_dynamic_feed"
+        android:title="@string/my_moments_title"
+        app:showAsAction="always" />
+</menu>

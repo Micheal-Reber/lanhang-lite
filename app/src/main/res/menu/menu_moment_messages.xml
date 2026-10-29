@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 互动消息中心的顶栏菜单：一键把当前列表全部标为已读（已读只在本地生效，见 MomentMessageStore） -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_mark_all_read"
+        android:icon="@drawable/ic_check"
+        android:title="@string/moments_messages_mark_all_read"
+        app:showAsAction="ifRoom" />
+</menu>

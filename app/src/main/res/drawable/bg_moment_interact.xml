@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!--
+      卡片内的嵌套容器：比填充卡片低一档，形成内凹层次（深色模式自动反转）。
+      圆角按嵌套规则算：外层卡片 24dp - 卡片内边距 16dp = 8dp，
+      内层跟着收，否则内角比外角还圆、视觉上会「顶出来」。
+    -->
+    <solid android:color="?attr/colorSurfaceContainerLow" />
+    <corners android:radius="@dimen/corner_sm" />
+</shape>
