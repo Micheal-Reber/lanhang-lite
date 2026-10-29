@@ -665,13 +665,41 @@ object ScheduleWidgetRenderer {
         private val gapW = dp(2f)
         private val lineW = dp(1f)
 
+        /**
+         * 实际要画的节次数 = 整周最晚那节课的下课节次。
+         *
+         * 自适应收缩是 4×4 这类小部件能看的关键：12 节全画时每行只有 ~18dp，夹在两行
+         * 文字之间；整周最晚只到第 8 节的话，把 11/12 节省掉，行高直接涨 1/3。
+         *
+         * 下限 4 行：再少就不像「一天的形状」了，而且单行会被拉成一块很厚的色块。
+         * 整周无课时退化成 [EMPTY_PERIOD_ROWS]，留给「本周无课」那句提示居中。
+         */
+        private val periodRows: Int = run {
+            val maxEnd = snapshot.days.asSequence()
+                .flatMap { it.courses.asSequence() }
+                .maxOfOrNull { it.end } ?: 0
+            if (maxEnd <= 0) EMPTY_PERIOD_ROWS else maxEnd.coerceIn(4, PeriodClock.count)
+        }
+
+        /**
+         * 实际要画的星期列数 = 最后一个有课的那天 + 1（周六周日没课就不占位置）。
+         *
+         * 中间断档（如周五没课、周六有课）不能跳列，否则日期与列对不上 —— 只裁尾部。
+         * 下限 3 列：只剩一两天有课时，一天独占整个宽度反而更难看。
+         * 整周无课时保留满 7 列，让表头的日期仍有参考价值。
+         */
+        private val dayCols: Int = run {
+            val lastBusy = snapshot.days.indexOfLast { it.courses.isNotEmpty() }
+            if (lastBusy < 0) 7 else (lastBusy + 1).coerceIn(3, 7)
+        }
+
         private val bodyTop = outerPad + headH
         private val bodyBottom = height - outerPad
         private val bodyH = (bodyBottom - bodyTop).coerceAtLeast(1f)
-        // 行高按作息表节数自适应：12 节时每行 = (可用高 - 13 道缝) / 12
+        // 行高按**实际要画的节数**算，不是按作息表节数：省下来的空节全部变成可读高度
         private val slotH =
-            ((bodyH - gapH * (PeriodClock.count + 1f)) / PeriodClock.count).coerceAtLeast(dp(3f))
-        private val dayW = ((width - outerPad * 2f - timeW - gapW * 8f) / 7f)
+            ((bodyH - gapH * (periodRows + 1f)) / periodRows).coerceAtLeast(dp(3f))
+        private val dayW = ((width - outerPad * 2f - timeW - gapW * (dayCols + 1)) / dayCols)
             .coerceAtLeast(1f)
 
         /** 今天整列淡底：浅色用容器色（白底上不发灰），深色用主色降低透明度 */
@@ -721,7 +749,7 @@ object ScheduleWidgetRenderer {
             val blockH = daySize + dp(2f) + dateSize
             val top = outerPad + (headH - blockH) / 2f
             paint.alpha = 255
-            for (index in 0..6) {
+            for (index in 0 until dayCols) {
                 val day = snapshot.days.getOrNull(index)
                 val isToday = day?.date == today
                 val centerX = colX(index) + dayW / 2f
@@ -756,7 +784,8 @@ object ScheduleWidgetRenderer {
 
         private fun drawTodayColumn() {
             val todayIndex = snapshot.days.indexOfFirst { it.date == today }
-            if (todayIndex < 0) return
+            // 今天落在被裁掉的周末列里（且那天没课）时不画，否则会涂到表格右侧外面
+            if (todayIndex < 0 || todayIndex >= dayCols) return
             val x = colX(todayIndex)
             paint.style = Paint.Style.FILL
             // 底色自带 alpha，paint.alpha 必须复位，否则会被上一步（教室行 209）二次压淡
@@ -778,11 +807,11 @@ object ScheduleWidgetRenderer {
             paint.color = palette.divider
             val left = outerPad + timeW + (gapW - lineW) / 2f
             // 每节底边一条线；最后一节的底边就是 body 下沿，不再单独画
-            for (index in 0 until PeriodClock.count - 1) {
+            for (index in 0 until periodRows - 1) {
                 val y = rowTop(index) + slotH + (gapH - lineW) / 2f
                 canvas.drawRect(RectF(left, y, width - outerPad, y + lineW), paint)
             }
-            for (d in 0..6) {
+            for (d in 0..dayCols) {
                 val x = separatorX(d) - lineW / 2f
                 canvas.drawRect(RectF(x, bodyTop, x + lineW, bodyBottom), paint)
             }
@@ -805,7 +834,7 @@ object ScheduleWidgetRenderer {
             val centerX = outerPad + timeW / 2f
             val twoLine = slotH >= dp(22f)
             val showStart = twoLine || slotH >= dp(12f)
-            for (index in 0 until PeriodClock.count) {
+            for (index in 0 until periodRows) {
                 val centerY = rowTop(index) + slotH / 2f
                 val startText = PeriodClock.startText(index + 1).orEmpty()
                 when {
@@ -876,13 +905,14 @@ object ScheduleWidgetRenderer {
 
         private fun courseLayouts(): List<CourseLayout> {
             val result = mutableListOf<CourseLayout>()
-            for (dayIndex in 0..6) {
+            for (dayIndex in 0 until dayCols) {
                 val day = snapshot.days.getOrNull(dayIndex) ?: continue
                 val lanes = layoutLanes(day.courses)
                 val colX = outerPad + timeW + gapW + dayIndex * (dayW + gapW)
                 for (lane in lanes) {
-                    val start = (lane.course.start - 1).coerceIn(0, PeriodClock.count - 1)
-                    val end = (lane.course.end - 1).coerceIn(start, PeriodClock.count - 1)
+                    // 夹到可见行内：periodRows 已覆盖整周最晚的下课节次，这里只是防御脏数据
+                    val start = (lane.course.start - 1).coerceIn(0, periodRows - 1)
+                    val end = (lane.course.end - 1).coerceIn(start, periodRows - 1)
                     val span = end - start + 1
                     val laneGap = if (lane.laneCount > 1) dp(1f) else 0f
                     val laneW = (dayW - laneGap * (lane.laneCount - 1)) / lane.laneCount
@@ -1153,6 +1183,11 @@ object ScheduleWidgetRenderer {
         }
 
         private fun dp(value: Float): Float = value * density
+
+        private companion object {
+            /** 整周无课时画的节次行数：只为给「本周无课」那句提示留出居中的表格形状 */
+            const val EMPTY_PERIOD_ROWS = 5
+        }
     }
 
     private data class CourseLayout(
