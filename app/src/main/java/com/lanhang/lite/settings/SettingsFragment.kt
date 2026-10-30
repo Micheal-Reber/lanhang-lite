@@ -280,28 +280,8 @@ class SettingsFragment : Fragment() {
         refreshMomentsFilterSummary()
         // 资料页可能刚回填过头像地址，回到设置页顺手对齐一次（命中缓存时不发请求）
         bindAvatar()
-        refreshCacheSize()
     }
 
-    /**
-     * 清除缓存行右侧的占用大小。
-     *
-     * 统计要遍历文件目录，必须放 IO 线程 —— 主线程扫一次 image_cache（实测 146 个文件、
-     * 74MB）会明显卡一下。
-     */
-    private fun refreshCacheSize() {
-        val b = _binding ?: return
-        val ctx = context ?: return
-        lifecycleScope.launch {
-            val usage = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
-            val cur = _binding ?: return@launch
-            cur.tvCacheSize.text = getString(
-                R.string.settings_clear_cache_size,
-                StorageJanitor.format(usage.images),
-                StorageJanitor.format(usage.others)
-            )
-        }
-    }
 
     /**
      * 清除缓存。
@@ -332,8 +312,6 @@ class SettingsFragment : Fragment() {
                             StorageJanitor.format(after.images),
                             StorageJanitor.format(after.others)
                         )
-                        // 首页那行的摘要也得跟着变
-                        refreshCacheSize()
                         Toast.makeText(
                             ctx,
                             getString(

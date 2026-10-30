@@ -397,7 +397,7 @@
                         android:layout_marginEnd="@dimen/card_padding"
                         android:background="?attr/colorOutlineVariant" />
 
-                    <!-- 清除缓存：副标题直接显示当前占用，不用点进去才知道有多少 -->
+                    <!-- 清除缓存：二级页。占用大小只在二级页里显示，这一行只做入口 -->
                     <LinearLayout
                         android:id="@+id/rowClearCache"
                         android:layout_width="match_parent"
@@ -406,7 +406,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:minHeight="@dimen/list_item_height_single"
                         android:orientation="horizontal"
                         android:paddingStart="@dimen/card_padding"
                         android:paddingTop="@dimen/space_sm"
@@ -420,28 +420,21 @@
                             android:src="@drawable/ic_clean"
                             app:tint="?attr/colorOnSurfaceVariant" />
 
-                        <LinearLayout
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="@dimen/list_icon_gap"
                             android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:text="@string/settings_clear_cache"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/settings_clear_cache"
-                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
-                                android:textColor="?attr/colorOnSurface" />
-
-                            <TextView
-                                android:id="@+id/tvCacheSize"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_xxs"
-                                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-                        </LinearLayout>
+                        <ImageView
+                            android:layout_width="@dimen/icon_md"
+                            android:layout_height="@dimen/icon_md"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <View
