@@ -9,8 +9,9 @@
 
       「我的动态」2026-10-28 从 never 改成 always：以前藏在「更多」三个点里，
       用户反馈「要点两下太麻烦」——它是进自己动态的唯一入口，直出图标少一次点击。
-      图标用 ic_dynamic_feed（与个人主页「个人动态」行同一套语义），不要换成人像。
-      「always」保证窄屏被挤时也留在栏上；搜索/消息保持 ifRoom，空间不够时它们进溢出，
+      图标 2026-10-30 从 ic_dynamic_feed 换成 ic_article：底栏「工作圈」Tab 用的就是
+      ic_dynamic_feed，一上一下两个一样的图标会让人以为是同一个入口。
+      「always」保证窄屏被挤时还在栏上；搜索/消息保持 ifRoom，空间不够时它们进溢出，
       而不是把「我的动态」挤走。
     -->
     <item
@@ -27,7 +28,7 @@
 
     <item
         android:id="@+id/action_my_moments"
-        android:icon="@drawable/ic_dynamic_feed"
+        android:icon="@drawable/ic_article"
         android:title="@string/my_moments_title"
         app:showAsAction="always" />
 </menu>
