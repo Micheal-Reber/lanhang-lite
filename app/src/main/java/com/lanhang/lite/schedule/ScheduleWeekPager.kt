@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.animation.Interpolator
 import android.widget.FrameLayout
 import com.lanhang.lite.R
@@ -14,35 +15,44 @@ import com.lanhang.lite.ui.Motion
 import kotlin.math.abs
 
 /**
- * 课表周次横向翻页容器（2026-10-27）。
+ * 课表周次横向翻页容器。
  *
  * 为什么不用 ViewPager2：课表页的每一页内容都是**代码动态生成**的（网格要按容器宽度算列宽、
  * 表头和表格要像素级对齐），而且当前页与目标页在拖动过程中只是**并排**平移、不是叠放，
  * 自己实现一层 view 平移比塞进 ViewPager2 + RecyclerView.Adapter 更直接，
  * 也不会和外面的 SwipeRefreshLayout、里面的 NestedScrollView 抢嵌套滚动。
  *
+ * 2026-10-30 按 miuix 版课表（Nuclear-Potatoes/lanhang-lite-miuix）的滑动逻辑对齐，三处改动：
+ *
+ * 1. **手势挂到 [ScheduleSwipeLayout]（dispatch 层）**，不再挂 `scroll.setOnTouchListener`。
+ *    后者在手指落在课程卡片上时连 DOWN 都收不到（卡片可点击，会消费掉事件），
+ *    表现为「按空白处能滑、按课表块滑不动」；
+ * 2. **只平移 [Page.sliding]**，不再平移整页。网格页的 7 天列在滑动层里，
+ *    左侧节次/时间列留在固定层 —— 每周都一样的东西不该跟着滑出去再滑回来（看着像坏了）；
+ * 3. 翻页行程改成**滑动层自己的宽度**（网格页 = 屏宽 - 时间列），并沿用「横向必须明显多于
+ *    竖向」的判定（`|dx| > |dy| × 1.2`），斜着划只会回弹。
+ *
  * 交互约定：
  * - 手指横向移动时页面**跟手**平移（不再是「松手才淡入淡出」，之前完全没有过程反馈）；
- * - 松手按「**速度投影**后的位移 ≥ 5% 屏宽」或「横向速度 ≥ 最小抛掷速度」判定翻页。
+ * - 松手按「**速度投影**后的位移 ≥ 行程的 5%」或「横向速度 ≥ 最小抛掷速度」判定翻页。
  *   投影 = 松手位移 + 手速 × 0.10s，这是 Compose pager（AnchoredDraggable + SnapFlingBehavior）
  *   的核心手感：手指离开瞬间还带着速度，页面该顺着它再滑一小段再决定去哪。
  *   只按「松手那一刻的位移」判定的话，慢拖到中途停住再松手必然弹回 —— 就是用户报的
- *   「怎么拖都过不去」。误翻由 MOVE 阶段的横滑判定挡（2 倍 slop 且横向明显大于纵向，
- *   约 44px），想纵向滚动的手势根本进不到收尾逻辑；
+ *   「怎么拖都过不去」（2026-10-27 连报两次）。
  * - 学期首/末周继续往该方向拖只有 0.28 倍阻尼位移，松手回弹 —— 明确告诉用户「到头了」；
  * - 切页后把新页滚到与旧页相同的纵向位置：同一学期每页高度一致，
  *   停在「第 9 节」翻到下一周应该还在第 9 节，而不是被拉回顶部。
  *
  * 手势必须守住的既有约束（2026-10-26 修「下拉刷新指示器滞留」时定下的）：
- * 1. `onTouch` 一律返回 false，绝不吞掉 UP —— 吞掉后 NestedScrollView 收不到
- *    `onTouchEvent(UP)`，`stopNestedScroll()` 不执行，SwipeRefreshLayout 等不到回弹；
- * 2. 横滑判定要够狠（2 倍 touchSlop 且明显横多于纵），否则下拉时的横向漂移会
- *    提前 `requestDisallowInterceptTouchEvent(true)`，把整段下拉手势废掉；
- * 3. 手势结束无条件放开 disallow-intercept。
- * 4. **位移和速度都必须基于绝对坐标**（`event.rawX`，VelocityTracker 喂 `offsetLocation` 后的副本）。
- *    被触摸的 `scroll` 自己也在被平移，`event.x` 会跟着补偿平移量 —— 用它算位移会把
- *    「手指总位移」算成「总位移 + 已平移量」，页面越跑越快，慢拖时表现为剧烈抖动。
- *    2026-10-27 用户报「滑得慢会一直抖」，根因就是这里，别改回去。
+ * 1. 没被判定为横向时一律返回 false —— 绝不吞掉竖向手势的 UP，否则 NestedScrollView
+ *    收不到 `onTouchEvent(UP)`、`stopNestedScroll()` 不执行，下拉指示器停在半路；
+ * 2. 横滑判定要够狠（1.5 倍 touchSlop 且明显横多于纵），否则下拉时的横向漂移会
+ *    提前认定为翻页，把整段下拉手势废掉；一旦已判过竖向，门槛再抬到 2 倍 slop + 2 倍比例
+ *    （不整段禁掉：斜着起手也还能翻过去）；
+ * 3. 手势结束无条件放开 disallow-intercept，并让调用方恢复下拉刷新；
+ * 4. 位移与速度一律基于绝对坐标（`rawX`）。现在被平移的是子层、接收触摸的外壳本身不动，
+ *    用本地坐标其实也稳，但绝对坐标不依赖这个前提 —— 哪天改成平移整页也不会再出现
+ *    「页面越跑越快、慢拖一直抖」（2026-10-27 的根因）。
  */
 class ScheduleWeekPager(
     private val host: FrameLayout,
@@ -53,10 +63,14 @@ class ScheduleWeekPager(
     /**
      * 一页。
      *
-     * [root] 是整页容器（平移对象），[scroll] 是该页自己的纵向滚动容器
-     * （手势装在它上面，`SwipeRefreshLayout` 也靠它判断「是否已在顶部」）。
+     * [root] 是整页外壳（必须是 [ScheduleSwipeLayout]），**永不平移**，手势挂在它上面；
+     * [scroll] 是该页自己的纵向滚动容器（`SwipeRefreshLayout` 也靠它判断「是否已在顶部」）；
+     * [sliding] 是这一页真正跟着手指横移的层：网格页只放「7 天列」（左轴钉住），
+     * 周视图页放整块内容。留空时退化成平移 [root]（无数据的空白页）。
      */
-    class Page(val week: Int, val root: View, val scroll: View)
+    class Page(val week: Int, val root: View, val scroll: View, sliding: List<View>) {
+        val sliding: List<View> = sliding.ifEmpty { listOf(root) }
+    }
 
     var minWeek: Int = 1
     var maxWeek: Int = 20
@@ -67,7 +81,10 @@ class ScheduleWeekPager(
     /** 一次翻页真正结束（含回弹到原页），用于延迟校验与相邻周预取 */
     var onSettle: (Int) -> Unit = {}
 
-    /** 手势结束（无论是否切页），用于兜底收回下拉指示器 */
+    /** 手势被判定为横向：调用方应关掉下拉刷新（否则指示器和翻页互相抢帧） */
+    var onHorizontalDragStart: () -> Unit = {}
+
+    /** 手势结束（无论是否切页），用于恢复下拉刷新 / 兜底收回指示器 */
     var onGestureEnd: () -> Unit = {}
 
     private var current: Page? = null
@@ -155,24 +172,21 @@ class ScheduleWeekPager(
     private fun install(page: Page) {
         val config = ViewConfiguration.get(host.context)
         // 一记「随手一划」的速度已经远超 minimumFlingVelocity（多数机型约 137px/s），
-        // 不要再乘系数抬高它，否则慢快滑会被判成「没动」
+        // 不要再乘系数抬高它，否则慢慢滑会被判成「没动」
         val minFling = config.scaledMinimumFlingVelocity.toFloat()
-        // 位移必须用 rawX/rawY（窗口绝对坐标），不能用 event.x/event.y。
-        // event.x 是「相对这个 scroll 的本地坐标」，而这个 scroll 正被我们平移：
-        // 页面左移 10px，同一根手指算出来的 event.x 就会 +10。于是
-        //   dx(n) = 手指总位移 + 前几帧累计的平移量
-        // 页面越跑越快，正反馈发散 —— 表现就是慢拖时页面一直抖、一冲就顶到边再来回弹。
-        // 2026-10-27 用户反馈「滑得慢会一直抖动」，根因就在这里。
+        val swipe = page.root as? ScheduleSwipeLayout ?: return
+
         var downRawX = 0f
         var downRawY = 0f
         var horizontal = false
+        var vertical = false
         var tracker: VelocityTracker? = null
 
-        page.scroll.setOnTouchListener { touched, event ->
+        swipe.pagerTouch = { event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     // 先占住「手指在屏上」，再收尾动画：收尾可能触发重建并换掉这一页，
-                    // 而正在接收这串事件的正是它的滚动视图
+                    // 而正在接收这串事件的正是它的外壳
                     touching = true
                     // 手指按上来时若上一段动画还在跑，先让它直接到位，别去拽一个正在移动的页面
                     finishAnimationNow()
@@ -181,54 +195,66 @@ class ScheduleWeekPager(
                     downRawX = event.rawX
                     downRawY = event.rawY
                     horizontal = false
+                    vertical = false
                     offset = 0f
+                    // 先占住手势，别让 SwipeRefreshLayout 在半路把我们拦走（下拉圆环被拉起来
+                    // 会和翻页互相抢帧，就是「两周叠着乱闪」的元凶）；判定为竖向时立刻放行
+                    disallowParent(page, true)
                     false
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    // 速度也必须喂「补偿过的副本」：VelocityTracker 内部读的是 event.getX()，
-                    // 和上面同一个污染源。不补偿的话算出来是手指速度 + 页面平移速度（约 2 倍），
-                    // fling 判定会过分灵敏，轻轻一碰就翻页。
-                    feedTracker(tracker, event, page.root.translationX)
+                    tracker?.addMovement(event)
                     val dx = event.rawX - downRawX
                     val dy = event.rawY - downRawY
-                    if (!horizontal && abs(dx) > slop * 2 && abs(dx) > abs(dy) * 1.5f) {
-                        horizontal = true
-                        touched.parent?.requestDisallowInterceptTouchEvent(true)
+                    if (!horizontal) {
+                        // 已经判过竖向（下拉刷新 / 滚课表）：门槛抬高一档 —— 不整段禁掉，
+                        // 否则「起手飘了十几像素纵向」的斜划永远翻不过去（用户报过两次
+                        // 「太难滑过去」）；但只要横向明显占优，把手势抢回来是合理的。
+                        val needSlop = if (vertical) slop * 2f else slop * 1.5f
+                        val needRatio = if (vertical) 2f else 1f
+                        if (abs(dx) > needSlop && abs(dx) > abs(dy) * needRatio) {
+                            horizontal = true
+                            onHorizontalDragStart()
+                        } else if (!vertical && abs(dy) > slop && abs(dy) > abs(dx)) {
+                            vertical = true
+                            disallowParent(page, false)
+                        }
                     }
-                    if (horizontal) dragTo(dx)
-                    false
+                    if (horizontal) {
+                        dragTo(dx)
+                        true
+                    } else {
+                        false
+                    }
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    feedTracker(tracker, event, page.root.translationX)
-                    val dx = event.rawX - downRawX
-                    val dy = event.rawY - downRawY
+                    tracker?.addMovement(event)
                     // 1000 是**单位**（px/秒），不是采样窗口 —— VelocityTracker 内部本来就只取
                     // 最近 100ms 左右的样本做拟合，算出来的已经接近「离开前一瞬的手速」。
                     // 千万别按「缩短窗口」的思路改成 100：那样单位变成 px/100ms，数值缩到十分之一，
                     // 任何滑动都过不了 fling 门槛。
                     tracker?.computeCurrentVelocity(1000)
                     val velocity = tracker?.xVelocity ?: 0f
-                    if (horizontal) {
-                        if (abs(dx) > abs(dy)) {
-                            release(dx, velocity, minFling)
-                        } else {
-                            snapBack()
-                        }
-                    }
-                    endGesture(touched)
+                    val dx = event.rawX - downRawX
+                    val dy = event.rawY - downRawY
+                    if (horizontal) release(dx, dy, velocity, minFling)
+                    endGesture(page)
                     tracker?.recycle()
                     tracker = null
-                    false
+                    horizontal
                 }
 
                 MotionEvent.ACTION_CANCEL -> {
+                    // 父控件把手势抢走（例如真的开始下拉刷新了）：一律回弹，绝不切周。
+                    // 以前把 CANCEL 当松手处理，event.x 归零后算出巨大位移直接判成切周，
+                    // 内容停在半路、周次和内容对不上。
                     if (horizontal) snapBack()
-                    endGesture(touched)
+                    endGesture(page)
                     tracker?.recycle()
                     tracker = null
-                    false
+                    horizontal
                 }
 
                 else -> false
@@ -236,42 +262,29 @@ class ScheduleWeekPager(
         }
     }
 
-    /**
-     * 给 VelocityTracker 喂一份「抵消页面平移」的事件副本。
-     *
-     * VelocityTracker 内部按下发到 View 的本地坐标做差分，而这块内容正被我们平移：
-     * 同一根手指，页面每左移 1px，本地坐标就 +1。不补偿的话算出来的速度是
-     * 「手指速度 + 平移速度」，约等于真实值的两倍，fling 判定会贼灵敏 ——
-     * 轻轻一碰就翻页，正是补偿缺失的典型症状。
-     *
-     * 加上当前 translationX 之后，坐标只剩「页面初始左边界」这一个常量偏移，差分不受影响。
-     */
-    private fun feedTracker(tracker: VelocityTracker?, event: MotionEvent, translation: Float) {
-        if (tracker == null) return
-        val copy = MotionEvent.obtain(event)
-        copy.offsetLocation(translation, 0f)
-        tracker.addMovement(copy)
-        copy.recycle()
-    }
-
     private fun dragTo(dx: Float) {
-        val width = host.width.toFloat()
-        if (width <= 0f) return
+        val travel = travelOf(current)
+        if (travel <= 0f) return
         // 每次位移都按当前方向校正相邻页：拖动中途反向时（先往右再往左）
         // 如果不换页，松手会翻到手指的反方向那一周。
         // 只在明显位移时校正：围绕 0 的亚像素抖动不该反复重建页面
         if (abs(dx) > slop) ensureSide(if (dx < 0f) 1 else -1)
         if (side == null) {
             // 学期边界：没有相邻周可露出来，只给一小段阻尼位移当作「到头了」的反馈
-            applyOffset((dx * 0.28f).coerceIn(-width * 0.3f, width * 0.3f))
+            applyOffset((dx * EDGE_DAMPING).coerceIn(-travel * 0.3f, travel * 0.3f))
         } else {
-            applyOffset(dx.coerceIn(-width, width))
+            applyOffset(dx.coerceIn(-travel, travel))
         }
     }
 
-    private fun release(dx: Float, velocity: Float, minFling: Float) {
-        val width = host.width.toFloat()
-        if (side == null || width <= 0f) {
+    private fun release(dx: Float, dy: Float, velocity: Float, minFling: Float) {
+        val travel = travelOf(current)
+        if (side == null || travel <= 0f) {
+            snapBack()
+            return
+        }
+        // 斜着划不算翻页：竖向分量和横向一个量级时，用户其实是在滚课表
+        if (abs(dx) < abs(dy) * AXIS_RATIO) {
             snapBack()
             return
         }
@@ -284,7 +297,7 @@ class ScheduleWeekPager(
         // 「拖了好多还是过不去」的直接来源（2026-10-27 第二次反馈）。
         val projected = dx + velocity * PROJECTION_SECONDS
         val sameDirection = (projected < 0f) == forward
-        val byDistance = sameDirection && abs(projected) >= width * COMMIT_DISTANCE_RATIO
+        val byDistance = sameDirection && abs(projected) >= travel * COMMIT_DISTANCE_RATIO
 
         // 快滑几乎不看位移：只要真的横向挪动过就算数。
         // 这个下限不是「要求拖多远」，只用来挡住「原地抖动 + 速度尖峰」的误判
@@ -295,14 +308,30 @@ class ScheduleWeekPager(
         if (byDistance || byFling) commit(forward) else snapBack()
     }
 
-    private fun endGesture(touched: View) {
+    private fun endGesture(page: Page) {
         touching = false
-        touched.parent?.requestDisallowInterceptTouchEvent(false)
+        disallowParent(page, false)
         onGestureEnd()
         drainPending()
     }
 
+    /** 放开/占住父控件的拦截开关（SwipeRefreshLayout 在链上） */
+    private fun disallowParent(page: Page, disallow: Boolean) {
+        (page.root.parent as? ViewGroup)?.requestDisallowInterceptTouchEvent(disallow)
+    }
+
     // ==================== 页面 ====================
+
+    /**
+     * 这一页的横移行程 = 滑动层自己的宽度。
+     * 网格页的滑动层是「7 天列」（屏宽 - 时间列），周视图页是整块内容。
+     * 用外层容器宽度是不对的：左轴钉住以后，列区只需要滑一个列区宽度就正好接上。
+     */
+    private fun travelOf(page: Page?): Float {
+        if (page == null) return host.width.toFloat().coerceAtLeast(1f)
+        val w = page.sliding.firstOrNull()?.width ?: 0
+        return if (w > 0) w.toFloat() else host.width.toFloat().coerceAtLeast(1f)
+    }
 
     /** 把相邻周准备好并放到屏幕外侧；超出学期范围时什么都不建（交给阻尼回弹） */
     private fun ensureSide(direction: Int) {
@@ -312,23 +341,29 @@ class ScheduleWeekPager(
             discardSide()
             return
         }
+        val travel = travelOf(base)
         val cached = side
         if (cached?.week == target) {
             // 复用的缓存页：校正一下位置（回弹时它会停在屏外，但如果期间发生过
-            // 尺寸变化——旋转、分屏、折叠展开——原来的 ±width 就不准了）
-            cached.root.translationX =
-                if (direction > 0) host.width.toFloat() else -host.width.toFloat()
+            // 尺寸变化——旋转、分屏、折叠展开——原来的 ±travel 就不准了）
+            val x = if (direction > 0) travel else -travel
+            cached.sliding.forEach { it.translationX = x }
             return
         }
         discardSide()
         val page = builder(target)
         host.addView(page.root, pageParams())
         install(page)
-        page.root.translationX =
-            if (direction > 0) host.width.toFloat() else -host.width.toFloat()
-        // 离屏时就把纵向位置对齐：等切页那一刻再滚，用户会看到一次明显的跳变
+        val x = if (direction > 0) travel else -travel
+        page.sliding.forEach { it.translationX = x }
+        // 离屏时就把纵向位置对齐：等切页那一刻再滚，用户会看到一次明显的跳变。
+        // 先同步滚一次，再 post 补一次 —— 同步那下保证「左轴钉住」后不会在第一帧
+        // 画出第 1 节的节次时间（两侧的时间列叠在同一位置，位置不一致就会闪一下）
         val y = base.scroll.scrollY
-        if (y > 0) page.scroll.post { if (page.root.parent != null) page.scroll.scrollTo(0, y) }
+        if (y > 0) {
+            page.scroll.scrollTo(0, y)
+            page.scroll.post { if (page.root.parent != null) page.scroll.scrollTo(0, y) }
+        }
         side = page
     }
 
@@ -347,7 +382,7 @@ class ScheduleWeekPager(
         discardSide()
         current = page
         offset = 0f
-        page.root.translationX = 0f
+        page.sliding.forEach { it.translationX = 0f }
         if (keepScrollY > 0) page.scroll.post { page.scroll.scrollTo(0, keepScrollY) }
         onWeekChange(week)
         onSettle(week)
@@ -361,32 +396,34 @@ class ScheduleWeekPager(
 
     // ==================== 动画 ====================
 
-    /** 手指位移 → 两页的横坐标（并排平移，不叠放） */
+    /** 手指位移 → 两页滑动层的横坐标（并排平移，不叠放） */
     private fun applyOffset(value: Float) {
         offset = value
-        val width = host.width.toFloat()
         val base = current ?: return
-        base.root.translationX = value
+        base.sliding.forEach { it.translationX = value }
         val other = side ?: return
-        other.root.translationX = if (other.week > base.week) width + value else -width + value
+        // 相邻页滑动层的自然位置：当前页列区右侧（下一周）或左侧（上一周）
+        val travel = travelOf(base)
+        val shift = if (other.week > base.week) travel + value else -travel + value
+        other.sliding.forEach { it.translationX = shift }
     }
 
     /** 翻页：滑到相邻周完全就位后换 current */
     private fun commit(forward: Boolean) {
-        val width = host.width.toFloat()
+        val travel = travelOf(current)
         val next = side
         val expected = if (forward) week + 1 else week - 1
         // 相邻页必须是这次要去的方向（拖动中途反向时如果没来得及换页，宁可回弹）
-        if (next == null || width <= 0f || next.week != expected) {
+        if (next == null || travel <= 0f || next.week != expected) {
             snapBack()
             return
         }
-        animate(offset, if (forward) -width else width, R.integer.motion_medium1) {
+        animate(offset, if (forward) -travel else travel, R.integer.motion_medium1) {
             val old = current
             current = next
             side = null
             offset = 0f
-            next.root.translationX = 0f
+            next.sliding.forEach { it.translationX = 0f }
             old?.let { host.removeView(it.root) }
             onWeekChange(next.week)
             onSettle(next.week)
@@ -430,8 +467,8 @@ class ScheduleWeekPager(
         val ctx = host.context
         animTarget = to
         animEnd = end
-        val width = host.width.toFloat().coerceAtLeast(1f)
-        val remaining = (abs(to - from) / width).coerceIn(0f, 1f)
+        val travel = travelOf(current).coerceAtLeast(1f)
+        val remaining = (abs(to - from) / travel).coerceIn(0f, 1f)
         val base = Motion.duration(ctx, durationRes)
         val durationMs = (base * (MIN_DURATION_RATIO + (1f - MIN_DURATION_RATIO) * remaining)).toLong()
         val anim = ValueAnimator.ofFloat(from, to).apply {
@@ -483,12 +520,14 @@ class ScheduleWeekPager(
 
     private companion object {
         /**
-         * 松手即翻页的位移门槛（占屏宽比例），作用在**速度投影之后**的落点上。
+         * 松手即翻页的位移门槛（占行程的比例），作用在**速度投影之后**的落点上。
          *
-         * 1080px 屏约 54px，比 MOVE 阶段的横滑准入（2 倍 touchSlop ≈ 44px）只高一点点 ——
+         * 1080px 屏约 54px，比 MOVE 阶段的横滑准入（1.5 倍 touchSlop ≈ 33px）只高一点点 ——
          * 也就是说：手势一旦被认定为「明确的横滑」，基本就一定会翻页。
          * 这是有意为之（2026-10-27 用户两次反馈「太难滑过去」）：课表页不存在
          * 「横向微调但不翻页」的需求，翻错了再滑回来成本很低，而「拖半天弹回去」很恼人。
+         * miuix 版用的是 20%（无速度投影）；这里保留投影 + 5%，两者手感接近但更宽容，
+         * 要严格对齐把它改成 0.2f 并把 PROJECTION_SECONDS 归零即可。
          */
         const val COMMIT_DISTANCE_RATIO = 0.05f
 
@@ -499,6 +538,12 @@ class ScheduleWeekPager(
          * 加上实际拖的几十像素，落点稳稳越过门槛。取太大（如 0.3s）会让轻点也翻页。
          */
         const val PROJECTION_SECONDS = 0.10f
+
+        /** 横向必须明显多于竖向才算翻页（对齐 miuix 版：`|dx| > |dy| × 1.2`） */
+        const val AXIS_RATIO = 1.2f
+
+        /** 学期边界处的阻尼系数（拖不动，但有跟手的反馈） */
+        const val EDGE_DAMPING = 0.28f
 
         /** 收尾动画时长下限比例：剩余距离为 0 时仍保留基础的短促时间，避免 0ms 突跳 */
         const val MIN_DURATION_RATIO = 0.55f

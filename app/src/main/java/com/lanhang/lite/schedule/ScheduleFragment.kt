@@ -59,6 +59,8 @@ class ScheduleFragment : Fragment() {
     private lateinit var style: ScheduleStyle
     /** 已应用的背景标识，避免每次 onResume 重复分析/重建视图 */
     private var appliedBackdropKey: String? = null
+    /** 横向翻页期间临时关掉了下拉刷新，手势结束时必须恢复 */
+    private var refreshSuppressed = false
 
     private var currentWeek = 1
 
@@ -104,7 +106,22 @@ class ScheduleFragment : Fragment() {
         }
         // 停稳后再预取相邻周：翻过去时用的是服务端该周数据，而不是本地全量过滤的兜底
         pager.onSettle = { week -> prefetchNeighbors(week) }
-        pager.onGestureEnd = { settleRefreshIndicator() }
+        // 判定为横向就关掉下拉刷新（对齐 miuix 版）：SwipeRefreshLayout 的圆环被拉起来
+        // 会和翻页互相抢帧，一行代码换来「不叠影、不闪」；手势结束必须恢复
+        pager.onHorizontalDragStart = {
+            if (swipeRefresh.isEnabled) {
+                swipeRefresh.isEnabled = false
+                refreshSuppressed = true
+            }
+        }
+        pager.onGestureEnd = {
+            if (refreshSuppressed) {
+                refreshSuppressed = false
+                // 重新 enable 会走库内部的 reset()：清动画 + 指示器归位，不会触发刷新回调
+                swipeRefresh.isEnabled = true
+            }
+            settleRefreshIndicator()
+        }
 
         style = ScheduleStyle.fromTheme(requireContext())
         applyChromeStyle()
@@ -607,7 +624,8 @@ class ScheduleFragment : Fragment() {
         content.addView(dayStrip)
         content.addView(daySections)
 
-        val root = FrameLayout(ctx).apply {
+        // 滑动层：周视图没有「每周都一样的左轴」，整块内容跟着手指走
+        val sliding = FrameLayout(ctx).apply {
             addView(
                 scroll,
                 FrameLayout.LayoutParams(
@@ -616,9 +634,21 @@ class ScheduleFragment : Fragment() {
                 )
             )
         }
+        // 外壳（[ScheduleSwipeLayout]）：手势挂它身上，永不平移。
+        // 挂在外壳上而不是 scroll 上，是因为课程卡片可点击会消费 DOWN，
+        // 父级 OnTouchListener 连 DOWN 都收不到 —— 按在课上就滑不动了。
+        val shell = ScheduleSwipeLayout(ctx).apply {
+            addView(
+                sliding,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
 
         val data = dataForWeek(week)
-        if (data == null) return ScheduleWeekPager.Page(week, root, scroll)
+        if (data == null) return ScheduleWeekPager.Page(week, shell, scroll, listOf(sliding))
 
         val density = resources.displayMetrics.density
         val s = style
@@ -689,7 +719,7 @@ class ScheduleFragment : Fragment() {
         }
 
         if (totalCourses == 0) {
-            root.addView(
+            sliding.addView(
                 TextView(ctx).apply {
                     text = getString(R.string.schedule_week_no_course)
                     setTextAppearance(R.style.TextAppearance_Lanhang_BodyMedium)
@@ -702,7 +732,7 @@ class ScheduleFragment : Fragment() {
                 )
             )
         }
-        return ScheduleWeekPager.Page(week, root, scroll)
+        return ScheduleWeekPager.Page(week, shell, scroll, listOf(sliding))
     }
 
     private fun addLessonRow(parent: LinearLayout, ci: CourseItem) {
@@ -859,8 +889,20 @@ class ScheduleFragment : Fragment() {
             addView(headerHost)
             addView(scroll)
         }
+        // 手势外壳（[ScheduleSwipeLayout]）永不平移，真正跟着手指走的是
+        // headerCols（表头 7 天列）和 cols（表格 7 天列）—— 左轴钉住
+        val shell = ScheduleSwipeLayout(ctx).apply {
+            addView(
+                root,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
 
-        val data = dataForWeek(week) ?: return ScheduleWeekPager.Page(week, root, scroll)
+        val data = dataForWeek(week)
+        if (data == null) return ScheduleWeekPager.Page(week, shell, scroll, emptyList())
 
         val s = style
         val today = LocalDate.now()
@@ -892,6 +934,8 @@ class ScheduleFragment : Fragment() {
         /** 第 d 列左边界：d=0 是时间列右边界，d=7 是表格右边界 */
         fun xOfCol(d: Int): Int = timeW + (gridW * d / 7f).roundToInt()
         fun colWidth(d: Int): Int = xOfCol(d + 1) - xOfCol(d)
+        /** 列区内部坐标（滑动层的本地坐标，原点在时间列右边界） */
+        fun xInCols(d: Int): Int = xOfCol(d) - timeW
         val breaksAfter = mapOf(
             4 to getString(R.string.schedule_break_noon),
             8 to getString(R.string.schedule_break_evening)
@@ -901,10 +945,13 @@ class ScheduleFragment : Fragment() {
         val gridH = yTopOfRow(periodCount) + rowH
 
         // ===== 表头：纯文字两行（周几 + 日期），今天整列用强调色，不再有底色卡片 =====
-        val header = FrameLayout(ctx).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, headerH
-            )
+        // 视口固定不动并裁剪，内部的 [headerCols] 才是滑动层 —— 切周时左轴（节次/时间）
+        // 钉住，只有 7 天列跟着手指走，对齐 miuix 版课表的滑动逻辑
+        val headerCols = FrameLayout(ctx)
+        val headerViewport = FrameLayout(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(gridW, headerH).apply { leftMargin = timeW }
+            clipChildren = true
+            addView(headerCols, FrameLayout.LayoutParams(gridW, headerH))
         }
         for (d in 0 until 7) {
             val date = weekMonday.plusDays(d.toLong())
@@ -913,7 +960,7 @@ class ScheduleFragment : Fragment() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 layoutParams = FrameLayout.LayoutParams(colWidth(d), headerH).apply {
-                    leftMargin = xOfCol(d)
+                    leftMargin = xInCols(d)
                 }
             }
             cell.addView(TextView(ctx).apply {
@@ -930,22 +977,39 @@ class ScheduleFragment : Fragment() {
                 gravity = Gravity.CENTER
                 maxLines = 1
             })
-            header.addView(cell)
+            headerCols.addView(cell)
         }
-        headerHost.addView(header)
+        headerHost.addView(headerViewport)
 
         // ===== 表格主体：时间列 + 网格线 + 休息带 + 课程块，统一绝对定位 =====
+        // 两层结构（2026-10-30）：
+        //  - [axisLayer] 左侧时间列，**钉住不动**：每周的节次/时间完全一样，跟着滑出去再滑回来
+        //    看着就像页面坏了；
+        //  - [cols] 7 天列（竖线 / 今天底色 / 课程块），装在裁剪视口里**跟着手指滑**。
+        //    视口必须裁剪，否则列区左移时会盖到时间列上。
+        // 两层各自保留原来的叠放顺序（线 → 色带 → 课程块），配色才对得上。
         val body = FrameLayout(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, gridH
             )
         }
+        val axisLayer = FrameLayout(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(timeW, gridH)
+        }
+        val cols = FrameLayout(ctx)
+        val colsViewport = FrameLayout(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(gridW, gridH).apply { leftMargin = timeW }
+            clipChildren = true
+            addView(cols, FrameLayout.LayoutParams(gridW, gridH))
+        }
+        body.addView(axisLayer)
+        body.addView(colsViewport)
 
         // 左侧节次列：只有节次号 + 起止时间，行线不穿过它
         for (p in 1..periodCount) {
             val cell = buildPeriodCell(ctx, p, rowH, timeW, s)
             (cell.layoutParams as FrameLayout.LayoutParams).topMargin = yTopOfRow(p)
-            body.addView(cell)
+            axisLayer.addView(cell)
         }
 
         // 今天整列淡底：只铺课程区，表头保持纯文字（周几本身已经是强调色）。
@@ -953,17 +1017,22 @@ class ScheduleFragment : Fragment() {
         val todayCol = (0 until 7)
             .firstOrNull { weekMonday.plusDays(it.toLong()) == today }
         todayCol?.let { d ->
-            body.addView(
+            cols.addView(
                 View(ctx).apply { setBackgroundColor(s.todayTint) },
-                FrameLayout.LayoutParams(colWidth(d), gridH).apply { leftMargin = xOfCol(d) }
+                FrameLayout.LayoutParams(colWidth(d), gridH).apply { leftMargin = xInCols(d) }
             )
         }
 
-        // 横线：表头下方一条 + 每节课底边一条（休息带所在行跳过，由色带自己形成分隔）
+        // 横线：表头下方一条 + 每节课底边一条（休息带所在行跳过，由色带自己形成分隔）。
+        // 时间列那段单独铺一份在固定层里 —— 左轴不跟手滑，但行线必须一直横穿到底
         for (p in 0..periodCount) {
             if (p > 0 && breaksAfter.containsKey(p)) continue
             val y = (if (p == 0) 0 else yTopOfRow(p) + rowH).coerceAtMost(gridH - lineW)
-            body.addView(
+            axisLayer.addView(
+                View(ctx).apply { setBackgroundColor(s.divider) },
+                FrameLayout.LayoutParams(timeW, lineW).apply { topMargin = y }
+            )
+            cols.addView(
                 View(ctx).apply { setBackgroundColor(s.divider) },
                 FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, lineW).apply {
                     topMargin = y
@@ -971,12 +1040,17 @@ class ScheduleFragment : Fragment() {
             )
         }
 
-        // 竖线：时间列右边界 + 6 条列分隔（最右列贴着屏幕边缘，不再单独画）
-        for (d in 0 until 7) {
-            body.addView(
+        // 竖线：时间列右边界（钉在固定层，它是左轴的边界）+ 6 条列分隔
+        //（最右列贴着屏幕边缘，不再单独画）
+        axisLayer.addView(
+            View(ctx).apply { setBackgroundColor(s.divider) },
+            FrameLayout.LayoutParams(lineW, gridH).apply { leftMargin = timeW - lineW }
+        )
+        for (d in 1 until 7) {
+            cols.addView(
                 View(ctx).apply { setBackgroundColor(s.divider) },
                 FrameLayout.LayoutParams(lineW, gridH).apply {
-                    leftMargin = xOfCol(d) - lineW / 2
+                    leftMargin = (xInCols(d) - lineW / 2).coerceAtLeast(0)
                 }
             )
         }
@@ -986,13 +1060,17 @@ class ScheduleFragment : Fragment() {
         for ((k, label) in breaksAfter) {
             if (k >= periodCount) continue
             val y = yTopOfRow(k) + rowH
-            body.addView(
+            axisLayer.addView(
+                View(ctx).apply { setBackgroundColor(s.bandFill) },
+                FrameLayout.LayoutParams(timeW, bandH).apply { topMargin = y }
+            )
+            cols.addView(
                 View(ctx).apply { setBackgroundColor(s.bandFill) },
                 FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, bandH).apply {
                     topMargin = y
                 }
             )
-            body.addView(
+            cols.addView(
                 TextView(ctx).apply {
                     text = label
                     setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
@@ -1020,14 +1098,14 @@ class ScheduleFragment : Fragment() {
                         colWidth(d0) - 2 * blockInsetX,
                         (ci.periodEnd - ci.periodStart + 1) * rowH - 2 * blockInsetY
                     )
-                    lp.leftMargin = xOfCol(d0) + blockInsetX
+                    lp.leftMargin = xInCols(d0) + blockInsetX
                     lp.topMargin = yTopOfRow(ci.periodStart) + blockInsetY
                     block.setOnClickListener {
                         // 自建课点一下就进编辑；学校课仍看详情
                         val id = ci.localId
                         if (id != null) openLocalEditor(id) else showCourseDetail(ci)
                     }
-                    body.addView(block, lp)
+                    cols.addView(block, lp)
                     return@forEach
                 }
                 // 冲突组：容器覆盖整组外接矩形，组内卡片叠在同一处，只显示当前那张。
@@ -1071,13 +1149,13 @@ class ScheduleFragment : Fragment() {
                     if (id != null) openLocalEditor(id) else showCourseDetail(shown)
                     true
                 }
-                body.addView(
+                cols.addView(
                     container,
                     FrameLayout.LayoutParams(
                         colWidth(d0),
                         yTopOfRow(unionEnd) + rowH - containerTop
                     ).apply {
-                        leftMargin = xOfCol(d0)
+                        leftMargin = xInCols(d0)
                         topMargin = containerTop
                     }
                 )
@@ -1114,7 +1192,7 @@ class ScheduleFragment : Fragment() {
 
         // 空周：表格照常画，只是没有课程块，居中给一句提示
         if (!hasCourse) {
-            body.addView(
+            cols.addView(
                 TextView(ctx).apply {
                     text = getString(R.string.schedule_week_no_course)
                     setTextAppearance(R.style.TextAppearance_Lanhang_BodyMedium)
@@ -1128,7 +1206,7 @@ class ScheduleFragment : Fragment() {
             )
         }
         container.addView(body)
-        return ScheduleWeekPager.Page(week, root, scroll)
+        return ScheduleWeekPager.Page(week, shell, scroll, listOf(headerCols, cols))
     }
 
     /**
