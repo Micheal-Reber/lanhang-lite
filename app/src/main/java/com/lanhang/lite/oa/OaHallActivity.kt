@@ -129,10 +129,33 @@ class OaHallActivity : AppCompatActivity() {
                 loadFailed = false
                 rows = buildRows(result.first, result.second)
                 applyFilter(binding.etSearch.text?.toString().orEmpty())
+                withContext(Dispatchers.IO) { OaCache.save(result.first, result.second) }
             } catch (e: Exception) {
                 if (e.isCancellation) return@launch
-                loadFailed = true
                 Diagnostics.record(this@OaHallActivity, getString(R.string.oa_hall_tag), e)
+                if (adapter.itemCount > 0) {
+                    // 已有宫格（下拉刷新失败）：别把已经显示的内容换成错误页
+                    Toast.makeText(
+                        this@OaHallActivity,
+                        getString(R.string.oa_hall_offline_stale),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+                val cached = withContext(Dispatchers.IO) { OaCache.load() }
+                if (cached != null) {
+                    // 断网兜底：显示上次的宫格。不算失败，所以不置 loadFailed
+                    loadFailed = false
+                    rows = buildRows(cached.first, cached.second)
+                    applyFilter(binding.etSearch.text?.toString().orEmpty())
+                    Toast.makeText(
+                        this@OaHallActivity,
+                        getString(R.string.oa_hall_offline_toast),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+                loadFailed = true
                 adapter.submit(emptyList())
                 binding.tvEmpty.text =
                     e.userMessage(this@OaHallActivity, R.string.oa_hall_load_failed)

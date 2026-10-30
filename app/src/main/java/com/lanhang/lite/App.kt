@@ -38,6 +38,10 @@ class App : Application() {
         com.lanhang.lite.moments.MomentsFilterStore.init(this)
         // 工作圈「不看某个人的动态」名单：只读 SP
         com.lanhang.lite.moments.BlockedUserStore.init(this)
+        // 工作圈第一页的离线快照：断网时唯一能看到内容的路径
+        com.lanhang.lite.moments.MomentsCache.init(this)
+        // 办事大厅应用宫格的离线快照
+        com.lanhang.lite.oa.OaCache.init(this)
         com.lanhang.lite.moments.MomentSearchStore.init(this)
         // 桌面小组件的状态可能已经过时（比如在别的设备/网页上把网线下了），
         // App 启动时同步一次（内部走协程查网络，不阻塞启动）

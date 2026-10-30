@@ -173,7 +173,13 @@ class GradesFragment : Fragment() {
                 adapter.submit(state.value)
                 renderStats()
                 if (state.value.isEmpty()) {
-                    binding.tvEmpty.showEmpty(R.string.grades_empty)
+                    // 带上学期名：原来只说「本学期暂无成绩」，用户会以为没加载出来
+                    // （实际是这学期还没出分）；写明学期后至少知道该切到哪一栏
+                    val label = semesters.firstOrNull { it.id == selectedTerm }?.name
+                        ?.takeIf { it.isNotBlank() }
+                        ?: selectedTerm
+                    binding.tvEmpty.text = getString(R.string.grades_empty, label)
+                    binding.tvEmpty.isVisible = true
                 } else {
                     binding.tvEmpty.isVisible = false
                 }

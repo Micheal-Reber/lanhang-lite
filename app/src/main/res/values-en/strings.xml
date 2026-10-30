@@ -253,7 +253,7 @@
     <string name="grades_weighted_avg">Weighted avg.</string>
     <string name="grades_total_credits">Credits</string>
     <string name="grades_course_count">Courses</string>
-    <string name="grades_empty">No grades this semester</string>
+    <string name="grades_empty">No grades for %1$s yet — try another term above</string>
     <string name="grades_credit">%1$s cr</string>
     <string name="grades_load_failed">Load failed: %1$s</string>
 
@@ -753,4 +753,9 @@
     <string name="moments_blocked_title">Hidden people</string>
     <string name="moments_blocked_empty">Nobody hidden yet\nOpen someone\'s profile and tap “Hide this person\'s posts”</string>
     <string name="moments_blocked_restore">Restore</string>
+    <!-- Offline fallbacks -->
+    <string name="moments_offline_toast">Offline · showing the last loaded content</string>
+    <string name="moments_offline_stale">Offline · refresh failed, content may be out of date</string>
+    <string name="oa_hall_offline_toast">Offline · showing the last loaded app list</string>
+    <string name="oa_hall_offline_stale">Offline · refresh failed, the list may be out of date</string>
 </resources>

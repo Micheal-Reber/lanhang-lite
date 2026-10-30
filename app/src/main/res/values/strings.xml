@@ -243,7 +243,7 @@
     <string name="grades_weighted_avg">加权平均分</string>
     <string name="grades_total_credits">总学分</string>
     <string name="grades_course_count">课程数</string>
-    <string name="grades_empty">本学期暂无成绩</string>
+    <string name="grades_empty">%1$s 暂无成绩，可切换上方其他学期查看</string>
     <string name="grades_credit">%1$s 学分</string>
     <string name="grades_load_failed">加载失败：%1$s</string>
 
@@ -757,4 +757,9 @@
     <string name="moments_blocked_title">不看的人</string>
     <string name="moments_blocked_empty">还没有屏蔽任何人\n在别人的主页底部可以「不看 TA 的动态」</string>
     <string name="moments_blocked_restore">恢复</string>
+    <!-- 离线兜底 -->
+    <string name="moments_offline_toast">网络不可用 · 显示的是上次加载的内容</string>
+    <string name="moments_offline_stale">网络不可用 · 刷新失败，内容可能不是最新的</string>
+    <string name="oa_hall_offline_toast">网络不可用 · 显示的是上次加载的应用列表</string>
+    <string name="oa_hall_offline_stale">网络不可用 · 刷新失败，列表可能不是最新的</string>
 </resources>

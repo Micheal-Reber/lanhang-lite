@@ -257,25 +257,22 @@ class MomentsFragment : Fragment() {
                 binding.fabPublish.invalidate()
                 updateEmpty()
                 if (visible.isEmpty() && !ended && hiddenCount > 0) needMore = true
+                // 第一页存一份离线快照（写盘失败无所谓，见 MomentsCache.save）
+                if (reset && page.isNotEmpty()) {
+                    withContext(Dispatchers.IO) { MomentsCache.save(page) }
+                }
             } catch (e: ApiException) {
                 if (e.isCancellation) return@launch
                 Diagnostics.record(requireContext(), getString(R.string.moments_tag_load), e)
-                val message = e.userMessage(requireContext(), R.string.moments_load_failed)
-                if (reset && adapter.itemCount == 0) {
-                    binding.tvEmpty.text = message
-                    binding.tvEmpty.isVisible = true
-                }
-                toast(message)
+                handleLoadFailure(
+                    reset,
+                    e.userMessage(requireContext(), R.string.moments_load_failed)
+                )
             } catch (e: Exception) {
                 if (e.isCancellation) return@launch
                 Diagnostics.record(requireContext(), getString(R.string.moments_tag_load), e)
                 // toast/占位只放固定提示，原始异常留给 diagnostics.log，避免往界面喷堆栈
-                val message = getString(R.string.moments_network_error)
-                if (reset && adapter.itemCount == 0) {
-                    binding.tvEmpty.text = message
-                    binding.tvEmpty.isVisible = true
-                }
-                toast(message)
+                handleLoadFailure(reset, getString(R.string.moments_network_error))
             } finally {
                 loading = false
                 // 协程取消后 view 可能已经销毁，收尾一律走可空引用
@@ -289,6 +286,45 @@ class MomentsFragment : Fragment() {
                 autoLoads = 0
             }
         }
+    }
+
+    /**
+     * 加载失败怎么收场，分三种。
+     *
+     * 1. 列表**已有内容**（下拉刷新失败 / 翻页失败）：不动列表，只说一句数据可能不是最新的 ——
+     *    把控好的内容清空换成错误页是最糟的处理，用户会以为刚才的阅读白费了。
+     * 2. 列表空且是首屏（`reset`）：用 [MomentsCache] 的快照渲染。这是断网时唯一能看到内容的路径。
+     * 3. 连快照都没有：才显示错误占位。
+     *
+     * 刻意**不在页面上挂「离线内容」提示条**（用户明确不要）：只 toast 一次。
+     * 快照本身有 7 天有效期，过期等于没有，避免拿几周前的动态冒充现在。
+     */
+    private fun handleLoadFailure(reset: Boolean, message: String) {
+        val view = _binding ?: return
+        if (adapter.itemCount > 0) {
+            toast(getString(R.string.moments_offline_stale))
+            return
+        }
+        if (reset) {
+            val cached = MomentsCache.load()
+            if (!cached.isNullOrEmpty()) {
+                val items = cached.map { MomentItem(it) }
+                val hidden = items.filter { isFiltered(it) }
+                allItems.clear()
+                allItems.addAll(items)
+                hiddenCount = hidden.size
+                adapter.submit(items - hidden.toSet())
+                // 快照只有一页，别再往下翻（翻了也是失败）
+                ended = true
+                view.fabPublish.invalidate()
+                updateEmpty()
+                toast(getString(R.string.moments_offline_toast))
+                return
+            }
+        }
+        view.tvEmpty.text = message
+        view.tvEmpty.isVisible = true
+        toast(message)
     }
 
     // ------------------------------------------------------------------ 过滤
