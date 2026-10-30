@@ -4,12 +4,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
+import com.lanhang.lite.core.networkHint
 import com.lanhang.lite.core.userDetail
 import com.lanhang.lite.databinding.ActivityLoginBinding
 import com.lanhang.lite.core.ApiException
 import com.lanhang.lite.net.MiniappApi
+import com.lanhang.lite.net.NetworkDoctor
 import com.lanhang.lite.net.RceApi
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.Session
@@ -55,6 +59,7 @@ class LoginActivity : AppCompatActivity() {
         }
 
         binding.loginButton.setOnClickListener { doLogin() }
+        binding.btnNetworkDiagnose.setOnClickListener { showNetworkDiagnosis() }
     }
 
     private fun doLogin() {
@@ -96,9 +101,55 @@ class LoginActivity : AppCompatActivity() {
                 toast(getString(R.string.login_failed, e.code, e.userDetail(this@LoginActivity)))
             } catch (e: Exception) {
                 toast(getString(R.string.login_network_error, e.userDetail(this@LoginActivity)))
+                // 网络类失败（不是账号密码问题）：顺手自检一次，直接告诉用户卡在哪一步。
+                // 移动数据下部分用户连不上学校接口，光说「网络异常」等于没说。
+                if (e.networkHint() != null) showNetworkDiagnosis()
             } finally {
                 binding.loginButton.isEnabled = true
             }
+        }
+    }
+
+    /**
+     * 网络自检。
+     *
+     * 逐项测 DNS、主接口（HTTPS）、统一身份与课表服务（明文 HTTP），把结果用
+     * 「通 / 不通 + 原因 + 下一步」列出来。用户看到「移动数据 · 主接口超时 ·
+     * 试试校园网或 VPN」就知道该干什么了，而不是对着 UnknownHostException 发懵。
+     */
+    private fun showNetworkDiagnosis() {
+        val ctx = this
+        binding.btnNetworkDiagnose.isEnabled = false
+        binding.tvDiagnosing.isVisible = true
+        lifecycleScope.launch {
+            val report = NetworkDoctor.diagnose(ctx)
+            if (isFinishing || isDestroyed) return@launch
+            binding.btnNetworkDiagnose.isEnabled = true
+            binding.tvDiagnosing.isVisible = false
+
+            val text = buildString {
+                append(getString(R.string.login_diag_network, report.networkLabel))
+                if (!report.dnsOk) {
+                    append('\n')
+                    append(getString(R.string.login_diag_dns))
+                }
+                report.probes.forEach { p ->
+                    append('\n')
+                    append(if (p.ok) "✓ " else "✗ ")
+                    append(p.label)
+                    append('：')
+                    append(if (p.ok) getString(R.string.login_diag_ok, p.elapsedMs) else p.detail)
+                }
+                if (!report.mainApiOk) {
+                    append('\n')
+                    append(getString(R.string.login_diag_conclusion))
+                }
+            }
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.login_diag_title)
+                .setMessage(text)
+                .setPositiveButton(R.string.common_ok, null)
+                .show()
         }
     }
 

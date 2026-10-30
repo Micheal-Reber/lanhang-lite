@@ -777,4 +777,12 @@
     <string name="settings_cache_usage_summary">图片 %1$s · 其他 %2$s</string>
     <string name="settings_cache_clear_now">立即清理</string>
     <string name="settings_cache_hint">图片缓存有 150MB 硬上限，超出会按「最久没用过」自动淘汰。这里再设一个周期：超过设定天数没下载过的图片，会在下次启动时一并清掉。\n\n清理只涉及图片与调试临时文件，课表、成绩、自建课程、离线快照都不受影响。</string>
+    <!-- 登录页的网络自检 -->
+    <string name="login_diagnose">网络诊断</string>
+    <string name="login_diagnosing">正在检测网络…</string>
+    <string name="login_diag_title">网络诊断</string>
+    <string name="login_diag_network">当前网络：%1$s</string>
+    <string name="login_diag_dns">DNS 解析异常：连学校服务器的名字都解析不到</string>
+    <string name="login_diag_ok">正常（%1$d 毫秒）</string>
+    <string name="login_diag_conclusion">学校主接口不可达 —— 这就是登录失败的原因。请改用校园网或 VPN 再试。</string>
 </resources>

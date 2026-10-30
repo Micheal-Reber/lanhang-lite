@@ -773,4 +773,12 @@
     <string name="settings_cache_usage_summary">Images %1$s · Other %2$s</string>
     <string name="settings_cache_clear_now">Clear now</string>
     <string name="settings_cache_hint">Images are capped at 150MB and the least recently used ones are dropped automatically. This extra period removes images that were not downloaded for that many days, on next launch.\n\nOnly images and debug temp files are touched — your schedule, grades, custom courses and offline snapshots stay untouched.</string>
+    <!-- Network diagnostics on the login screen -->
+    <string name="login_diagnose">Network check</string>
+    <string name="login_diagnosing">Checking network…</string>
+    <string name="login_diag_title">Network check</string>
+    <string name="login_diag_network">Current network: %1$s</string>
+    <string name="login_diag_dns">DNS problem: the school server name does not even resolve</string>
+    <string name="login_diag_ok">OK (%1$d ms)</string>
+    <string name="login_diag_conclusion">The school main API is unreachable — that is why the login failed. Try campus network or a VPN.</string>
 </resources>
