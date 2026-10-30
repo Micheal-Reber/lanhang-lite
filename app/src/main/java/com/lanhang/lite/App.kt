@@ -36,6 +36,8 @@ class App : Application() {
         com.lanhang.lite.moments.MomentMessageStore.init(this)
         // 工作圈关键词过滤规则 / 搜索历史：只读 SP，首次运行会写入默认档位
         com.lanhang.lite.moments.MomentsFilterStore.init(this)
+        // 工作圈「不看某个人的动态」名单：只读 SP
+        com.lanhang.lite.moments.BlockedUserStore.init(this)
         com.lanhang.lite.moments.MomentSearchStore.init(this)
         // 桌面小组件的状态可能已经过时（比如在别的设备/网页上把网线下了），
         // App 启动时同步一次（内部走协程查网络，不阻塞启动）

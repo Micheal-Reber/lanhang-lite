@@ -24,7 +24,9 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
+import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.core.isCancellation
+import com.lanhang.lite.core.scrollToTopNow
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentMomentsBinding
 import com.lanhang.lite.core.ApiException
@@ -107,6 +109,11 @@ class MomentsFragment : Fragment() {
         binding.root.viewTreeObserver.addOnGlobalLayoutListener(onFabLayout)
         binding.recycler.layoutManager = LinearLayoutManager(requireContext())
         binding.recycler.adapter = adapter
+        // 双击（正文/空白处）回到顶部；落在图片、头像、赞/评论上时不接管
+        binding.recycler.attachDoubleTapToTop(
+            onBeforeScroll = { adapter.cancelPendingRowClick() },
+            onAfterScroll = { _binding?.fabPublish?.invalidate() }
+        )
         binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy <= 0 || loading || ended) return
@@ -132,6 +139,18 @@ class MomentsFragment : Fragment() {
         if (loading || adapter.itemCount > 0) return
         binding.progress.isVisible = true
         load(reset = true)
+    }
+
+    /**
+     * 已经在「工作圈」Tab 上又点了一次。
+     *
+     * 和 [onTabSelected] 分开：切过来不该动滚动位置（用户可能就是想接着看），
+     * 只有「再点一次」才回顶 —— 这是主流 App 的惯例，和双击列表互不干扰。
+     */
+    fun onTabReselect() {
+        if (_binding == null || adapter.itemCount == 0) return
+        adapter.cancelPendingRowClick()
+        binding.recycler.scrollToTopNow { _binding?.fabPublish?.invalidate() }
     }
 
     override fun onDestroyView() {
@@ -274,15 +293,26 @@ class MomentsFragment : Fragment() {
 
     // ------------------------------------------------------------------ 过滤
 
-    private fun isFiltered(item: MomentItem): Boolean =
-        MomentsFilterStore.match(item.content.text.orEmpty(), item.feed.user_id) != null
+    /**
+     * 这条该不该被藏。
+     *
+     * 屏蔽排在关键词之前：屏蔽是用户点名不想看的人，**不该被任何自动豁免推翻** ——
+     * 否则被屏蔽的人发一条「求借充电宝」就会被失物招领豁免放出来。
+     */
+    private fun isFiltered(item: MomentItem): Boolean {
+        if (BlockedUserStore.isBlocked(item.feed.user_id)) return true
+        return MomentsFilterStore.match(item.content.text.orEmpty(), item.feed.user_id) != null
+    }
 
-    /** 规则指纹：档位 / 自定义词 / 总开关任一变化都要重刷列表 */
+    /** 规则指纹：档位 / 自定义词 / 总开关 / 屏蔽名单任一变化都要重刷列表 */
     private fun filterSignature(): String = buildString {
         append(MomentsFilterStore.enabled)
         MomentsFilterStore.activePresets().forEach { append('|').append(it.key) }
         append('#')
         append(MomentsFilterStore.customRules().joinToString("\u0001"))
+        append('#')
+        // 名单变化也要重排，否则「刚屏蔽的人还在列表里」直到下次刷新
+        append(BlockedUserStore.ids().sorted().joinToString(","))
     }
 
     /** 用当前规则重新算一遍「哪些被挡住」，再整体重排（规则变化时用） */

@@ -268,6 +268,17 @@
                     android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:visibility="gone" />
+
+                <!-- 「不看 TA 的动态」。放页面底部而不是菜单里：这是低频但需要被看见的开关，
+                     藏进溢出菜单基本等于没有。自己的主页不显示（由代码控制）。 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBlockUser"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xl"
+                    android:text="@string/moments_block_user"
+                    android:visibility="gone" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 

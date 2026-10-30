@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.R
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.ActivityMyMomentsBinding
@@ -110,6 +111,8 @@ class MyMomentsActivity : AppCompatActivity() {
 
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = concat
+        // 双击回到顶部（图标/按钮上的双击不接管）
+        binding.recycler.attachDoubleTapToTop()
         binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy <= 0 || loading || ended) return

@@ -232,6 +232,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun switchTab(tab: Int) {
+        // 记下切之前是哪个 Tab：底栏对「已选中的 Tab」也会回调，
+        // 靠它区分「切过来」和「再点一次」（后者才是回顶的信号）。
+        val previousTab = tabState.intValue
         tabState.intValue = tab
         val tx = supportFragmentManager.beginTransaction()
         val s = scheduleFragment ?: com.lanhang.lite.schedule.ScheduleFragment().also {
@@ -258,7 +261,12 @@ class MainActivity : AppCompatActivity() {
             TAB_MOMENTS -> {
                 tx.hide(s).hide(g).hide(st).show(m)
                 showToolbarMain(getString(R.string.tab_moments))
-                (m as? MomentsFragment)?.onTabSelected()
+                // 已经在这个 Tab 上再点一次 → 回顶；从别的 Tab 切过来不动滚动位置
+                if (previousTab == TAB_MOMENTS) {
+                    (m as? MomentsFragment)?.onTabReselect()
+                } else {
+                    (m as? MomentsFragment)?.onTabSelected()
+                }
                 // 切到工作圈才看得见铃铛，这时候顺手刷一次未读（节流）
                 refreshUnreadBadge()
             }

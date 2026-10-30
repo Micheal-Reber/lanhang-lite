@@ -79,6 +79,7 @@ class MomentsFilterActivity : AppCompatActivity() {
         bindSwitches()
         bindCustom()
         binding.rowViewFiltered.setOnClickListener { FilteredMomentsActivity.start(this) }
+        binding.rowBlockedUsers.setOnClickListener { BlockedUsersActivity.start(this) }
         binding.btnPreview.setOnClickListener { preview() }
         // 带占位符的文案不能在 xml 里直接写，否则界面上会露出 %1$d
         binding.btnPreview.text = getString(R.string.moments_filter_preview, PREVIEW_DEPTH)
@@ -146,6 +147,28 @@ class MomentsFilterActivity : AppCompatActivity() {
             .forEach { it.isEnabled = enabled }
         binding.btnPreview.isEnabled = enabled && !previewing
         renderRules()
+        renderBlockedSummary()
+    }
+
+    /**
+     * 屏蔽名单摘要。
+     *
+     * 与关键词过滤的开关**无关**：关掉自动过滤不会放行被屏蔽的人，
+     * 所以这里不跟 [render] 里的 enabled 走，单独算。
+     */
+    private fun renderBlockedSummary() {
+        val blocked = BlockedUserStore.count()
+        binding.tvBlockedSummary.text = if (blocked == 0) {
+            getString(R.string.moments_blocked_summary_none)
+        } else {
+            getString(R.string.moments_blocked_summary_count, blocked)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 从「不看的人」里恢复了几个人回来，摘要得跟着变
+        if (::binding.isInitialized) renderBlockedSummary()
     }
 
     // ------------------------------------------------------------ 自定义词

@@ -1,6 +1,8 @@
 package com.lanhang.lite.moments
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -73,6 +75,24 @@ class MomentAdapter(
 
     val items = mutableListOf<MomentItem>()
 
+    /**
+     * 整行点击改成「延迟执行」，给双击回顶让路。
+     *
+     * 手势层拿到双击时，第一次抬手早已触发过单击 —— 双击回顶就变成了「先打开详情页」。
+     * 所以单击先挂 320ms（要长过 GestureDetector 的 300ms 双击窗口），
+     * 真双击时由 [cancelPendingRowClick] 撤掉；只有单击才真的会执行。
+     *
+     * 没有整行点击的页面（工作圈主列表）完全不受影响。
+     */
+    private val rowClickHandler = Handler(Looper.getMainLooper())
+    private var pendingRowClick: Runnable? = null
+
+    /** 双击回顶会调用它，撤掉还没触发的那次单击 */
+    fun cancelPendingRowClick() {
+        pendingRowClick?.let { rowClickHandler.removeCallbacks(it) }
+        pendingRowClick = null
+    }
+
     /** 搜索命中的关键词：正文里命中的片段铺底色。空 = 不高亮 */
     var highlightWords: List<String> = emptyList()
         @SuppressLint("NotifyDataSetChanged")
@@ -136,6 +156,12 @@ class MomentAdapter(
         holder.bind(items[position])
     }
 
+    override fun onViewRecycled(holder: VH) {
+        super.onViewRecycled(holder)
+        // 滚走的行不该再在后台把详情页打开
+        cancelPendingRowClick()
+    }
+
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivAvatar: AvatarView = itemView.findViewById(R.id.ivAvatar)
         private val tvName: TextView = itemView.findViewById(R.id.tvName)
@@ -191,12 +217,25 @@ class MomentAdapter(
 
             bindImages(item.content.media)
 
-            val hasLikes = item.likes.isNotEmpty()
-            val hasComments = item.comments.isNotEmpty()
+            // 被屏蔽的人不该在点赞行和评论区冒出来：只藏他发的动态等于半遮半掩
+            val blocked = BlockedUserStore.ids()
+            val visibleLikes = if (blocked.isEmpty()) {
+                item.likes
+            } else {
+                item.likes.filterNot { it.user_id?.let(blocked::contains) == true }
+            }
+            val visibleComments = if (blocked.isEmpty()) {
+                item.comments
+            } else {
+                item.comments.filterNot { it.user_id?.let(blocked::contains) == true }
+            }
+
+            val hasLikes = visibleLikes.isNotEmpty()
+            val hasComments = visibleComments.isNotEmpty()
             llInteract.visibility = if (hasLikes || hasComments) View.VISIBLE else View.GONE
 
             if (hasLikes) {
-                val names = item.likes.map { like ->
+                val names = visibleLikes.map { like ->
                     UserInfoCache.nameOf(like.user_id) ?: UserInfoCache.fallbackName(ctx)
                 }
                 tvLikes.text = names.joinToString("，")
@@ -207,7 +246,7 @@ class MomentAdapter(
 
             if (hasComments) {
                 commentsRow.visibility = View.VISIBLE
-                bindComments(item)
+                bindComments(item, visibleComments)
                 commentsRow.setOnLongClickListener {
                     onCommentsLongPress(item)
                     true
@@ -219,15 +258,16 @@ class MomentAdapter(
             dividerMid.visibility =
                 if (hasLikes && hasComments) View.VISIBLE else View.GONE
 
+            // 数字与上面列出来的名字 / 评论条数保持一致，否则「写了 3 个名字、标着 4 个赞」
             tvLike.text = if (item.likedByMe) {
-                ctx.getString(R.string.moments_liked, item.likes.size)
+                ctx.getString(R.string.moments_liked, visibleLikes.size)
             } else {
-                ctx.getString(R.string.moments_like, item.likes.size)
+                ctx.getString(R.string.moments_like, visibleLikes.size)
             }
             ivLike.setImageResource(if (item.likedByMe) R.drawable.ic_favorite else R.drawable.ic_favorite_outline)
             val tintRes = if (item.likedByMe) R.color.like_red else R.color.icon_muted
             ivLike.imageTintList = androidx.core.content.ContextCompat.getColorStateList(itemView.context, tintRes)
-            tvComment.text = ctx.getString(R.string.moments_comment_count, item.comments.size)
+            tvComment.text = ctx.getString(R.string.moments_comment_count, visibleComments.size)
 
             llLike.setOnClickListener { onLike(item) }
             llComment.setOnClickListener { onComment(item) }
@@ -257,9 +297,19 @@ class MomentAdapter(
                 tvName.setOnClickListener(null)
             }
 
-            // 整行点击只在调用方要求时注册（搜索页）；复用时同样要清掉
-            if (onRowClick != null) {
-                itemView.setOnClickListener { onRowClick.invoke(item) }
+            // 整行点击只在调用方要求时注册（搜索页）；复用时同样要清掉。
+            // 点击延迟 320ms 执行：给双击回顶留出取消的机会（见 cancelPendingRowClick）
+            val rowClick = onRowClick
+            if (rowClick != null) {
+                itemView.setOnClickListener {
+                    cancelPendingRowClick()
+                    val job = Runnable {
+                        pendingRowClick = null
+                        rowClick.invoke(item)
+                    }
+                    pendingRowClick = job
+                    rowClickHandler.postDelayed(job, ROW_CLICK_DELAY_MS)
+                }
             } else {
                 itemView.setOnClickListener(null)
             }
@@ -281,10 +331,9 @@ class MomentAdapter(
          * 本人评论在正文下方多一个「删除」：服务端只允许删自己的评论，
          * 别人的评论根本不显示这个键（不是显示了再报错）。
          */
-        private fun bindComments(item: MomentItem) {
+        private fun bindComments(item: MomentItem, list: List<CommentEntry>) {
             val ctx = itemView.context
             val link = androidx.core.content.ContextCompat.getColor(ctx, R.color.link)
-            val list = item.comments
             // 复用已有行，避免每次 bind 都 inflate
             while (llComments.childCount > list.size) {
                 llComments.removeViewAt(llComments.childCount - 1)
@@ -404,5 +453,11 @@ class MomentAdapter(
 
     companion object {
         private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+
+        /**
+         * 整行点击的延迟。必须**长过 GestureDetector 的 300ms 双击窗口**，
+         * 否则双击时第一次单击已经执行完，守卫形同虚设。
+         */
+        private const val ROW_CLICK_DELAY_MS = 320L
     }
 }

@@ -4,11 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.JsonParser
 import com.lanhang.lite.R
 import com.lanhang.lite.core.ApiException
@@ -169,8 +171,73 @@ class UserProfileActivity : AppCompatActivity() {
         val staff = data.staff
         bindHeader(staff)
         bindRows(staff, data)
+        bindBlockButton(staff)
         binding.scroll.isVisible = true
         binding.errorBox.isVisible = false
+    }
+
+    /**
+     * 「不看 TA 的动态」/「已屏蔽 · 点此恢复」。
+     *
+     * 自己的主页不显示。屏蔽后不回退/不跳走 —— 用户可能只是想确认一下这个人的资料，
+     * 把人赶走反而莫名其妙；只把按钮文案换掉，回工作圈时列表会按新名单重排。
+     */
+    private fun bindBlockButton(staff: StaffBrief?) {
+        val btn = binding.btnBlockUser
+        if (isSelf) {
+            btn.isVisible = false
+            return
+        }
+        btn.isVisible = true
+        val blocked = BlockedUserStore.isBlocked(targetId)
+        btn.setText(
+            if (blocked) R.string.moments_unblock_user else R.string.moments_block_user
+        )
+        btn.setOnClickListener { confirmToggleBlock(staff, blocked) }
+    }
+
+    private fun confirmToggleBlock(staff: StaffBrief?, blocked: Boolean) {
+        val name = staff?.name?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.moments_anonymous)
+        if (blocked) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.moments_unblock_dialog_title)
+                .setMessage(getString(R.string.moments_unblock_dialog_message, name))
+                .setNegativeButton(R.string.common_cancel, null)
+                .setPositiveButton(R.string.moments_unblock_action) { _, _ ->
+                    BlockedUserStore.unblock(targetId)
+                    bindBlockButton(staff)
+                    Toast.makeText(
+                        this,
+                        getString(R.string.moments_unblock_done, name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                .show()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.moments_block_dialog_title)
+            .setMessage(getString(R.string.moments_block_dialog_message, name))
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.moments_block_action) { _, _ ->
+                val result = BlockedUserStore.block(
+                    BlockedUserStore.BlockedUser(targetId, name, staff?.bestPortrait)
+                )
+                val message = when (result) {
+                    BlockedUserStore.AddResult.OK ->
+                        getString(R.string.moments_block_done, name)
+                    BlockedUserStore.AddResult.FULL ->
+                        getString(R.string.moments_block_full)
+                    BlockedUserStore.AddResult.SELF ->
+                        getString(R.string.moments_block_self)
+                    BlockedUserStore.AddResult.ALREADY ->
+                        getString(R.string.moments_block_already)
+                }
+                if (result == BlockedUserStore.AddResult.OK) bindBlockButton(staff)
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun bindHeader(staff: StaffBrief?) {

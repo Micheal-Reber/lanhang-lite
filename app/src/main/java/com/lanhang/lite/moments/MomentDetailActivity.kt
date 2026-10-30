@@ -9,6 +9,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.R
 import com.lanhang.lite.core.ApiException
 import com.lanhang.lite.core.LocaleHelper
@@ -85,6 +86,8 @@ class MomentDetailActivity : AppCompatActivity() {
         actions = MomentActions(this, adapter)
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
+        // 双击回到顶部
+        binding.recycler.attachDoubleTapToTop()
         binding.swipe.setOnRefreshListener { load() }
 
         if (feedId.isBlank()) {

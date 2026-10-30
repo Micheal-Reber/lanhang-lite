@@ -737,4 +737,24 @@
     <string name="local_course_select_weeks">请选择上课周次</string>
     <string name="local_course_period_single">第 %1$d 节</string>
     <string name="local_course_period_range">第 %1$d-%2$d 节</string>
+    <!-- 工作圈：不看某个人的动态 -->
+    <string name="moments_block_user">不看 TA 的动态</string>
+    <string name="moments_unblock_user">已屏蔽 · 点此恢复</string>
+    <string name="moments_block_dialog_title">不看 TA 的动态？</string>
+    <string name="moments_block_dialog_message">将不再显示 %1$s 发的动态，以及 TA 的评论和点赞。随时可以在「工作圈过滤 → 不看的人」里恢复。</string>
+    <string name="moments_block_action">确认</string>
+    <string name="moments_block_done">已屏蔽 %1$s</string>
+    <string name="moments_block_already">已经在名单里了</string>
+    <string name="moments_block_full">名单已满，先去「不看的人」里移除几个</string>
+    <string name="moments_block_self">不能屏蔽自己</string>
+    <string name="moments_unblock_dialog_title">恢复显示？</string>
+    <string name="moments_unblock_dialog_message">将重新显示 %1$s 的动态、评论和点赞。</string>
+    <string name="moments_unblock_action">恢复</string>
+    <string name="moments_unblock_done">已恢复 %1$s</string>
+    <string name="moments_blocked_entry">不看的人</string>
+    <string name="moments_blocked_summary_none">还没有屏蔽任何人</string>
+    <string name="moments_blocked_summary_count">已屏蔽 %1$d 人</string>
+    <string name="moments_blocked_title">不看的人</string>
+    <string name="moments_blocked_empty">还没有屏蔽任何人\n在别人的主页底部可以「不看 TA 的动态」</string>
+    <string name="moments_blocked_restore">恢复</string>
 </resources>

@@ -14,6 +14,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.chip.Chip
+import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.core.isCancellation
@@ -141,6 +142,10 @@ class MomentSearchActivity : AppCompatActivity() {
         }
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
+        // 双击回到顶部：点结果进详情被延后 320ms，这里撤掉它再回顶
+        binding.recycler.attachDoubleTapToTop(
+            onBeforeScroll = { adapter.cancelPendingRowClick() }
+        )
 
         bindInput()
         binding.btnMore.setOnClickListener { searchDeeper() }

@@ -10,6 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.core.isCancellation
@@ -123,6 +124,10 @@ class FilteredMomentsActivity : AppCompatActivity() {
 
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
+        // 双击回到顶部：点结果进详情被延后 320ms，这里撤掉它再回顶
+        binding.recycler.attachDoubleTapToTop(
+            onBeforeScroll = { adapter.cancelPendingRowClick() }
+        )
         binding.btnMore.setOnClickListener { searchDeeper() }
 
         if (!MomentsFilterStore.enabled) {

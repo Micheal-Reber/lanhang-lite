@@ -45,6 +45,8 @@ internal object MomentMessageFilter {
     ): Boolean {
         // 自己的点赞/评论不提醒自己（正常服务端不会推，防一手）
         if (message.user_id == me) return false
+        // 屏蔽的人一律不提醒 —— 「一起隐藏」的口径：动态、评论、赞、互动消息都算
+        if (BlockedUserStore.isBlocked(message.user_id)) return false
         // 我的动态：别人赞或评论都算
         val feedId = message.feed_id?.takeIf { it.isNotBlank() } ?: return false
         if (owners[feedId] == me) return true

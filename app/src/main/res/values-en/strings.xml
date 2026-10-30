@@ -733,4 +733,24 @@
     <string name="local_course_select_weeks">Select at least one week</string>
     <string name="local_course_period_single">P%1$d</string>
     <string name="local_course_period_range">P%1$d-%2$d</string>
+    <!-- Moments: hide one person's posts -->
+    <string name="moments_block_user">Hide this person\'s posts</string>
+    <string name="moments_unblock_user">Hidden · tap to restore</string>
+    <string name="moments_block_dialog_title">Hide this person\'s posts?</string>
+    <string name="moments_block_dialog_message">You will no longer see posts from %1$s, nor their comments and likes. You can undo this anytime in Moments filter → Hidden people.</string>
+    <string name="moments_block_action">Hide</string>
+    <string name="moments_block_done">Hid %1$s</string>
+    <string name="moments_block_already">Already on the list</string>
+    <string name="moments_block_full">List is full — remove someone first</string>
+    <string name="moments_block_self">You cannot hide yourself</string>
+    <string name="moments_unblock_dialog_title">Show again?</string>
+    <string name="moments_unblock_dialog_message">Posts, comments and likes from %1$s will be shown again.</string>
+    <string name="moments_unblock_action">Restore</string>
+    <string name="moments_unblock_done">Restored %1$s</string>
+    <string name="moments_blocked_entry">Hidden people</string>
+    <string name="moments_blocked_summary_none">Nobody hidden yet</string>
+    <string name="moments_blocked_summary_count">%1$d hidden</string>
+    <string name="moments_blocked_title">Hidden people</string>
+    <string name="moments_blocked_empty">Nobody hidden yet\nOpen someone\'s profile and tap “Hide this person\'s posts”</string>
+    <string name="moments_blocked_restore">Restore</string>
 </resources>

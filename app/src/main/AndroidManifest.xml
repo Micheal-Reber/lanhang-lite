@@ -157,6 +157,12 @@
             android:exported="false"
             android:label="@string/moments_filtered_view_title" />
 
+        <!-- 「不看 TA 的动态」名单管理（入口：设置 → 工具 → 工作圈过滤 → 不看的人） -->
+        <activity
+            android:name=".moments.BlockedUsersActivity"
+            android:exported="false"
+            android:label="@string/moments_blocked_title" />
+
         <!-- 关键词搜索（入口在工作圈顶栏放大镜）：需要弹输入法，adjustResize 让结果区跟着缩 -->
         <activity
             android:name=".moments.MomentSearchActivity"
