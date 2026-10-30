@@ -22,6 +22,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
+import com.lanhang.lite.core.StorageJanitor
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.campusnet.CampusNetActivity
 import com.lanhang.lite.databinding.FragmentSettingsBinding
@@ -136,6 +137,7 @@ class SettingsFragment : Fragment() {
         binding.rowAccount.setOnClickListener { openMyProfile() }
         binding.rowLogout.setOnClickListener { confirmLogout() }
         binding.rowDiagnostics.setOnClickListener { showDiagnostics() }
+        binding.rowClearCache.setOnClickListener { confirmClearCache() }
         bindAccountCard()
 
         val restored = savedInstanceState?.getInt(KEY_DETAIL, -1) ?: -1
@@ -278,6 +280,65 @@ class SettingsFragment : Fragment() {
         refreshMomentsFilterSummary()
         // 资料页可能刚回填过头像地址，回到设置页顺手对齐一次（命中缓存时不发请求）
         bindAvatar()
+        refreshCacheSize()
+    }
+
+    /**
+     * 清除缓存行右侧的占用大小。
+     *
+     * 统计要遍历文件目录，必须放 IO 线程 —— 主线程扫一次 image_cache（实测 146 个文件、
+     * 74MB）会明显卡一下。
+     */
+    private fun refreshCacheSize() {
+        val b = _binding ?: return
+        val ctx = context ?: return
+        lifecycleScope.launch {
+            val usage = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
+            val cur = _binding ?: return@launch
+            cur.tvCacheSize.text = getString(
+                R.string.settings_clear_cache_size,
+                StorageJanitor.format(usage.images),
+                StorageJanitor.format(usage.others)
+            )
+        }
+    }
+
+    /**
+     * 清除缓存。
+     *
+     * 只删图片缓存与调试产物；课表、成绩、自建课程、离线快照都在 `filesDir` 里，**一个不动**。
+     * 删之前先说清楚会释放多少、以及图片下次会重新下载 —— 用户点下去之前得知道代价。
+     */
+    private fun confirmClearCache() {
+        val ctx = context ?: return
+        lifecycleScope.launch {
+            val usage = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
+            if (_binding == null) return@launch
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.settings_clear_cache_confirm_title)
+                .setMessage(
+                    getString(
+                        R.string.settings_clear_cache_confirm_message,
+                        StorageJanitor.format(usage.total)
+                    )
+                )
+                .setNegativeButton(R.string.common_cancel, null)
+                .setPositiveButton(R.string.settings_clear_cache_action) { _, _ ->
+                    lifecycleScope.launch {
+                        val freed = withContext(Dispatchers.IO) { StorageJanitor.clear(ctx) }
+                        refreshCacheSize()
+                        Toast.makeText(
+                            ctx,
+                            getString(
+                                R.string.settings_clear_cache_done,
+                                StorageJanitor.format(freed)
+                            ),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .show()
+        }
     }
 
     /** 工具页里的上课提醒摘要（停在工具页时从提醒页返回要跟着变） */

@@ -187,6 +187,7 @@ apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk
 - 诊断日志（`diagnostics.log`）写盘前对 cookie / token / 密码做脱敏，不含凭证原文
 - 没有统计、埋点、崩溃上报，没有第三方 SDK 收集行为数据
 - 唯一的对外网络请求就是上面这几套学校接口
+- **图片缓存上限 150MB**（Coil 按 LRU 自动淘汰）。设置首页有「清除缓存」，显示当前占用并可一键清掉图片缓存与调试临时文件；课表、成绩、自建课程、离线快照不在清理范围内
 
 ## 已知限制
 

@@ -10,7 +10,7 @@ import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 
-class App : Application() {
+class App : Application(), coil.ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         ApiClient.init(this)
@@ -42,6 +42,9 @@ class App : Application() {
         com.lanhang.lite.moments.MomentsCache.init(this)
         // 办事大厅应用宫格的离线快照
         com.lanhang.lite.oa.OaCache.init(this)
+        // 清老版本遗留的重复文件（score_*.json 与 grades_*.json 内容相同）与过期的崩溃快照。
+        // 只删文件、不碰用户数据，放后台线程，不占冷启动
+        Thread { com.lanhang.lite.core.StorageJanitor.run(this) }.start()
         com.lanhang.lite.moments.MomentSearchStore.init(this)
         // 桌面小组件的状态可能已经过时（比如在别的设备/网页上把网线下了），
         // App 启动时同步一次（内部走协程查网络，不阻塞启动）
@@ -88,5 +91,30 @@ class App : Application() {
                 else -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
         )
+    }
+
+    /**
+     * Coil 磁盘缓存必须封顶。
+     *
+     * 默认策略是「可用空间的 2%」且没有硬上限 —— 实测这台机器已经长到 **74MB**
+     * （单张最大 11.9MB），而工作圈图片服务端只给原图（`thumbnail` 与 `url` 完全相同），
+     * 不封顶就会一直涨下去。
+     *
+     * 目录故意用和 Coil 默认一致的 `image_cache`：换了目录等于把已有缓存全扔掉，
+     * 用户下次刷工作圈要重新下载几十 MB。设了上限后 DiskCache 会按 LRU 自己淘汰到 150MB 以下。
+     */
+    override fun newImageLoader(): coil.ImageLoader =
+        coil.ImageLoader.Builder(this)
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(IMAGE_CACHE_MAX_BYTES)
+                    .build()
+            }
+            .build()
+
+    private companion object {
+        /** 图片磁盘缓存上限：够存几百张动态图，又不至于把用户的存储吃光 */
+        const val IMAGE_CACHE_MAX_BYTES = 150L * 1024 * 1024
     }
 }

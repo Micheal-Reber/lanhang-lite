@@ -758,4 +758,11 @@
     <string name="moments_offline_stale">Offline · refresh failed, content may be out of date</string>
     <string name="oa_hall_offline_toast">Offline · showing the last loaded app list</string>
     <string name="oa_hall_offline_stale">Offline · refresh failed, the list may be out of date</string>
+    <!-- Clear cache -->
+    <string name="settings_clear_cache">Clear cache</string>
+    <string name="settings_clear_cache_size">Images %1$s · Other %2$s</string>
+    <string name="settings_clear_cache_confirm_title">Clear cache?</string>
+    <string name="settings_clear_cache_confirm_message">This frees %1$s (image cache and debug temp files).\n\nYour schedule, grades, custom courses and offline snapshots are untouched — images will be downloaded again when you browse them.</string>
+    <string name="settings_clear_cache_action">Clear</string>
+    <string name="settings_clear_cache_done">Freed %1$s</string>
 </resources>

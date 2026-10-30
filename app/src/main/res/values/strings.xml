@@ -762,4 +762,11 @@
     <string name="moments_offline_stale">网络不可用 · 刷新失败，内容可能不是最新的</string>
     <string name="oa_hall_offline_toast">网络不可用 · 显示的是上次加载的应用列表</string>
     <string name="oa_hall_offline_stale">网络不可用 · 刷新失败，列表可能不是最新的</string>
+    <!-- 清除缓存 -->
+    <string name="settings_clear_cache">清除缓存</string>
+    <string name="settings_clear_cache_size">图片 %1$s · 其他 %2$s</string>
+    <string name="settings_clear_cache_confirm_title">清除缓存？</string>
+    <string name="settings_clear_cache_confirm_message">将释放 %1$s（图片缓存与调试临时文件）。\n\n课表、成绩、自建课程、离线快照都不受影响；图片下次浏览时会重新下载。</string>
+    <string name="settings_clear_cache_action">清除</string>
+    <string name="settings_clear_cache_done">已释放 %1$s</string>
 </resources>

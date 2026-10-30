@@ -397,6 +397,60 @@
                         android:layout_marginEnd="@dimen/card_padding"
                         android:background="?attr/colorOutlineVariant" />
 
+                    <!-- 清除缓存：副标题直接显示当前占用，不用点进去才知道有多少 -->
+                    <LinearLayout
+                        android:id="@+id/rowClearCache"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_lg"
+                            android:layout_height="@dimen/icon_lg"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_clean"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/list_icon_gap"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/settings_clear_cache"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvCacheSize"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
+
                     <!-- 关于：单行，版本号在二级页里（参考版式不带副标题） -->
                     <LinearLayout
                         android:id="@+id/rowAbout"
