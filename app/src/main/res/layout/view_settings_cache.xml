@@ -7,7 +7,7 @@
     android:paddingStart="@dimen/screen_padding_h"
     android:paddingTop="@dimen/screen_padding_h"
     android:paddingEnd="@dimen/screen_padding_h"
-    android:paddingBottom="@dimen/content_padding_bottom">
+    android:paddingBottom="@dimen/content_padding_bottom_bare">
 
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Lanhang.Card"

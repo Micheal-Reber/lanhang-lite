@@ -15,7 +15,7 @@
     android:paddingStart="@dimen/screen_padding_h"
     android:paddingTop="@dimen/screen_padding_h"
     android:paddingEnd="@dimen/screen_padding_h"
-    android:paddingBottom="@dimen/content_padding_bottom">
+    android:paddingBottom="@dimen/content_padding_bottom_bare">
 
     <!-- ========== 分区一：版本信息（无标题） ========== -->
     <com.google.android.material.card.MaterialCardView

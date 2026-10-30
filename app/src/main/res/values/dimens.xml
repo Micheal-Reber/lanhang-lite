@@ -88,6 +88,12 @@
     <dimen name="avatar_settings">40dp</dimen>
     <!-- 内容区底部留白：让内容滚到底时不被液态玻璃底栏遮住 -->
     <dimen name="content_padding_bottom">112dp</dimen>
+    <!--
+      无底栏页面的底部留白（设置二级页：外观 / 工具 / 清缓存 / 关于）。
+      这些页面刻意不显示底栏（与身份码、校园网这类独立二级页保持一致），
+      只需常规呼吸空间，不再为底栏让位 —— 用 112dp 会在页面底部白留一段空白。
+    -->
+    <dimen name="content_padding_bottom_bare">32dp</dimen>
 
     <!-- 发表页图片区：方形缩略图 + 右上角移除键 + 末尾添加方块 -->
     <dimen name="publish_image_tile">78dp</dimen>

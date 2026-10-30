@@ -3,6 +3,7 @@ package com.lanhang.lite.ui
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -212,6 +213,11 @@ class MainActivity : AppCompatActivity() {
                 TAB_GRADES -> getString(R.string.tab_grades)
                 else -> getString(R.string.tab_schedule)
             })
+            // 设置页可能正停在某个二级页上（亮暗主题/语言切换会 recreate）：那种状态底栏必须收起。
+            // onViewCreated 里的 syncToolbar 早于 tabState 定稿，会被上面这行 showToolbarMain 覆盖，补一次。
+            if (restored == TAB_SETTINGS) {
+                (settingsFragment as? com.lanhang.lite.settings.SettingsFragment)?.syncToolbar()
+            }
         }
         handleWidgetIntent(intent)
         // 通知渠道建一次即可（重复调用无副作用）；放在这里而不是 App.onCreate，
@@ -312,6 +318,8 @@ class MainActivity : AppCompatActivity() {
         toolbarBackAction = null
         binding.toolbar.navigationIcon = null
         binding.toolbar.title = title
+        // 主 Tab 态一律带底栏（从设置二级页切走 / 退回目录时都要把它放回来）
+        setBottomNavVisible(true)
         if (tabState.intValue == TAB_SCHEDULE) {
             // 课表页要让自定义背景铺满整屏，所以顶栏必须是透明浮层；
             // 文字色用课表上报的值（自定义背景可能是深是浅），字体/图标仍走 M3 规格
@@ -333,8 +341,56 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.navigationIcon =
             androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_back)
         binding.toolbar.title = title
+        // 二级页一律不带底栏：与身份码 / 校园网等独立 Activity 的二级页保持同一种版式
+        setBottomNavVisible(false)
         applyOpaqueToolbar()
         invalidateOptionsMenu()
+    }
+
+    // ------------------------------------------------------------------ 底栏显隐
+
+    /** 「底栏该显示」的当前意图：淡出动画结束回调要读它，防止刚藏好又被要求显示时误设 GONE */
+    private var bottomNavWanted = true
+
+    /**
+     * 底栏显隐。
+     *
+     * 设置页的「外观 / 工具 / 清缓存 / 关于」这几个二级页是在 [com.lanhang.lite.settings.SettingsFragment]
+     * 内部换视图的，而身份码、校园网、图书馆座位等二级页是独立 Activity —— 前者的底栏还在、
+     * 后者没有，同一层级两种版式。2026-10-30 用户要求统一成「二级页都没有底栏」：
+     * 顶栏进入二级态（[showToolbarSub]）收起底栏，回目录（[showToolbarMain]）再放回来。
+     *
+     * 判定放在这两个 toolbar 方法里而不是设置页里，是因为「切 Tab 离开设置页」「系统返回键退回目录」
+     * 「亮暗主题 recreate 后恢复」都要跟着变 —— 这些路径本来就都会经过它们。
+     *
+     * 用淡出而非直接 GONE：底栏是液态玻璃浮层，硬切会在屏幕底部闪一下。
+     * 动画途中被要求反向时先 cancel（ViewPropertyAnimator 取消不执行 withEndAction），
+     * 再由新动画接管透明度，不会卡在半透明或残留 GONE。
+     */
+    fun setBottomNavVisible(visible: Boolean) {
+        bottomNavWanted = visible
+        val nav = binding.bottomNav
+        nav.animate().cancel()
+        if (visible) {
+            if (nav.visibility == View.VISIBLE && nav.alpha >= 1f) return
+            nav.visibility = View.VISIBLE
+            nav.alpha = 0f
+            nav.animate()
+                .alpha(1f)
+                .setDuration(Motion.duration(this, R.integer.motion_short4))
+                .setInterpolator(Motion.emphasizedDecelerate(this))
+                .start()
+        } else {
+            if (nav.visibility != View.VISIBLE) return
+            nav.animate()
+                .alpha(0f)
+                .setDuration(Motion.duration(this, R.integer.motion_short2))
+                .setInterpolator(Motion.emphasizedAccelerate(this))
+                .withEndAction {
+                    if (!bottomNavWanted) nav.visibility = View.GONE
+                }
+                .start()
+        }
     }
 
     /** 常规页顶栏：M3 surface 底 + onSurface 前景，状态栏图标跟随系统明暗 */

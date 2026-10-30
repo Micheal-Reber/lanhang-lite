@@ -7,7 +7,7 @@
     android:paddingStart="@dimen/screen_padding_h"
     android:paddingTop="@dimen/screen_padding_h"
     android:paddingEnd="@dimen/screen_padding_h"
-    android:paddingBottom="@dimen/content_padding_bottom">
+    android:paddingBottom="@dimen/content_padding_bottom_bare">
 
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Lanhang.Card"
@@ -54,6 +54,17 @@
                         android:text="@string/settings_theme"
                         android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
                         android:textColor="?attr/colorOnSurface" />
+
+                    <!-- 当前档位（浅色 / 深色 / 跟随系统）：与「课表背景」「语言」两行同一种双行版式 -->
+                    <TextView
+                        android:id="@+id/tvThemeSummary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_xxs"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
                 <ImageView

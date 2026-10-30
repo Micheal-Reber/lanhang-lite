@@ -274,6 +274,7 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         syncToolbar()
+        refreshThemeSummary()
         refreshBackgroundSummary()
         refreshClassReminderSummary()
         // 从过滤设置页返回时档位/词数可能变了，摘要跟着刷
@@ -450,6 +451,7 @@ class SettingsFragment : Fragment() {
     private fun setupDetail(page: Int, root: View) {
         when (page) {
             PAGE_APPEARANCE -> {
+                root.findViewById<TextView>(R.id.tvThemeSummary).text = currentThemeLabel()
                 root.findViewById<View>(R.id.rowTheme).setOnClickListener { showThemeDialog() }
                 root.findViewById<TextView>(R.id.tvScheduleBackgroundSummary).text =
                     ScheduleBackdrop.summary(requireContext())
@@ -525,10 +527,26 @@ class SettingsFragment : Fragment() {
                 if (mode != Session.themeMode) {
                     Session.themeMode = mode
                     applyTheme(mode)
+                    // 换模式一般会 recreate（重建后 setupDetail 会重填），但「浅色 ↔ 跟随系统」
+                    // 在系统本身就是浅色时 AppCompatDelegate 不一定重建，所以这里显式刷一次
+                    refreshThemeSummary()
                 }
             }
             .setNegativeButton(R.string.schedule_export_cancel, null)
             .show()
+    }
+
+    /** 当前主题档位的显示名：与「课表背景」「语言」两行的副标题同一口径 */
+    private fun currentThemeLabel(): String {
+        val label = themeOptions.firstOrNull { it.first == Session.themeMode }?.second
+            ?: R.string.settings_theme_system
+        return getString(label)
+    }
+
+    /** 二级页开着时刷新主题副标题（不在外观页时找不到这个 TextView，直接跳过） */
+    private fun refreshThemeSummary() {
+        val b = _binding ?: return
+        b.detailContainer.findViewById<TextView>(R.id.tvThemeSummary)?.text = currentThemeLabel()
     }
 
     private fun applyTheme(mode: String) {
