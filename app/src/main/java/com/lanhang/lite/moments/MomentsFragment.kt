@@ -101,8 +101,7 @@ class MomentsFragment : Fragment() {
             onUser = { userId ->
                 context?.let { UserProfileActivity.start(it, userId) }
             },
-            onDelete = { item -> confirmDeletePost(item) },
-            onCommentDelete = { item, comment -> confirmDeleteComment(item, comment) }
+            onDelete = { item -> confirmDeletePost(item) }
         )
         setupGlassFab()
         binding.root.viewTreeObserver.addOnScrollChangedListener(onFabScroll)

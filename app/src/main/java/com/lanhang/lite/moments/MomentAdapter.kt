@@ -56,6 +56,12 @@ class MomentAdapter(
     private val onComment: (MomentItem) -> Unit,
     private val onImage: (List<String>, Int) -> Unit,
     private val onReply: (MomentItem, String) -> Unit,
+    /**
+     * 长按评论区 →「我的评论」→ 选一条删除。
+     *
+     * 这是删除评论的**唯一入口**（2026-10-30 起）：每条评论正文下方的「删除」键已去掉，
+     * 评论行不再被一个次要按钮撑高，长按仍然精确到这条动态的评论区。
+     */
     private val onCommentsLongPress: (MomentItem) -> Unit,
     /** 点头像 / 昵称进个人主页；为 null 时不注册点击（比如不想跳转的场景） */
     private val onUser: ((String) -> Unit)? = null,
@@ -65,12 +71,7 @@ class MomentAdapter(
      * 删除自己发布的动态（二次确认、调接口、摘列表都由宿主处理）。
      * 为 null 时卡片右下角不显示「删除」，长按也不触发；非本人的动态一律不显示。
      */
-    private val onDelete: ((MomentItem) -> Unit)? = null,
-    /**
-     * 删除一条自己的评论（本人评论正文下方的「删除」）。
-     * 为 null 时不显示这个键，仍保留长按评论区 →「我的评论」的旧入口。
-     */
-    private val onCommentDelete: ((MomentItem, CommentEntry) -> Unit)? = null
+    private val onDelete: ((MomentItem) -> Unit)? = null
 ) : RecyclerView.Adapter<MomentAdapter.VH>() {
 
     val items = mutableListOf<MomentItem>()
@@ -328,8 +329,8 @@ class MomentAdapter(
          * 每条评论独占一行：整行（正文 + 行末空白）点击都回复该评论作者。
          * 旧实现把所有评论拼进一个 TextView，只有名字的 ClickableSpan 能点，点正文完全没反应。
          *
-         * 本人评论在正文下方多一个「删除」：服务端只允许删自己的评论，
-         * 别人的评论根本不显示这个键（不是显示了再报错）。
+         * 删除只走长按（→「我的评论」列表）：行内不再放「删除」键，
+         * 否则每条自己的评论都被一个次要操作撑高一截。
          */
         private fun bindComments(item: MomentItem, list: List<CommentEntry>) {
             val ctx = itemView.context
@@ -348,26 +349,14 @@ class MomentAdapter(
                         .also { llComments.addView(it) }
                 }
                 val line = row.findViewById<TextView>(R.id.tvCommentLine)
-                val delete = row.findViewById<TextView>(R.id.tvCommentDelete)
                 line.text = buildCommentLine(c, link)
 
                 row.setOnClickListener { onReply(item, uid) }
-                // 行本身 clickable 会吞掉触摸流，长按必须挂在行上，否则原来的「长按删评论」会失效
+                // 行本身 clickable 会吞掉触摸流，长按必须挂在行上；删除评论只有这一个入口
                 row.setOnLongClickListener {
                     onCommentsLongPress(item)
                     true
                 }
-
-                // 只有自己的评论才露「删除」；服务端生成的 comment_id 为空时删不了，也一并藏掉
-                val canDelete = onCommentDelete != null &&
-                    c.user_id == Session.userId &&
-                    !c.comment_id.isNullOrEmpty()
-                delete.visibility = if (canDelete) View.VISIBLE else View.GONE
-                delete.setOnClickListener(
-                    if (canDelete) View.OnClickListener {
-                        onCommentDelete.invoke(item, c)
-                    } else null
-                )
             }
         }
 

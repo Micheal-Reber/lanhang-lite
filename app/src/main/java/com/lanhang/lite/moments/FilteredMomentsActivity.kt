@@ -115,8 +115,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
                         binding.tvEmpty.isVisible = true
                     }
                 }
-            },
-            onCommentDelete = { item, comment -> actions.askDeleteComment(item, comment) }
+            }
         )
         // 每条都写清「被哪条规则挡住」：全是同一句「已被过滤」等于没说，用户没法判断误伤
         adapter.filterTagText = { item -> reasonOf(item) }

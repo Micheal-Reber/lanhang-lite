@@ -148,9 +148,7 @@ class MyMomentsActivity : AppCompatActivity() {
         // 这一页所有动态都是同一个人的，点他头像仍进资料页（自洽，也方便从贴文回资料）
         onUser = { uid -> UserProfileActivity.start(this, uid) },
         // 只有本人动态才显示「删除」；看别人的「个人动态」时由 MomentAdapter 自动隐藏
-        onDelete = { item -> confirmDeletePost(item) },
-        // 评论同理：只有自己发的评论下方才显示「删除」
-        onCommentDelete = { item, comment -> confirmDeleteComment(item, comment) }
+        onDelete = { item -> confirmDeletePost(item) }
     )
 
     private fun load(reset: Boolean) {

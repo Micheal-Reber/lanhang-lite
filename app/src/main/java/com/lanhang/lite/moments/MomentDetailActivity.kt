@@ -80,8 +80,7 @@ class MomentDetailActivity : AppCompatActivity() {
             onCommentsLongPress = { item -> actions.showMyComments(item) },
             onUser = { userId -> UserProfileActivity.start(this, userId) },
             // 详情页删掉自己发的动态后没有内容可留，直接关页
-            onDelete = { item -> actions.askDeletePost(item) { finish() } },
-            onCommentDelete = { item, comment -> actions.askDeleteComment(item, comment) }
+            onDelete = { item -> actions.askDeletePost(item) { finish() } }
         )
         actions = MomentActions(this, adapter)
         binding.recycler.layoutManager = LinearLayoutManager(this)

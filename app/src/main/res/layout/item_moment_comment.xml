@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  单条评论：整行可点（回复该评论作者）。
-  本人评论在正文下方多一个蓝色「删除」；别人的评论不显示（MomentAdapter 控制）。
+  单条评论：整行可点（回复该评论作者），长按 = 打开「我的评论」删除入口。
+  行内不再放「删除」键（2026-10-30 去掉）：删除是低频操作，不该把每条评论都撑高一截，
+  统一走长按，与「长按卡片删动态」的手势习惯一致。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -20,18 +21,4 @@
         android:lineSpacingExtra="4dp"
         android:textColor="?attr/colorOnSurface"
         android:textSize="@dimen/text_body_medium" />
-
-    <TextView
-        android:id="@+id/tvCommentDelete"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:paddingTop="2dp"
-        android:paddingEnd="@dimen/space_sm"
-        android:paddingBottom="2dp"
-        android:text="@string/common_delete"
-        android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
-        android:textColor="@color/link"
-        android:visibility="gone" />
 </LinearLayout>

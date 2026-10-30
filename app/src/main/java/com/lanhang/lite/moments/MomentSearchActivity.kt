@@ -128,8 +128,7 @@ class MomentSearchActivity : AppCompatActivity() {
                         binding.tvEmpty.isVisible = true
                     }
                 }
-            },
-            onCommentDelete = { item, comment -> actions.askDeleteComment(item, comment) }
+            }
         )
         actions = MomentActions(this, adapter)
         // 命中过滤规则的打标：解释「为什么工作圈列表里看不到这条」

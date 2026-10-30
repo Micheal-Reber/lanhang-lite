@@ -96,7 +96,12 @@ class MomentActions(
             .show()
     }
 
-    /** 长按评论区：列出自己发过的评论，可删除（DELETE /comment/{feed}/{comment}） */
+    /**
+     * 长按评论区：列出自己发过的评论，可删除（`DELETE /comment/{feed}/{comment}`）。
+     *
+     * 这是删除评论的**唯一入口**（2026-10-30 去掉每条评论下方的「删除」键）：
+     * 只有自己的、且服务端已生成 comment_id 的评论会出现在列表里。
+     */
     fun showMyComments(item: MomentItem) {
         val mine = item.comments.filter {
             it.user_id == Session.userId && !it.comment_id.isNullOrEmpty()
@@ -113,18 +118,6 @@ class MomentActions(
             .setItems(labels) { _, which -> confirmDeleteComment(item, mine[which]) }
             .setNegativeButton(R.string.common_cancel, null)
             .show()
-    }
-
-    /**
-     * 单条评论正文下方的「删除」入口。
-     *
-     * 只处理自己的、服务端已生成 comment_id 的评论；确认与接口复用 [confirmDeleteComment]，
-     * 和「长按评论区 → 我的评论」走完全相同的一条链路。
-     */
-    fun askDeleteComment(item: MomentItem, comment: CommentEntry) {
-        if (comment.user_id != Session.userId) return
-        if (comment.comment_id.isNullOrEmpty()) return
-        confirmDeleteComment(item, comment)
     }
 
     private fun confirmDeleteComment(item: MomentItem, comment: CommentEntry) {
