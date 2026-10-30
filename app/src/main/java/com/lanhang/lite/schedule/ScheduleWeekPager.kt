@@ -10,6 +10,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.Interpolator
 import android.widget.FrameLayout
+import androidx.core.view.doOnNextLayout
 import com.lanhang.lite.R
 import com.lanhang.lite.ui.Motion
 import kotlin.math.abs
@@ -27,9 +28,11 @@ import kotlin.math.abs
  * 1. **手势挂到 [ScheduleSwipeLayout]（dispatch 层）**，不再挂 `scroll.setOnTouchListener`。
  *    后者在手指落在课程卡片上时连 DOWN 都收不到（卡片可点击，会消费掉事件），
  *    表现为「按空白处能滑、按课表块滑不动」；
- * 2. **只平移 [Page.sliding]**，不再平移整页。网格页的 7 天列在滑动层里，
- *    左侧节次/时间列留在固定层 —— 每周都一样的东西不该跟着滑出去再滑回来（看着像坏了）；
- * 3. 翻页行程改成**滑动层自己的宽度**（网格页 = 屏宽 - 时间列），并沿用「横向必须明显多于
+ * 2. **只平移 [Page.sliding]**：网格页传空 → 整页平移（左侧节次/时间列跟着一起滑）。
+ *    曾经把左侧时间列钉住不滑（"每周都一样，不该滑出去再滑回来"），但那一层不参与平移
+ *    却要跟着纵向滚动，两页并排时会原地叠在同一屏幕位置 → 两页 scrollY 差几像素就露出
+ *    两套时间交错（2026-10-30 连报两次，最终按用户要求改回整页平移）；
+ * 3. 翻页行程 = **滑动层自己的宽度**（整页平移时即屏宽），并沿用「横向必须明显多于
  *    竖向」的判定（`|dx| > |dy| × 1.2`），斜着划只会回弹。
  *
  * 交互约定：
@@ -63,10 +66,15 @@ class ScheduleWeekPager(
     /**
      * 一页。
      *
-     * [root] 是整页外壳（必须是 [ScheduleSwipeLayout]），**永不平移**，手势挂在它上面；
+     * [root] 是整页外壳（必须是 [ScheduleSwipeLayout]），手势挂在它上面；
      * [scroll] 是该页自己的纵向滚动容器（`SwipeRefreshLayout` 也靠它判断「是否已在顶部」）；
-     * [sliding] 是这一页真正跟着手指横移的层：网格页只放「7 天列」（左轴钉住），
-     * 周视图页放整块内容。留空时退化成平移 [root]（无数据的空白页）。
+     * [sliding] 是真正跟着手指横移的层。**网格页传空**，含义是「整页平移」（含左侧时间列）；
+     * 只有需要钉住某一层时才显式列出（列表页传的是包住内容的那个容器，等价于整页）。
+     *
+     * 网格页曾经把左侧节次/时间列钉住不滑（"每周都一样，不该滑出去再滑回来"），
+     * 代价是那一层**不参与平移却又要跟着纵向滚动**：两页并排时它会原地压在同一个屏幕位置，
+     * 两页 `scrollY` 差几像素就露出两套时间交错（2026-10-30 连报两次）。
+     * 现在改成整页平移 —— 每页带着自己的时间列一起走，物理上不可能重叠。
      */
     class Page(val week: Int, val root: View, val scroll: View, sliding: List<View>) {
         val sliding: List<View> = sliding.ifEmpty { listOf(root) }
@@ -348,6 +356,10 @@ class ScheduleWeekPager(
             // 尺寸变化——旋转、分屏、折叠展开——原来的 ±travel 就不准了）
             val x = if (direction > 0) travel else -travel
             cached.sliding.forEach { it.translationX = x }
+            // 回弹后用户可能接着滚动了这一周的内容，缓存页的 scrollY 就旧了。
+            // 它此刻已经布局完成，这一下 scrollTo 立即生效；不补的话切页那刻内容会跳一下
+            val y = base.scroll.scrollY
+            if (cached.scroll.scrollY != y) cached.scroll.scrollTo(0, y)
             return
         }
         discardSide()
@@ -357,14 +369,33 @@ class ScheduleWeekPager(
         val x = if (direction > 0) travel else -travel
         page.sliding.forEach { it.translationX = x }
         // 离屏时就把纵向位置对齐：等切页那一刻再滚，用户会看到一次明显的跳变。
-        // 先同步滚一次，再 post 补一次 —— 同步那下保证「左轴钉住」后不会在第一帧
-        // 画出第 1 节的节次时间（两侧的时间列叠在同一位置，位置不一致就会闪一下）
+        // 必须用 doOnNextLayout 而不是 post：新建页此刻还没 measure/layout，
+        // 直接 scrollTo 会因「滚动范围 = 0」被钳到 0；而 View.post 的 Runnable 跑在
+        // 下一帧 performTraversals 之前（layout 还没走），同样白跑一趟。
         val y = base.scroll.scrollY
         if (y > 0) {
-            page.scroll.scrollTo(0, y)
-            page.scroll.post { if (page.root.parent != null) page.scroll.scrollTo(0, y) }
+            page.scroll.doOnNextLayout {
+                if (page.root.parent != null) page.scroll.scrollTo(0, y)
+            }
         }
         side = page
+        pruneHost()
+    }
+
+    /**
+     * 宿主里只允许存在「当前页 + 相邻页」两个 root。
+     *
+     * 页是后 add 的在上层，多出来的任何一页都会把它的**钉住层下方的列区**露在屏幕上
+     * （例如某个早退路径漏了 remove），这正是「两套时间」另一种可能的来源。
+     * 收尾时扫一遍比在每条分支里各写一次 removeView 更可靠。
+     */
+    private fun pruneHost() {
+        val keepCurrent = current?.root
+        val keepSide = side?.root
+        for (i in host.childCount - 1 downTo 0) {
+            val child = host.getChildAt(i)
+            if (child !== keepCurrent && child !== keepSide) host.removeViewAt(i)
+        }
     }
 
     private fun discardSide() {
@@ -383,7 +414,8 @@ class ScheduleWeekPager(
         current = page
         offset = 0f
         page.sliding.forEach { it.translationX = 0f }
-        if (keepScrollY > 0) page.scroll.post { page.scroll.scrollTo(0, keepScrollY) }
+        if (keepScrollY > 0) page.scroll.doOnNextLayout { page.scroll.scrollTo(0, keepScrollY) }
+        pruneHost()
         onWeekChange(week)
         onSettle(week)
         drainPending()
@@ -420,11 +452,17 @@ class ScheduleWeekPager(
         }
         animate(offset, if (forward) -travel else travel, R.integer.motion_medium1) {
             val old = current
+            // 这一页要顶上来了：先把纵向位置钉死在与旧页一致处，再放出它的时间列。
+            // 顺序反过来的话，时间列会先以自己（可能还没对齐的）scrollY 露一帧，
+            // 左轴看着「跳一下」—— 与两套时间叠在一起是同一个毛病
+            val settleY = old?.scroll?.scrollY ?: 0
+            next.scroll.scrollTo(0, settleY)
             current = next
             side = null
             offset = 0f
             next.sliding.forEach { it.translationX = 0f }
             old?.let { host.removeView(it.root) }
+            pruneHost()
             onWeekChange(next.week)
             onSettle(next.week)
             drainPending()

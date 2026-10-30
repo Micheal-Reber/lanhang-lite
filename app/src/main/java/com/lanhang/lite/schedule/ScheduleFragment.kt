@@ -945,8 +945,9 @@ class ScheduleFragment : Fragment() {
         val gridH = yTopOfRow(periodCount) + rowH
 
         // ===== 表头：纯文字两行（周几 + 日期），今天整列用强调色，不再有底色卡片 =====
-        // 视口固定不动并裁剪，内部的 [headerCols] 才是滑动层 —— 切周时左轴（节次/时间）
-        // 钉住，只有 7 天列跟着手指走，对齐 miuix 版课表的滑动逻辑
+        // 现在翻周是**整页平移**（含左侧时间列），表头与表格都在页内跟着走；
+        // [headerViewport] 只负责把 7 天列摆到时间列右侧（leftMargin = timeW），
+        // 裁剪与单独平移都不再需要（早期"左轴钉住"的方案已经废弃，原因见 Page.sliding 注释）
         val headerCols = FrameLayout(ctx)
         val headerViewport = FrameLayout(ctx).apply {
             layoutParams = FrameLayout.LayoutParams(gridW, headerH).apply { leftMargin = timeW }
@@ -982,12 +983,12 @@ class ScheduleFragment : Fragment() {
         headerHost.addView(headerViewport)
 
         // ===== 表格主体：时间列 + 网格线 + 休息带 + 课程块，统一绝对定位 =====
-        // 两层结构（2026-10-30）：
-        //  - [axisLayer] 左侧时间列，**钉住不动**：每周的节次/时间完全一样，跟着滑出去再滑回来
-        //    看着就像页面坏了；
-        //  - [cols] 7 天列（竖线 / 今天底色 / 课程块），装在裁剪视口里**跟着手指滑**。
-        //    视口必须裁剪，否则列区左移时会盖到时间列上。
-        // 两层各自保留原来的叠放顺序（线 → 色带 → 课程块），配色才对得上。
+        // 两层结构（2026-10-30 定稿）：
+        //  - [axisLayer] 左侧时间列（含那一段横线、休息带、左边界竖线）；
+        //  - [colsViewport] 里的 [cols]：7 天列（竖线 / 今天底色 / 休息带文字 / 课程块）。
+        //    视口只用来把列区摆到时间列右侧（leftMargin = timeW）。
+        // 翻周时**整个页面一起平移**，两层都跟着手指走 —— 不再有"左轴钉住"，
+        // 那种做法会让两页的同一层叠在同一屏幕位置（两套时间交错），见 Page.sliding。
         val body = FrameLayout(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, gridH
@@ -1024,7 +1025,8 @@ class ScheduleFragment : Fragment() {
         }
 
         // 横线：表头下方一条 + 每节课底边一条（休息带所在行跳过，由色带自己形成分隔）。
-        // 时间列那段单独铺一份在固定层里 —— 左轴不跟手滑，但行线必须一直横穿到底
+        // 时间列那段铺在 [axisLayer] 里、列区那段铺在 [cols] 里 —— 同一页内两段一起平移，
+        // 行线始终横穿到底；不要再把时间列那段拆成"固定层"（那正是两套时间叠在一起的来源）
         for (p in 0..periodCount) {
             if (p > 0 && breaksAfter.containsKey(p)) continue
             val y = (if (p == 0) 0 else yTopOfRow(p) + rowH).coerceAtMost(gridH - lineW)
@@ -1040,7 +1042,7 @@ class ScheduleFragment : Fragment() {
             )
         }
 
-        // 竖线：时间列右边界（钉在固定层，它是左轴的边界）+ 6 条列分隔
+        // 竖线：时间列右边界（左轴的边界，铺在 [axisLayer] 里）+ 6 条列分隔
         //（最右列贴着屏幕边缘，不再单独画）
         axisLayer.addView(
             View(ctx).apply { setBackgroundColor(s.divider) },
@@ -1206,7 +1208,10 @@ class ScheduleFragment : Fragment() {
             )
         }
         container.addView(body)
-        return ScheduleWeekPager.Page(week, shell, scroll, listOf(headerCols, cols))
+        // sliding 传空 = **整页平移**，左侧时间列跟着一起滑（2026-10-30 用户决定）。
+        // 曾经只平移 7 天列、把时间列钉住，结果两页并排时钉住的那一层原地叠在一起，
+        // 两页纵向滚动位置差几像素就会看到两套时间交错。
+        return ScheduleWeekPager.Page(week, shell, scroll, emptyList())
     }
 
     /**
