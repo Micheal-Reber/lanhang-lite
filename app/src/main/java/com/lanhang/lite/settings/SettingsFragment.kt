@@ -137,11 +137,11 @@ class SettingsFragment : Fragment() {
         binding.rowAccount.setOnClickListener { openMyProfile() }
         binding.rowLogout.setOnClickListener { confirmLogout() }
         binding.rowDiagnostics.setOnClickListener { showDiagnostics() }
-        binding.rowClearCache.setOnClickListener { confirmClearCache() }
+        binding.rowClearCache.setOnClickListener { openDetail(PAGE_CACHE) }
         bindAccountCard()
 
         val restored = savedInstanceState?.getInt(KEY_DETAIL, -1) ?: -1
-        if (restored == PAGE_APPEARANCE || restored == PAGE_TOOLS || restored == PAGE_ABOUT) {
+        if (restored in intArrayOf(PAGE_APPEARANCE, PAGE_TOOLS, PAGE_ABOUT, PAGE_CACHE)) {
             openDetail(restored, syncToolbar = false)
         }
         syncToolbar()
@@ -309,7 +309,7 @@ class SettingsFragment : Fragment() {
      * 只删图片缓存与调试产物；课表、成绩、自建课程、离线快照都在 `filesDir` 里，**一个不动**。
      * 删之前先说清楚会释放多少、以及图片下次会重新下载 —— 用户点下去之前得知道代价。
      */
-    private fun confirmClearCache() {
+    private fun confirmClearCache(usageSummary: TextView) {
         val ctx = context ?: return
         lifecycleScope.launch {
             val usage = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
@@ -326,6 +326,13 @@ class SettingsFragment : Fragment() {
                 .setPositiveButton(R.string.settings_clear_cache_action) { _, _ ->
                     lifecycleScope.launch {
                         val freed = withContext(Dispatchers.IO) { StorageJanitor.clear(ctx) }
+                        val after = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
+                        usageSummary.text = getString(
+                            R.string.settings_cache_usage_summary,
+                            StorageJanitor.format(after.images),
+                            StorageJanitor.format(after.others)
+                        )
+                        // 首页那行的摘要也得跟着变
                         refreshCacheSize()
                         Toast.makeText(
                             ctx,
@@ -339,6 +346,51 @@ class SettingsFragment : Fragment() {
                 }
                 .show()
         }
+    }
+
+    /**
+     * 二级页里的占用与周期摘要。
+     *
+     * 统计要遍历文件目录，必须放 IO 线程 —— 主线程扫一次 image_cache（实测 146 个文件、
+     * 74MB）会明显卡一下。
+     */
+    private fun refreshCacheUsage(ttlSummary: TextView, usageSummary: TextView) {
+        val ctx = context ?: return
+        lifecycleScope.launch {
+            val days = StorageJanitor.ttlDays(ctx)
+            val usage = withContext(Dispatchers.IO) { StorageJanitor.usage(ctx) }
+            ttlSummary.text = ttlLabel(days)
+            usageSummary.text = getString(
+                R.string.settings_cache_usage_summary,
+                StorageJanitor.format(usage.images),
+                StorageJanitor.format(usage.others)
+            )
+        }
+    }
+
+    /** 选自动清理周期 */
+    private fun showCacheTtlDialog(summary: TextView) {
+        val ctx = context ?: return
+        val options = StorageJanitor.TTL_OPTIONS
+        val labels = options.map { ttlLabel(it) }.toTypedArray()
+        val current = StorageJanitor.ttlDays(ctx)
+        val checked = options.indexOf(current).coerceAtLeast(0)
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.settings_cache_ttl)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                StorageJanitor.setTtlDays(ctx, options[which])
+                summary.text = labels[which]
+                // 单选列表默认不自动关闭，得自己 dismiss
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.common_cancel, null)
+            .show()
+    }
+
+    private fun ttlLabel(days: Int): String = if (days <= 0) {
+        getString(R.string.settings_cache_ttl_never)
+    } else {
+        getString(R.string.settings_cache_ttl_days, days)
     }
 
     /** 工具页里的上课提醒摘要（停在工具页时从提醒页返回要跟着变） */
@@ -383,6 +435,7 @@ class SettingsFragment : Fragment() {
         PAGE_APPEARANCE -> getString(R.string.settings_appearance)
         // 工具页现在也装「身份码」，不只课表相关，标题与入口统一叫「工具」
         PAGE_TOOLS -> getString(R.string.settings_tools)
+        PAGE_CACHE -> getString(R.string.settings_clear_cache)
         else -> getString(R.string.settings_about_app)
     }
 
@@ -391,6 +444,7 @@ class SettingsFragment : Fragment() {
         val layout = when (page) {
             PAGE_APPEARANCE -> R.layout.view_settings_appearance
             PAGE_TOOLS -> R.layout.view_settings_tools
+            PAGE_CACHE -> R.layout.view_settings_cache
             else -> R.layout.view_settings_about
         }
         b.detailContainer.removeAllViews()
@@ -456,6 +510,17 @@ class SettingsFragment : Fragment() {
                 }
                 root.findViewById<View>(R.id.rowDebugSchedule)
                     .setOnClickListener { debugSchedule() }
+            }
+            PAGE_CACHE -> {
+                val ttlSummary = root.findViewById<TextView>(R.id.tvCacheTtlSummary)
+                val usageSummary = root.findViewById<TextView>(R.id.tvCacheUsageSummary)
+                root.findViewById<View>(R.id.rowCacheTtl).setOnClickListener {
+                    showCacheTtlDialog(ttlSummary)
+                }
+                root.findViewById<View>(R.id.btnClearCacheNow).setOnClickListener {
+                    confirmClearCache(usageSummary)
+                }
+                refreshCacheUsage(ttlSummary, usageSummary)
             }
             else -> {
                 // 关于页：版本信息 / 反馈问题 / 项目链接；诊断已提到目录页（2026-10-26）
@@ -867,6 +932,7 @@ class SettingsFragment : Fragment() {
         private const val PAGE_APPEARANCE = 0
         private const val PAGE_TOOLS = 1
         private const val PAGE_ABOUT = 2
+        private const val PAGE_CACHE = 3
         private const val KEY_DETAIL = "settings_detail_page"
 
         /** 公开仓库：关于页的「源码仓库」「开源许可」都指向这里 */

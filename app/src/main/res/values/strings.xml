@@ -769,4 +769,12 @@
     <string name="settings_clear_cache_confirm_message">将释放 %1$s（图片缓存与调试临时文件）。\n\n课表、成绩、自建课程、离线快照都不受影响；图片下次浏览时会重新下载。</string>
     <string name="settings_clear_cache_action">清除</string>
     <string name="settings_clear_cache_done">已释放 %1$s</string>
+    <!-- 清除缓存二级页 -->
+    <string name="settings_cache_ttl">自动清理周期</string>
+    <string name="settings_cache_ttl_days">%1$d 天</string>
+    <string name="settings_cache_ttl_never">从不</string>
+    <string name="settings_cache_usage">当前占用</string>
+    <string name="settings_cache_usage_summary">图片 %1$s · 其他 %2$s</string>
+    <string name="settings_cache_clear_now">立即清理</string>
+    <string name="settings_cache_hint">图片缓存有 150MB 硬上限，超出会按「最久没用过」自动淘汰。这里再设一个周期：超过设定天数没下载过的图片，会在下次启动时一并清掉。\n\n清理只涉及图片与调试临时文件，课表、成绩、自建课程、离线快照都不受影响。</string>
 </resources>

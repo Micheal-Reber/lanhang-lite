@@ -765,4 +765,12 @@
     <string name="settings_clear_cache_confirm_message">This frees %1$s (image cache and debug temp files).\n\nYour schedule, grades, custom courses and offline snapshots are untouched — images will be downloaded again when you browse them.</string>
     <string name="settings_clear_cache_action">Clear</string>
     <string name="settings_clear_cache_done">Freed %1$s</string>
+    <!-- Cache sub-page -->
+    <string name="settings_cache_ttl">Automatic cleanup</string>
+    <string name="settings_cache_ttl_days">%1$d days</string>
+    <string name="settings_cache_ttl_never">Never</string>
+    <string name="settings_cache_usage">Currently used</string>
+    <string name="settings_cache_usage_summary">Images %1$s · Other %2$s</string>
+    <string name="settings_cache_clear_now">Clear now</string>
+    <string name="settings_cache_hint">Images are capped at 150MB and the least recently used ones are dropped automatically. This extra period removes images that were not downloaded for that many days, on next launch.\n\nOnly images and debug temp files are touched — your schedule, grades, custom courses and offline snapshots stay untouched.</string>
 </resources>
