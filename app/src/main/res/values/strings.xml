@@ -755,8 +755,12 @@
     <string name="moments_blocked_summary_none">还没有屏蔽任何人</string>
     <string name="moments_blocked_summary_count">已屏蔽 %1$d 人</string>
     <string name="moments_blocked_title">不看的人</string>
-    <string name="moments_blocked_empty">还没有屏蔽任何人\n在别人的主页底部可以「不看 TA 的动态」</string>
+    <string name="moments_blocked_empty_title">还没有屏蔽任何人</string>
+    <string name="moments_blocked_empty_hint">在别人的主页底部可以「不看 TA 的动态」</string>
+    <string name="moments_blocked_item_hint">已屏蔽 · 不会出现在工作圈</string>
     <string name="moments_blocked_restore">恢复</string>
+    <string name="moments_blocked_restored">已恢复 %1$s</string>
+    <string name="moments_blocked_undo">撤销</string>
     <!-- 离线兜底 -->
     <string name="moments_offline_toast">网络不可用 · 显示的是上次加载的内容</string>
     <string name="moments_offline_stale">网络不可用 · 刷新失败，内容可能不是最新的</string>

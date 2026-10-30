@@ -751,8 +751,12 @@
     <string name="moments_blocked_summary_none">Nobody hidden yet</string>
     <string name="moments_blocked_summary_count">%1$d hidden</string>
     <string name="moments_blocked_title">Hidden people</string>
-    <string name="moments_blocked_empty">Nobody hidden yet\nOpen someone\'s profile and tap “Hide this person\'s posts”</string>
+    <string name="moments_blocked_empty_title">Nobody hidden yet</string>
+    <string name="moments_blocked_empty_hint">Open someone\'s profile and tap “Hide this person\'s posts”</string>
+    <string name="moments_blocked_item_hint">Hidden · won\'t show up in Moments</string>
     <string name="moments_blocked_restore">Restore</string>
+    <string name="moments_blocked_restored">Restored %1$s</string>
+    <string name="moments_blocked_undo">Undo</string>
     <!-- Offline fallbacks -->
     <string name="moments_offline_toast">Offline · showing the last loaded content</string>
     <string name="moments_offline_stale">Offline · refresh failed, content may be out of date</string>

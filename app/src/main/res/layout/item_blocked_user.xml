@@ -1,37 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  名单项：与通讯录成员行（item_directory_member）同一套卡片规格。
+  原先是裸行 —— 跟全 App 的卡片列表风格断裂，没有点击涟漪，也没有说明文字。
+  整行可点 = 进对方个人主页，用户能先确认「屏蔽的是不是这个人」再点恢复。
+-->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Lanhang.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
-    android:minHeight="@dimen/list_item_height_two_line"
-    android:orientation="horizontal"
-    android:paddingStart="@dimen/space_lg"
-    android:paddingTop="@dimen/space_md"
-    android:paddingEnd="@dimen/space_lg"
-    android:paddingBottom="@dimen/space_md">
+    android:layout_marginStart="@dimen/screen_padding_h"
+    android:layout_marginEnd="@dimen/screen_padding_h"
+    android:layout_marginBottom="@dimen/card_gap"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
 
-    <com.lanhang.lite.ui.AvatarView
-        android:id="@+id/ivAvatar"
-        android:layout_width="@dimen/avatar_settings"
-        android:layout_height="@dimen/avatar_settings" />
-
-    <TextView
-        android:id="@+id/tvName"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_md"
-        android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
-        android:textColor="?attr/colorOnSurface" />
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/list_item_height_two_line"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/card_padding"
+        android:paddingTop="@dimen/space_md"
+        android:paddingEnd="@dimen/space_sm"
+        android:paddingBottom="@dimen/space_md">
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnUnblock"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:minWidth="0dp"
-        android:text="@string/moments_blocked_restore" />
-</LinearLayout>
+        <com.lanhang.lite.ui.AvatarView
+            android:id="@+id/ivAvatar"
+            android:layout_width="@dimen/avatar_settings"
+            android:layout_height="@dimen/avatar_settings"
+            android:contentDescription="@string/moments_cd_avatar" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                android:textColor="?attr/colorOnSurface" />
+
+            <!-- 说清屏蔽的实际效果；名单里存的是快照昵称，只有名字容易被误认 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xxs"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/moments_blocked_item_hint"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnblock"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_xs"
+            android:minWidth="0dp"
+            android:text="@string/moments_blocked_restore" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
