@@ -43,7 +43,6 @@ class ScheduleFragment : Fragment() {
     private lateinit var tvWeekPill: MaterialButton
     private lateinit var btnPrev: MaterialButton
     private lateinit var btnNext: MaterialButton
-    private lateinit var btnCalendar: MaterialButton
     /** 网格/列表切换：单按钮点按（2026-10-25 由两段式分段按钮改回，让周次能真正居中） */
     private lateinit var btnViewSwitch: MaterialButton
     /** 承载所有周次页面的容器，每页一整个视图树，见 [ScheduleWeekPager] */
@@ -55,6 +54,11 @@ class ScheduleFragment : Fragment() {
     private lateinit var bgSolidLayer: View
     private lateinit var bgImageLayer: ImageView
     private lateinit var bgVeil: View
+    /**
+     * 内容层（工具条 + 周次页面 + 进度）：Tab 切换淡入的唯一目标。
+     * 背景三层必须留在它外面、始终保持 alpha 1，否则溢出到顶栏那段会在淡入期间被裁掉。
+     */
+    private var contentLayer: View? = null
     /** 当前配色令牌：无自定义背景时来自主题，有背景时来自背景分析 */
     private lateinit var style: ScheduleStyle
     /** 已应用的背景标识，避免每次 onResume 重复分析/重建视图 */
@@ -78,11 +82,14 @@ class ScheduleFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        tvWeekPill = view.findViewById(R.id.tvWeekPill)
-        btnPrev = view.findViewById(R.id.btnPrevWeek)
-        btnNext = view.findViewById(R.id.btnNextWeek)
-        btnCalendar = view.findViewById(R.id.btnCalendar)
-        btnViewSwitch = view.findViewById(R.id.btnViewSwitch)
+        // 顶栏那组控件（上一周 / 周次胶囊 / 下一周 / 视图切换）自 2026-10-31 起住在
+        // Activity 的顶栏里（跟「课表」标题同一行、整体靠右，见 activity_main.xml 的 scheduleHeader），
+        // 所以从 activity 的视图树取 —— 不在本页的 view 里，view.findViewById 会抛空指针。
+        val header = requireActivity()
+        tvWeekPill = header.findViewById(R.id.tvWeekPill)
+        btnPrev = header.findViewById(R.id.btnPrevWeek)
+        btnNext = header.findViewById(R.id.btnNextWeek)
+        btnViewSwitch = header.findViewById(R.id.btnViewSwitch)
         pagerHost = view.findViewById(R.id.pagerHost)
         tvEmpty = view.findViewById(R.id.tvEmpty)
         progress = view.findViewById(R.id.progress)
@@ -97,6 +104,7 @@ class ScheduleFragment : Fragment() {
         bgSolidLayer = view.findViewById(R.id.bgSolidLayer)
         bgImageLayer = view.findViewById(R.id.bgImageLayer)
         bgVeil = view.findViewById(R.id.bgVeil)
+        contentLayer = view.findViewById(R.id.contentLayer)
 
         pager = ScheduleWeekPager(pagerHost) { week -> buildPage(week) }
         pager.onWeekChange = { week ->
@@ -128,14 +136,14 @@ class ScheduleFragment : Fragment() {
 
         btnPrev.setOnClickListener { switchWeek(currentWeek - 1) }
         btnNext.setOnClickListener { switchWeek(currentWeek + 1) }
-        btnCalendar.setOnClickListener { showWeekPicker() }
+        // 周次胶囊点一下 = 选周（原日历按钮，2026-10-31 合并：少一个图标，顶栏更清爽）
+        tvWeekPill.setOnClickListener { showWeekPicker() }
         // 单按钮切换：点一下就换到另一个视图（图标与无障碍描述见 updateViewSwitch）
         btnViewSwitch.setOnClickListener { switchView(!showingGrid) }
         swipeRefresh.setOnRefreshListener { refresh() }
-        // SwipeRefreshLayout 只有**直接子视图**这一份滚动状态可看，而这里的直接子视图是
-        // LinearLayout（工具条 + 翻页容器），`canScrollVertically(-1)` 永远 false ——
-        // 它会把「表格已经滚到中间还往下拖」也当成下拉刷新，白拉一下不滚动、只弹指示器。
-        // 1.1.0 提供官方回调，明确告诉它当前这一页的滚动容器是否真的在顶部。
+        // SwipeRefreshLayout 只有**直接子视图**这一份滚动状态可看，而这里的直接子视图是 FrameLayout，
+        // `canScrollVertically(-1)` 永远 false —— 它会把「表格已经滚到中间还往下拖」也当成下拉刷新，
+        // 白拉一下不滚动、只弹指示器。1.1.0 提供官方回调，明确告诉它当前这一页的滚动容器是否真的在顶部。
         swipeRefresh.setOnChildScrollUpCallback { _, _ ->
             pager.scrollView?.canScrollVertically(-1) ?: false
         }
@@ -179,6 +187,16 @@ class ScheduleFragment : Fragment() {
     }
 
     /**
+     * Tab 切换淡入的目标（[com.lanhang.lite.ui.MainActivity] 用）。
+     *
+     * 只淡内容层，**不能淡 Fragment 根视图**：自定义背景三层靠负 topMargin 溢出到顶栏/状态栏后面，
+     * 而 ViewGroup 一旦 alpha < 1 就会离屏合成、按自身边界裁剪 —— 顶栏后面那段在整个淡入期间是空的，
+     * alpha 归 1 的瞬间才整块跳出来（用户看到的「切到课表顶部闪一下再出现图片」）。
+     */
+    val tabFadeTarget: View?
+        get() = contentLayer
+
+    /**
      * 每次 Tab 切回课表时由 MainActivity 调用。
      * 四个 Tab 用 hide/show 切换、Fragment 不重建，所以不会走 onResume，
      * 需要显式把浏览周拉回当前实际周——否则上次翻到第 N 周，切回来还停在第 N 周。
@@ -207,28 +225,44 @@ class ScheduleFragment : Fragment() {
 
     /**
      * 加载并应用自定义背景：图片/纯色/渐变 → 分析明暗与主色 → 生成配色令牌。
-     * 分析在 IO 线程做，主线程只负责上屏。
+     *
+     * 首次 / 换背景 / 进程重启走 IO 线程分析；结论已在内存里时**同步**上屏，
+     * 避免 recreate（切亮暗、切语言）后先露一帧纯底色。
      */
     private fun applyBackdrop(force: Boolean = false) {
         val ctx = context ?: return
         val spec = ScheduleBackdrop.load(ctx)
-        val key = "${spec.type}|${spec.value}"
+        // 内容标识（图片带文件大小/修改时间）：换图后 key 会变，否则这里会把新图直接拦掉
+        val key = ScheduleBackdrop.contentKey(ctx, spec)
         if (!force && key == appliedBackdropKey) return
         appliedBackdropKey = key
+        // 内存里已有结论（recreate / 切亮暗 / 切语言后回来）：同步上屏，
+        // 不要先走一帧 IO —— 那期间三层还是 GONE，看到的就是「背景闪一下才出现」
+        ScheduleBackdrop.cachedAnalysis(ctx, spec)?.let { cached ->
+            ScheduleBackdrop.bind(ctx, bgSolidLayer, bgImageLayer, bgVeil, spec, cached)
+            applyStyle(ScheduleStyle.fromBackdrop(cached))
+            return
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             val analysis = withContext(Dispatchers.IO) {
                 runCatching { ScheduleBackdrop.analyze(ctx, spec) }.getOrNull()
             }
             val host = context ?: return@launch
             ScheduleBackdrop.bind(host, bgSolidLayer, bgImageLayer, bgVeil, spec, analysis)
-            style = if (analysis == null) {
-                ScheduleStyle.fromTheme(host)
-            } else {
-                ScheduleStyle.fromBackdrop(analysis)
-            }
-            applyChromeStyle()
-            renderAll()
+            applyStyle(
+                if (analysis == null) ScheduleStyle.fromTheme(host)
+                else ScheduleStyle.fromBackdrop(analysis)
+            )
         }
+    }
+
+    /** 配色令牌换了：顶栏常驻视图 + 所有周次页面一起重绘 */
+    private fun applyStyle(next: ScheduleStyle) {
+        style = next
+        applyChromeStyle()
+        // 视图还没测量（recreate 后首次绑定背景）时不要重绘：此刻页面一个都还没建，
+        // 随后的 loadCacheOrRefresh 会用新令牌直接建页；在这里抢先建会用兜底宽度算版面
+        if (pagerHost.width > 0) renderAll()
     }
 
     /** 顶栏、面板等「常驻视图」的配色随令牌刷新 */
@@ -237,7 +271,6 @@ class ScheduleFragment : Fragment() {
         // MaterialButton 用 iconTint（原来的自绘圆形底 + ImageButton 已删除）
         btnPrev.iconTint = iconTint
         btnNext.iconTint = iconTint
-        btnCalendar.iconTint = ColorStateList.valueOf(style.accent)
         tvEmpty.setTextColor(style.onBackgroundVariant)
         // 下拉指示器：默认是系统白圆盘（深色主题/深色背景上像一颗白球），
         // 改成 M3 的「容器色圆盘 + 主色弧」，跟课表自己的配色令牌一起走
@@ -481,9 +514,14 @@ class ScheduleFragment : Fragment() {
     /**
      * 周次按钮：M3 里用 chip 形态表达"当前筛选值"。
      * 当周 → tonal 填充（secondaryContainer）；非当周 → 透明 + 1dp 描边。
+     *
+     * 2026-10-31 起它还是「选周」入口（原日历按钮已删）：点一下弹周次选择弹层。
+     * 无障碍描述要同时给出周号和动作，只留周号的话读屏用户不知道点开是什么。
      */
     private fun updateWeekPill() {
         tvWeekPill.text = getString(R.string.schedule_week_format, currentWeek)
+        tvWeekPill.contentDescription =
+            getString(R.string.schedule_week_pill_desc, currentWeek)
         if (currentWeek == actualCurrentWeek) {
             tvWeekPill.backgroundTintList = ColorStateList.valueOf(style.accentFill)
             tvWeekPill.strokeWidth = 0
@@ -1132,18 +1170,27 @@ class ScheduleFragment : Fragment() {
                 // 相机拉远：翻转更像「翻卡片」，而不是近距透视的拉伸
                 container.cameraDistance = dp(8000).toFloat()
                 var flipping = false
+                // 工具型动效：时长/缓动都走 M3 token（res/values/motion.xml + m3_standard）
+                val flipMs = Motion.duration(ctx, R.integer.motion_short2)
+                val flipEasing = Motion.standard(ctx)
                 container.setOnClickListener {
                     if (flipping) return@setOnClickListener
                     flipping = true
-                    container.animate().rotationY(90f).setDuration(110).withEndAction {
-                        cards[active].visibility = View.INVISIBLE
-                        active = (active + 1) % cards.size
-                        cards[active].visibility = View.VISIBLE
-                        container.rotationY = -90f
-                        container.animate().rotationY(0f).setDuration(110).withEndAction {
-                            flipping = false
+                    container.animate().rotationY(90f)
+                        .setDuration(flipMs)
+                        .setInterpolator(flipEasing)
+                        .withEndAction {
+                            cards[active].visibility = View.INVISIBLE
+                            active = (active + 1) % cards.size
+                            cards[active].visibility = View.VISIBLE
+                            container.rotationY = -90f
+                            container.animate().rotationY(0f)
+                                .setDuration(flipMs)
+                                .setInterpolator(flipEasing)
+                                .withEndAction {
+                                    flipping = false
+                                }.start()
                         }.start()
-                    }.start()
                 }
                 container.setOnLongClickListener {
                     val shown = group[active]

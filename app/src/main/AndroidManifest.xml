@@ -163,6 +163,12 @@
             android:exported="false"
             android:label="@string/moments_blocked_title" />
 
+        <!-- 诊断与日志（入口：设置目录第二张卡的「诊断与日志」）：整页展示 + 顶栏保存/分享 -->
+        <activity
+            android:name=".settings.DiagnosticsActivity"
+            android:exported="false"
+            android:label="@string/diagnostics_page_title" />
+
         <!-- 关键词搜索（入口在工作圈顶栏放大镜）：需要弹输入法，adjustResize 让结果区跟着缩 -->
         <activity
             android:name=".moments.MomentSearchActivity"

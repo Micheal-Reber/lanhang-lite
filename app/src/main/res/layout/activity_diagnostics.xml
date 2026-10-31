@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  诊断页（2026-10-30 从设置页的 AlertDialog 改成独立页面，版式对齐 Hoshi Reader）：
+
+    ┌ ← 诊断 ⬇ ↑ ┐   顶栏标题居中（CenterAlignedTopAppBar 的观感），右侧两个动作
+    分组卡片：标签左 / 值右（包名、版本、Android、设备、时间）
+    分区小标题「应用错误记录」 + 等宽卡片
+    分区小标题「运行日志」 + 说明 + 等宽卡片
+
+  等宽只用在两个正文块上：时间戳、异常类名、PID 在比例字体里根本对不齐列，
+  看得出「同一秒刷了十几条同样的错」才叫日志。
+  顶栏仍走 `Widget.Lanhang.Toolbar` + wrap_content + minHeight：insets 回调给它补
+  `paddingTop = 状态栏高度`，高度写死 actionBarSize 的话这份 padding 会在固定高度内部占位。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Lanhang.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/top_app_bar_height"
+        app:menu="@menu/menu_diagnostics"
+        app:navigationContentDescription="@string/common_back"
+        app:navigationIcon="@drawable/ic_back"
+        app:title="@string/diagnostics_page_title"
+        app:titleCentered="true" />
+
+    <!-- 采集时 logcat 可能要几百毫秒：先把内容藏起来、中间转圈，避免进来看到一片空白 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingStart="@dimen/screen_padding_h"
+        android:paddingTop="@dimen/space_lg"
+        android:paddingEnd="@dimen/screen_padding_h"
+        android:paddingBottom="@dimen/space_xl"
+        android:scrollbars="none"
+        android:visibility="invisible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- ========== 卡片一：包与运行环境（一卡多行，行间内缩分隔线） ========== -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Lanhang.Card.Large"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="35"
+                            android:text="@string/diagnostics_field_package"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvPackage"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="65"
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="35"
+                            android:text="@string/diagnostics_field_version"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvVersion"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="65"
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="35"
+                            android:text="@string/diagnostics_field_android"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvAndroid"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="65"
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="35"
+                            android:text="@string/diagnostics_field_device"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvDevice"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="65"
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="35"
+                            android:text="@string/diagnostics_field_time"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvTime"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="65"
+                            android:ellipsize="end"
+                            android:gravity="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/space_xl" />
+
+            <!-- ========== 应用错误记录 ========== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_xs"
+                android:layout_marginBottom="@dimen/space_sm"
+                android:text="@string/diagnostics_app_errors"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelLarge"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Lanhang.Card.Large"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:id="@+id/tvErrors"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:paddingStart="@dimen/card_padding"
+                    android:paddingTop="@dimen/space_md"
+                    android:paddingEnd="@dimen/card_padding"
+                    android:paddingBottom="@dimen/space_md"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textIsSelectable="true" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/space_xl" />
+
+            <!-- ========== 运行日志 ========== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_xs"
+                android:text="@string/diagnostics_section_log"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelLarge"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_xs"
+                android:layout_marginTop="@dimen/space_xxs"
+                android:layout_marginBottom="@dimen/space_sm"
+                android:text="@string/diagnostics_scope"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Lanhang.Card.Large"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:paddingStart="@dimen/card_padding"
+                    android:paddingTop="@dimen/space_md"
+                    android:paddingEnd="@dimen/card_padding"
+                    android:paddingBottom="@dimen/space_md"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textIsSelectable="true" />
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+</LinearLayout>

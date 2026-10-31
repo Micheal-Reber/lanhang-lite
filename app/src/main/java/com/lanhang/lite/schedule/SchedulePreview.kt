@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import coil.load
 import com.lanhang.lite.R
+import java.io.File
 
 /**
  * 「课表背景」预览渲染器。
@@ -52,7 +53,12 @@ object SchedulePreview {
                 solid.visibility = View.GONE
                 image.visibility = View.VISIBLE
                 if (imageSource != null) {
-                    image.load(imageSource) { crossfade(true) }
+                    // 已落盘的背景图走统一入口（会带上内容相关的缓存键，换图后不会拿回旧位图）
+                    if (imageSource is File) {
+                        ScheduleBackdrop.loadImage(image, imageSource)
+                    } else {
+                        image.load(imageSource) { crossfade(true) }
+                    }
                 } else {
                     image.setImageDrawable(null)
                 }

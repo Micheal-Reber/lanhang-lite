@@ -3,7 +3,6 @@ package com.lanhang.lite.ui.navigation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -102,14 +100,19 @@ fun LiquidGlassBottomBar(
     onNavigate: (LanhangTab) -> Unit,
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
+    /**
+     * 采样源版本号（见 [ViewBackdrop]）：原生页面滚动/刷新时递增，
+     * 玻璃在绘制期读它，让缓存了「上一次采样结果」的图层重新录制。
+     * 不传 = 只采样一次（只有 Compose 内容自己会动时才够用）。
+     */
+    backdropRevision: () -> Int = { 0 },
 ) {
     val isLightTheme = MaterialTheme.colorScheme.background.luminance() >= 0.5f
     val accentColor = MaterialTheme.colorScheme.primary
-    // Keep the capsule visibly frosted even when a tab has a flat surface behind it.
-    val glassBase = MaterialTheme.colorScheme.surfaceContainerHigh
-    val containerColor = glassBase.copy(alpha = 0.84f)
-    val containerFallback = glassBase.copy(alpha = 0.54f)
-    val containerOutline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
+    // 与 PocketDiary / E:\app_start 完全一致：40% 底色。
+    // 这层是唯一盖在模糊之上的漆，调高到 0.5 以上就会把 blur/折射压没（历史上 0.84+0.54 双层叠加
+    // 合成 92.6% 不透明，实测就是「看起来像实心卡片」）。
+    val containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.40f)
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(
@@ -245,7 +248,6 @@ fun LiquidGlassBottomBar(
         Row(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
-                .background(containerFallback, RoundedCornerShape(50.dp))
                 .drawBackdrop(
                     backdrop = backdrop,
                     shape = { RoundedCornerShape(50.dp) },
@@ -260,19 +262,14 @@ fun LiquidGlassBottomBar(
                         scaleX = scale
                         scaleY = scale
                     },
-                    onDrawSurface = {
-                        drawRect(containerColor)
-                        drawRoundRect(
-                            color = containerOutline,
-                            cornerRadius = CornerRadius(size.height / 2f),
-                            style = Stroke(1.dp.toPx()),
-                        )
-                    },
+                    onDrawSurface = { drawRect(containerColor) },
                 )
                 .then(interactiveHighlight.modifier)
                 .height(BarHeight)
                 .fillMaxWidth()
-                .padding(ContentMargin),
+                .padding(ContentMargin)
+                // 采样源（原生页面）变了就重录本层：否则这层 RenderNode 会一直复放上一次的模糊底图
+                .drawBehind { backdropRevision() },
             verticalAlignment = Alignment.CenterVertically,
             content = tabContent,
         )
@@ -286,6 +283,8 @@ fun LiquidGlassBottomBar(
                 Modifier
                     .clearAndSetSemantics {}
                     .alpha(0f)
+                    // 读在淡出层内部、layerBackdrop 外部：这一层重录才会把染色副本重新录进 tabsBackdrop
+                    .drawBehind { backdropRevision() }
                     .layerBackdrop(tabsBackdrop)
                     .graphicsLayer { translationX = panelOffset }
                     .drawBackdrop(
@@ -342,7 +341,6 @@ fun LiquidGlassBottomBar(
                     },
                     onDrawSurface = {
                         val progress = drag.pressProgress
-                        drawRect(glassBase.copy(alpha = 0.72f), alpha = 1f - progress)
                         drawRect(
                             if (isLightTheme) Color.Black.copy(0.1f) else Color.White.copy(0.1f),
                             alpha = 1f - progress,
@@ -352,7 +350,9 @@ fun LiquidGlassBottomBar(
                 )
                 .height(IndicatorHeight)
                 // 显式宽度：分数填充会在 padding 之后测量，导致指示器右漂
-                .width(with(density) { tabWidth.toDp() }),
+                .width(with(density) { tabWidth.toDp() })
+                // 指示器也采样整窗底图，页面滚动时要跟着重录
+                .drawBehind { backdropRevision() },
         )
 
         // 固定输入层，压在所有玻璃之上统一接管手势

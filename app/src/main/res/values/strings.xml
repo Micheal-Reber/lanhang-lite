@@ -192,7 +192,7 @@
     <string name="schedule_period_single">%1$d节</string>
     <string name="schedule_period_range">%1$d-%2$d节</string>
     <string name="schedule_refresh_failed">刷新失败：%1$s</string>
-    <string name="schedule_jump_week">跳转周次</string>
+    <string name="schedule_week_pill_desc">第 %1$d 周，点击切换周次</string>
     <string name="schedule_week_picker_title">选择周次</string>
     <string name="schedule_prev_week">上一周</string>
     <string name="schedule_next_week">下一周</string>
@@ -438,12 +438,22 @@
     <string name="settings_diagnostics_chooser">分享诊断信息</string>
 
     <!-- ==================== 诊断报告 ==================== -->
+    <string name="diagnostics_page_title">诊断</string>
     <string name="diagnostics_title">蓝航 Lite 诊断信息</string>
-    <string name="diagnostics_version">版本：%1$s</string>
-    <string name="diagnostics_device">设备：%1$s</string>
-    <string name="diagnostics_time">时间：%1$s</string>
-    <string name="diagnostics_scope">日志级别：Warning / Error；仅本机最近日志</string>
-    <string name="diagnostics_app_errors">应用错误记录：</string>
+    <string name="diagnostics_field_package">包名</string>
+    <string name="diagnostics_field_version">版本</string>
+    <string name="diagnostics_field_android">Android</string>
+    <string name="diagnostics_field_device">设备</string>
+    <string name="diagnostics_field_time">时间</string>
+    <string name="diagnostics_scope">级别: Warning / Error；仅本机最近日志</string>
+    <string name="diagnostics_app_errors">应用错误记录</string>
+    <string name="diagnostics_section_log">运行日志</string>
+    <string name="diagnostics_none">（无）</string>
+    <string name="diagnostics_collecting">正在收集诊断信息…</string>
+    <string name="diagnostics_not_ready">报告还没生成完，稍等一下</string>
+    <string name="diagnostics_save">保存到文件</string>
+    <string name="diagnostics_saved">已保存 %1$s</string>
+    <string name="diagnostics_save_failed">保存失败</string>
     <string name="diagnostics_log_begin">— 日志开始 —</string>
     <string name="diagnostics_log_end">— 日志结束 —</string>
     <string name="diagnostics_log_failed">读取系统日志失败：%1$s</string>

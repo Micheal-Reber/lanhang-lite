@@ -5,17 +5,15 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -25,14 +23,14 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.badge.BadgeUtils
 import com.google.android.material.color.MaterialColors
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityMainBinding
 import com.lanhang.lite.moments.MomentsFragment
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.navigation.LanhangTab
 import com.lanhang.lite.ui.navigation.LiquidGlassBottomBar
+import com.lanhang.lite.ui.navigation.ViewBackdrop
+import com.lanhang.lite.ui.navigation.rememberViewBackdrop
 import android.content.Context
 import com.lanhang.lite.core.LocaleHelper
 import com.google.android.material.R as MaterialR
@@ -94,12 +92,19 @@ class MainActivity : AppCompatActivity() {
     /** 当前顶栏菜单图标颜色；onCreateOptionsMenu 读它，避免每次重建菜单都重新推导 */
     private var toolbarIconTint: Int? = null
 
-    /** 底栏玻璃的模糊底图：fragmentContainer 在底栏矩形外扩 margin 的区域截图 */
+    /**
+     * 底栏玻璃的模糊底图：把可见的 Fragment 视图实时录进 LayerBackdrop。
+     * 由 Compose 侧（[rememberViewBackdrop]）在组合时赋值，这里只负责在原生事件里
+     * 通知它「内容变了」。
+     */
+    private var glassBackdrop: ViewBackdrop? = null
+
+    /** 底栏玻璃的采样源变了（滚动 / 布局变化）：让它重录一帧 */
     private val onContentScrolled = android.view.ViewTreeObserver.OnScrollChangedListener {
-        binding.bottomNav.invalidate()
+        glassBackdrop?.invalidate()
     }
     private val onContentLayoutChanged = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-        binding.bottomNav.invalidate()
+        glassBackdrop?.invalidate()
     }
     private var forwardedTouchTarget: android.view.View? = null
 
@@ -111,6 +116,9 @@ class MainActivity : AppCompatActivity() {
         // 课表页顶栏是透明浮层，内容会从其下方一直画到状态栏；
         // 显式抬高 Z，保证顶栏（标题/菜单图标）永远画在溢出的背景之上。1px 不产生可见阴影。
         binding.toolbar.translationZ = 1f
+        // 课表 Tab 的「标题 + 周次/视图切换」与 toolbar 共用同一块区域（见 activity_main.xml），
+        // 再抬一层：绘制与触摸都排在 toolbar 之前，避免两者叠在同一位置时互相遮住。
+        binding.scheduleHeader.translationZ = 2f
         binding.toolbar.setNavigationOnClickListener { toolbarBackAction?.invoke() }
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
@@ -123,6 +131,10 @@ class MainActivity : AppCompatActivity() {
             // 高度 = 状态栏 inset + M3 small top app bar 的 64dp（token 见 res/values/dimens.xml）
             lp.height = bars.top + resources.getDimensionPixelSize(R.dimen.top_app_bar_height)
             tb.layoutParams = lp
+            // 课表页顶栏内容（标题 + 周次/视图切换）与 toolbar 共用同一块区域：
+            // 高度跟着 toolbar 的约束走，这里只把状态栏那一段让出来，保证两者一条基线
+            val sh = binding.scheduleHeader
+            sh.setPadding(sh.paddingLeft, bars.top, sh.paddingRight, 0)
             insets
         }
 
@@ -153,37 +165,24 @@ class MainActivity : AppCompatActivity() {
                         stringResource(R.string.tab_settings),
                     ),
                 )
-                // PocketDiary's host pattern: a live LayerBackdrop source and the glass
-                // bar share one Compose drawing layer. Draw the visible native fragment
-                // directly at its window-relative position instead of passing stale bitmaps.
-                val backdrop = rememberLayerBackdrop()
+                // 玻璃的采样源 = 当前可见的 Fragment 视图。重放与重录都交给 ViewBackdrop，
+                // 底栏与工作圈 FAB 共用同一套实现（见 ui/navigation/ViewBackdrop.kt）。
+                val glass = rememberViewBackdrop(
+                    source = { binding.fragmentContainer },
+                    host = { binding.bottomNav },
+                )
+                DisposableEffect(glass) {
+                    glassBackdrop = glass
+                    onDispose { if (glassBackdrop === glass) glassBackdrop = null }
+                }
                 Box(Modifier.fillMaxSize()) {
-                    Canvas(
-                        Modifier
-                            .fillMaxSize()
-                            .layerBackdrop(backdrop),
-                    ) {
-                        val source = binding.fragmentContainer
-                        val sourceLocation = IntArray(2)
-                        val hostLocation = IntArray(2)
-                        source.getLocationInWindow(sourceLocation)
-                        binding.bottomNav.getLocationInWindow(hostLocation)
-                        drawIntoCanvas { canvas ->
-                            val nativeCanvas = canvas.nativeCanvas
-                            val saveCount = nativeCanvas.save()
-                            nativeCanvas.translate(
-                                (sourceLocation[0] - hostLocation[0]).toFloat(),
-                                (sourceLocation[1] - hostLocation[1]).toFloat(),
-                            )
-                            source.draw(nativeCanvas)
-                            nativeCanvas.restoreToCount(saveCount)
-                        }
-                    }
+                    glass.Capture(Modifier.fillMaxSize())
                     LiquidGlassBottomBar(
                         tabs = tabs,
                         selectedIndex = tabState.intValue,
                         onNavigate = { tab -> switchTab(tabs.indexOf(tab)) },
-                        backdrop = backdrop,
+                        backdrop = glass.backdrop,
+                        backdropRevision = glass::revisionTick,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 16.dp),
@@ -197,6 +196,8 @@ class MainActivity : AppCompatActivity() {
         gradesFragment = supportFragmentManager.findFragmentByTag(TAG_GRADES)
         momentsFragment = supportFragmentManager.findFragmentByTag(TAG_MOMENTS)
         settingsFragment = supportFragmentManager.findFragmentByTag(TAG_SETTINGS)
+        // 进程恢复时 switchTab 不会跑，这里补挂一次；正常路径下 switchTab 里会再赋一遍（幂等）
+        (momentsFragment as? MomentsFragment)?.onContentScrolled = { glassBackdrop?.invalidate() }
         if (savedInstanceState == null) {
             switchTab(TAB_SCHEDULE)
         } else {
@@ -255,6 +256,8 @@ class MainActivity : AppCompatActivity() {
             momentsFragment = it
             tx.add(R.id.fragmentContainer, it, TAG_MOMENTS)
         }
+        // 工作圈的 RecyclerView 滚动不触发窗口 OnScrollChanged，底栏玻璃靠这个回调重录
+        (m as? MomentsFragment)?.onContentScrolled = { glassBackdrop?.invalidate() }
         val st = settingsFragment ?: com.lanhang.lite.settings.SettingsFragment().also {
             settingsFragment = it
             tx.add(R.id.fragmentContainer, it, TAG_SETTINGS)
@@ -288,18 +291,17 @@ class MainActivity : AppCompatActivity() {
         // Finish show/hide before sampling; otherwise the next frame can still contain
         // the previous fragment and leave that image in the glass backdrop.
         tx.commitNow()
-        binding.bottomNav.invalidate()
-        // M3 fade through 的「入」阶段（210ms, emphasizedDecelerate）：commitNow 之后对目标页根视图淡入。
+        glassBackdrop?.invalidate()
+        // M3 fade through 的「入」阶段（210ms, emphasizedDecelerate）：commitNow 之后对目标页淡入。
         // 不能用 FragmentTransaction.setTransition —— commitNow 下不播放，且会打乱底栏当帧采样。
-        val entering = when (tab) {
-            TAB_GRADES -> g.view
-            TAB_MOMENTS -> m.view
-            TAB_SETTINGS -> st.view
-            else -> s.view
-        }
-        listOfNotNull(s.view, g.view, m.view, st.view).forEach {
-            it.animate().cancel()
-            it.alpha = 1f
+        // 目标取 tabFadeTarget（课表只淡内容层），不是一律 Fragment 根视图。
+        val entering = tabFadeTarget(tab)
+        // 复位上一次可能被打断的淡入：四个目标统一取消动画、alpha 归 1，避免停在半透明
+        for (t in intArrayOf(TAB_SCHEDULE, TAB_GRADES, TAB_MOMENTS, TAB_SETTINGS)) {
+            tabFadeTarget(t)?.apply {
+                animate().cancel()
+                alpha = 1f
+            }
         }
         entering?.let { Motion.fadeIn(this, it) }
         // 课表页每次被切回来都回到当前实际周（hide/show 不触发 onResume，只能显式通知）
@@ -312,20 +314,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Tab 切换淡入的目标视图。
+     *
+     * 课表页不能直接淡 Fragment 根视图：自定义背景三层用负 topMargin 溢出到顶栏与状态栏后面，
+     * 父容器一旦带 alpha 就会离屏合成并按自身边界裁剪 —— 顶栏后面那段在整个淡入期间是空的，
+     * alpha 归 1 的瞬间才整块跳出来（用户报的「切到课表顶部闪一下再出现图片」）。
+     * 所以课表只淡内容层，背景层保持 alpha 1；其余 Tab 没有溢出层，仍淡根视图。
+     */
+    private fun tabFadeTarget(tab: Int): View? = when (tab) {
+        TAB_GRADES -> gradesFragment?.view
+        TAB_MOMENTS -> momentsFragment?.view
+        TAB_SETTINGS -> settingsFragment?.view
+        else -> (scheduleFragment as? com.lanhang.lite.schedule.ScheduleFragment)?.tabFadeTarget
+            ?: scheduleFragment?.view
+    }
+
     /** 主 Tab 态：标题 + 无返回箭头。 */
     fun showToolbarMain(title: String) {
         toolbarSubMode = false
         toolbarBackAction = null
         binding.toolbar.navigationIcon = null
-        binding.toolbar.title = title
+        // 课表 Tab 的标题画在 scheduleHeader 里（与右侧的周次/视图切换同一行），
+        // 这时 toolbar 自带标题必须留空，否则两处都画「课表」会叠在一起。
+        // 其余 Tab / 二级页没有这组控件，标题仍走 toolbar。
+        val scheduleHeaderVisible = tabState.intValue == TAB_SCHEDULE
+        binding.toolbar.title = if (scheduleHeaderVisible) "" else title
+        binding.scheduleHeaderTitle.text = title
+        binding.scheduleHeader.visibility = if (scheduleHeaderVisible) View.VISIBLE else View.GONE
         // 主 Tab 态一律带底栏（从设置二级页切走 / 退回目录时都要把它放回来）
         setBottomNavVisible(true)
-        if (tabState.intValue == TAB_SCHEDULE) {
+        if (scheduleHeaderVisible) {
             // 课表页要让自定义背景铺满整屏，所以顶栏必须是透明浮层；
             // 文字色用课表上报的值（自定义背景可能是深是浅），字体/图标仍走 M3 规格
             val foreground = scheduleChromeColor ?: materialColor(MaterialR.attr.colorOnSurface)
             binding.toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             binding.toolbar.setTitleTextColor(foreground)
+            binding.scheduleHeaderTitle.setTextColor(foreground)
             toolbarIconTint = foreground
             setStatusBarIconsLight(!scheduleDarkBackground)
         } else {
@@ -341,6 +366,8 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.navigationIcon =
             androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_back)
         binding.toolbar.title = title
+        // 二级页不属于课表 Tab，顶栏唯一那组课表控件必须收起来
+        binding.scheduleHeader.visibility = View.GONE
         // 二级页一律不带底栏：与身份码 / 校园网等独立 Activity 的二级页保持同一种版式
         setBottomNavVisible(false)
         applyOpaqueToolbar()
@@ -382,6 +409,14 @@ class MainActivity : AppCompatActivity() {
                 .start()
         } else {
             if (nav.visibility != View.VISIBLE) return
+            // 还没真正显形（alpha 0）就要求收起：直接 GONE。
+            // 这种情况出现在 recreate 后 —— 布局里底栏默认 gone，showToolbarMain 先把 alpha 置 0
+            // 起一段淡入，紧接着 showToolbarSub 又要收起；不短路的话这里会空跑一段 100ms 的
+            // "0 → 0" 动画，期间底栏虽然透明却仍是 VISIBLE，会隔着它吞掉底部的触摸。
+            if (nav.alpha <= 0f) {
+                nav.visibility = View.GONE
+                return
+            }
             nav.animate()
                 .alpha(0f)
                 .setDuration(Motion.duration(this, R.integer.motion_short2))
@@ -421,6 +456,8 @@ class MainActivity : AppCompatActivity() {
         scheduleDarkBackground = darkBackground
         if (tabState.intValue != TAB_SCHEDULE || toolbarSubMode) return
         binding.toolbar.setTitleTextColor(onBackground)
+        // 课表 Tab 的标题实际画在顶栏那组控件里（toolbar 自带标题留空），两处都要跟着背景走
+        binding.scheduleHeaderTitle.setTextColor(onBackground)
         toolbarIconTint = onBackground
         setStatusBarIconsLight(!darkBackground)
         invalidateOptionsMenu()

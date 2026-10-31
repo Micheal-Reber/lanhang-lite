@@ -10,8 +10,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.content.Intent
-import android.text.TextUtils
-import android.widget.ScrollView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -136,7 +134,11 @@ class SettingsFragment : Fragment() {
         binding.rowAbout.setOnClickListener { openDetail(PAGE_ABOUT) }
         binding.rowAccount.setOnClickListener { openMyProfile() }
         binding.rowLogout.setOnClickListener { confirmLogout() }
-        binding.rowDiagnostics.setOnClickListener { showDiagnostics() }
+        binding.rowDiagnostics.setOnClickListener {
+            // 2026-10-30 改成独立页面（原来是 AlertDialog，报错一多就挤成一坨灰墙，
+            // 也没法只挑一行复制），见 DiagnosticsActivity
+            DiagnosticsActivity.start(requireContext())
+        }
         binding.rowClearCache.setOnClickListener { openDetail(PAGE_CACHE) }
         bindAccountCard()
 
@@ -894,34 +896,6 @@ class SettingsFragment : Fragment() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(send, getString(R.string.schedule_export_chooser)))
-    }
-
-    private fun showDiagnostics() {
-        val report = Diagnostics.report(requireContext())
-        val preview = TextView(requireContext()).apply {
-            text = report
-            textSize = 12f
-            setTextIsSelectable(true)
-            setPadding(20, 12, 20, 12)
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val scroll = ScrollView(requireContext()).apply {
-            addView(preview)
-            layoutParams = ViewGroup.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.55f).toInt())
-        }
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_diagnostics)
-            .setView(scroll)
-            .setNegativeButton(R.string.common_close, null)
-            .setPositiveButton(R.string.common_share) { _, _ ->
-                val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.settings_diagnostics_subject))
-                    putExtra(Intent.EXTRA_TEXT, report)
-                }
-                startActivity(Intent.createChooser(send, getString(R.string.settings_diagnostics_chooser)))
-            }
-            .show()
     }
 
     companion object {

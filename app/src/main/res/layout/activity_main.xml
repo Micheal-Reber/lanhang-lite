@@ -34,11 +34,98 @@
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/tab_schedule" />
 
+    <!--
+      课表 Tab 的顶栏内容：左侧「课表」标题，右侧 ‹ / 周次胶囊 / › / 视图切换。
+      2026-10-31 由课表页内的独立工具条搬到这里（顺带把课表页那一整行的高度还给了网格），
+      并按用户要求改成「整体靠右」，与工作圈 Tab 的顶栏动作图标同一侧；标题用 weight 顶到左边。
+      原日历按钮已删：点周次胶囊即弹周次选择弹层（ScheduleFragment.showWeekPicker）。
+
+      约定：
+      - 只在该 Tab 显示（MainActivity.showToolbarMain 切）；显示时 toolbar 自带标题留空，
+        否则两处都画「课表」会重叠。其余 Tab / 二级页仍用 toolbar 的 title。
+      - 声明在 toolbar 之后 = 画在它上面（课表页背景会向上溢出到顶栏区域）。
+      - paddingTop 由 MainActivity 的 insets 监听补成状态栏高度，与 toolbar 标题同一基线。
+      - 控件仍由 ScheduleFragment 绑监听与配色（视图搬家，逻辑不动）。
+    -->
+    <LinearLayout
+        android:id="@+id/scheduleHeader"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_lg"
+        android:paddingEnd="@dimen/space_lg"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/toolbar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/toolbar">
+
+        <!-- 课表 Tab 的标题：与 toolbar 自带 title 同一字阶、同一左边距。
+             weight=1 吃掉左侧剩余空间，把右边那组控件顶到屏幕最右侧（对齐工作圈 Tab 的顶栏动作图标） -->
+        <TextView
+            android:id="@+id/scheduleHeaderTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/space_sm"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:text="@string/tab_schedule"
+            android:textAppearance="@style/TextAppearance.Lanhang.ToolbarTitle"
+            android:textColor="?attr/colorOnSurface" />
+
+        <!-- 上一周 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPrevWeek"
+            style="@style/Widget.Lanhang.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/schedule_prev_week"
+            app:icon="@drawable/ic_chevron_left" />
+
+        <!-- 周次胶囊：当前查看的周（tonal = 当周，描边 = 非当周，见 updateWeekPill）。
+             点它 = 打开周次选择弹层（原日历按钮的职责，2026-10-31 合并到这里）。
+             无障碍描述在 updateWeekPill() 里现拼（要带上当前周号），布局里不写死。 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tvWeekPill"
+            style="@style/Widget.Lanhang.WeekPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/ph_week" />
+
+        <!-- 下一周 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNextWeek"
+            style="@style/Widget.Lanhang.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/schedule_next_week"
+            app:icon="@drawable/ic_chevron_right" />
+
+        <!-- 网格/周视图切换：图标表示「点一下会切到的视图」，由 switchView 更新 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewSwitch"
+            style="@style/Widget.Lanhang.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/schedule_switch_to_week"
+            app:icon="@drawable/ic_view_week" />
+    </LinearLayout>
+
+    <!--
+      底栏默认 gone（2026-10-31）：语言/主题切换会 recreate 整个 Activity，新实例在
+      setContentView 那一刻底栏就是「VISIBLE + alpha 1」，随后 showToolbarSub 才把它淡出 ——
+      中间那一帧足够看到一次「底栏闪一下」。默认收起后，只有 showToolbarMain 显式放出来才显示；
+      二级页恢复时 showToolbarMain 刚设的 alpha=0 会立刻被 setBottomNavVisible(false) 收成 GONE。
+    -->
     <androidx.compose.ui.platform.ComposeView
         android:id="@+id/bottomNav"
         android:layout_width="0dp"
         android:layout_height="128dp"
         android:layout_marginBottom="10dp"
+        android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

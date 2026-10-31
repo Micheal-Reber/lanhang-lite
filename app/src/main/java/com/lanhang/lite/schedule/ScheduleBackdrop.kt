@@ -149,6 +149,36 @@ object ScheduleBackdrop {
         return if (file.exists() && file.length() > 0) file else null
     }
 
+    /**
+     * 背景的「内容标识」：纯色/渐变就是色值本身，图片还要带上文件大小与修改时间。
+     *
+     * 图片固定写 `background.jpg`，只比 `type|value` 的话**换一张图 key 也不会变**，
+     * 调用方的去重（`ScheduleFragment.appliedBackdropKey`）会把新图直接拦掉。
+     * 这个标识同时用作分析缓存的键。
+     */
+    fun contentKey(context: Context, spec: Spec): String {
+        val base = "${spec.type}|${spec.value}"
+        if (spec.type != TYPE_IMAGE) return base
+        val file = imageFile(context) ?: return "$base|-"
+        return "$base|${file.length()}@${file.lastModified()}"
+    }
+
+    /** Coil 缓存键：路径固定是 `background.jpg`，换图后路径不变，必须靠内容特征区分 */
+    private fun imageCacheKey(file: File): String = "schedule-bg:${file.length()}@${file.lastModified()}"
+
+    /**
+     * 加载背景图片（已落盘的 [File]）的唯一入口：课表页、设置页缩略图、预览页都走它，
+     * 保证换图后不会从 Coil 内存缓存里拿回上一张。
+     */
+    fun loadImage(view: ImageView, file: File) {
+        val key = imageCacheKey(file)
+        view.load(file) {
+            crossfade(true)
+            memoryCacheKey(key)
+            diskCacheKey(key)
+        }
+    }
+
     /** 设置页摘要文案 */
     fun summary(context: Context): String {
         val spec = load(context)
@@ -176,9 +206,7 @@ object ScheduleBackdrop {
             TYPE_IMAGE -> {
                 solidLayer.visibility = View.GONE
                 imageLayer.visibility = View.VISIBLE
-                imageFile(context)?.let { file ->
-                    imageLayer.load(file) { crossfade(true) }
-                }
+                imageFile(context)?.let { file -> loadImage(imageLayer, file) }
             }
 
             TYPE_COLOR -> {
@@ -242,26 +270,52 @@ object ScheduleBackdrop {
 
     // ==================== 分析 ====================
 
-    fun analyze(context: Context, spec: Spec, pending: Uri? = null): Analysis? = when (spec.type) {
-        TYPE_COLOR -> colorOf(spec.value)?.let { color -> fromColors(listOf(color, color)) }
+    /**
+     * 结论只依赖背景本身（图片像素 / 纯色 / 渐变色标），与主题、屏幕尺寸无关，
+     * 所以可以在内存里缓存：切亮暗、切语言、Activity recreate 后不必重新解码 + 采样，
+     * 调用方拿到缓存就能**同步**上屏 —— 否则会先露一帧纯底色（「背景闪一下」）。
+     */
+    private val analysisCache = java.util.concurrent.ConcurrentHashMap<String, Analysis>()
 
-        TYPE_GRADIENT -> preset(spec.value)?.let { p -> fromColors(listOf(p.start, p.end)) }
+    /** 正常只会用到 1~2 条（当前背景 + 设置页预览过的候选），留点余量 */
+    private const val CACHE_MAX = 8
 
-        TYPE_IMAGE -> {
-            val bitmap = if (pending != null) {
-                decodeSampled(context, pending, SAMPLE_SIDE)
-            } else {
-                imageFile(context)?.let { decodeSampledFile(it, SAMPLE_SIDE) }
-            }
-            bitmap?.let { bmp ->
-                val result = fromBitmap(bmp)
-                bmp.recycle()
-                result
-            }
-        }
+    /** 内存里已算好的结论；命中时可跳过 IO 线程直接绑定 */
+    fun cachedAnalysis(context: Context, spec: Spec): Analysis? =
+        analysisCache[contentKey(context, spec)]
 
-        else -> null
+    fun analyze(context: Context, spec: Spec, pending: Uri? = null): Analysis? {
+        // 「待选但还没落盘」的图片不进缓存：uri 内容随时可能变，只用于设置页的一次性预览
+        if (pending != null) return analyzeUncached(context, spec, pending)
+        val key = contentKey(context, spec)
+        analysisCache[key]?.let { return it }
+        val result = analyzeUncached(context, spec, null) ?: return null
+        if (analysisCache.size >= CACHE_MAX) analysisCache.clear()
+        analysisCache[key] = result
+        return result
     }
+
+    private fun analyzeUncached(context: Context, spec: Spec, pending: Uri?): Analysis? =
+        when (spec.type) {
+            TYPE_COLOR -> colorOf(spec.value)?.let { color -> fromColors(listOf(color, color)) }
+
+            TYPE_GRADIENT -> preset(spec.value)?.let { p -> fromColors(listOf(p.start, p.end)) }
+
+            TYPE_IMAGE -> {
+                val bitmap = if (pending != null) {
+                    decodeSampled(context, pending, SAMPLE_SIDE)
+                } else {
+                    imageFile(context)?.let { decodeSampledFile(it, SAMPLE_SIDE) }
+                }
+                bitmap?.let { bmp ->
+                    val result = fromBitmap(bmp)
+                    bmp.recycle()
+                    result
+                }
+            }
+
+            else -> null
+        }
 
     /** 纯色/渐变：按色标插值出条带色，再统一走对比度决策 */
     private fun fromColors(colors: List<Int>): Analysis {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 诊断页顶栏：保存到文件 / 分享（与 Hoshi Reader 的诊断页同样的两个动作） -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_diagnostics_save"
+        android:icon="@drawable/ic_download"
+        android:title="@string/diagnostics_save"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_diagnostics_share"
+        android:icon="@drawable/ic_share"
+        android:title="@string/common_share"
+        app:showAsAction="ifRoom" />
+</menu>

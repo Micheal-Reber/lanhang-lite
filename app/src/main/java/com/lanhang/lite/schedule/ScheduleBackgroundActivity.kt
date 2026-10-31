@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.content.Context
 import com.lanhang.lite.core.LocaleHelper
+import java.io.File
 
 /**
  * 课表背景设置：预览 → 应用 / 移除。
@@ -176,7 +177,12 @@ class ScheduleBackgroundActivity : AppCompatActivity() {
         if (source != null) {
             thumb.setPadding(0, 0, 0, 0)
             thumb.imageTintList = null
-            thumb.load(source) { crossfade(true) }
+            // 已落盘的老图要带内容缓存键，否则换图后缩略图还是上一张
+            if (source is File) {
+                ScheduleBackdrop.loadImage(thumb, source)
+            } else {
+                thumb.load(source) { crossfade(true) }
+            }
         } else {
             val padding = (10 * density).toInt()
             thumb.setPadding(padding, padding, padding, padding)
@@ -246,6 +252,10 @@ class ScheduleBackgroundActivity : AppCompatActivity() {
                 }
             }
             ScheduleBackdrop.save(this@ScheduleBackgroundActivity, target)
+            // 预热分析缓存：课表页 onResume 拿到缓存就能同步上屏，不用先露一帧纯底色
+            withContext(Dispatchers.IO) {
+                runCatching { ScheduleBackdrop.analyze(this@ScheduleBackgroundActivity, target) }
+            }
             Toast.makeText(
                 this@ScheduleBackgroundActivity,
                 R.string.schedule_bg_applied,

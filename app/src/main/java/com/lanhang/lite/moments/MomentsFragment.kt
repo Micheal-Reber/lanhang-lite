@@ -9,19 +9,15 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
 import com.lanhang.lite.core.attachDoubleTapToTop
@@ -34,6 +30,8 @@ import com.lanhang.lite.net.MomentsApi
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.settings.Diagnostics
 import com.lanhang.lite.ui.LanhangTheme
+import com.lanhang.lite.ui.navigation.ViewBackdrop
+import com.lanhang.lite.ui.navigation.rememberViewBackdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +40,15 @@ class MomentsFragment : Fragment() {
 
     private var _binding: FragmentMomentsBinding? = null
     private val binding get() = _binding!!
+
+    /** FAB 玻璃的采样桥（由 Compose 侧赋值），见 ui/navigation/ViewBackdrop.kt */
+    private var glassFab: ViewBackdrop? = null
+
+    /**
+     * 列表滚动时通知宿主（[MainActivity]）：底栏玻璃的底图也要重录。
+     * RecyclerView 滚动不触发窗口的 `OnScrollChanged`，宿主那边收不到。
+     */
+    var onContentScrolled: (() -> Unit)? = null
 
     private lateinit var adapter: MomentAdapter
     private var fromFeedId: String? = null
@@ -73,10 +80,10 @@ class MomentsFragment : Fragment() {
     }
 
     private val onFabScroll = android.view.ViewTreeObserver.OnScrollChangedListener {
-        _binding?.fabPublish?.invalidate()
+        glassFab?.invalidate()
     }
     private val onFabLayout = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-        _binding?.fabPublish?.invalidate()
+        glassFab?.invalidate()
     }
 
     override fun onCreateView(
@@ -111,10 +118,14 @@ class MomentsFragment : Fragment() {
         // 双击（正文/空白处）回到顶部；落在图片、头像、赞/评论上时不接管
         binding.recycler.attachDoubleTapToTop(
             onBeforeScroll = { adapter.cancelPendingRowClick() },
-            onAfterScroll = { _binding?.fabPublish?.invalidate() }
+            onAfterScroll = { glassFab?.invalidate() }
         )
         binding.recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                // RecyclerView 是移动子 View、不走 View.scrollTo，窗口的 OnScrollChanged
+                // 收不到 —— 玻璃的重录只能在这里主动通知（否则底栏/FAB 会停在上一帧的底图）。
+                glassFab?.invalidate()
+                onContentScrolled?.invoke()
                 if (dy <= 0 || loading || ended) return
                 val lm = recyclerView.layoutManager as LinearLayoutManager
                 val total = lm.itemCount
@@ -134,7 +145,7 @@ class MomentsFragment : Fragment() {
     /** 底栏选中「工作圈」时回调：列表为空则自动刷新（兜底全黑） */
     fun onTabSelected() {
         if (_binding == null) return
-        binding.fabPublish.invalidate()
+        glassFab?.invalidate()
         if (loading || adapter.itemCount > 0) return
         binding.progress.isVisible = true
         load(reset = true)
@@ -149,7 +160,7 @@ class MomentsFragment : Fragment() {
     fun onTabReselect() {
         if (_binding == null || adapter.itemCount == 0) return
         adapter.cancelPendingRowClick()
-        binding.recycler.scrollToTopNow { _binding?.fabPublish?.invalidate() }
+        binding.recycler.scrollToTopNow { glassFab?.invalidate() }
     }
 
     override fun onDestroyView() {
@@ -157,41 +168,30 @@ class MomentsFragment : Fragment() {
         binding.root.viewTreeObserver.removeOnGlobalLayoutListener(onFabLayout)
         super.onDestroyView()
         _binding = null
+        glassFab = null
     }
 
     /** 与底栏同款：Compose Canvas 录一层内容做实时 backdrop，玻璃 FAB 从中采样 */
     private fun setupGlassFab() {
-        val fab = binding.fabPublish
-        val source = binding.swipe
         val publishLabel = getString(R.string.moments_cd_publish)
         val night = (resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        fab.setContent {
+        binding.fabPublish.setContent {
             LanhangTheme(darkTheme = night) {
-                val backdrop = rememberLayerBackdrop()
+                // 采样源 = 列表容器（含下拉刷新指示器）；与底栏共用 ViewBackdrop
+                val glass = rememberViewBackdrop(
+                    source = { _binding?.swipe },
+                    host = { _binding?.fabPublish },
+                )
+                DisposableEffect(glass) {
+                    glassFab = glass
+                    onDispose { if (glassFab === glass) glassFab = null }
+                }
                 Box(Modifier.fillMaxSize()) {
-                    Canvas(
-                        Modifier
-                            .fillMaxSize()
-                            .layerBackdrop(backdrop),
-                    ) {
-                        val sourceLocation = IntArray(2)
-                        val hostLocation = IntArray(2)
-                        source.getLocationInWindow(sourceLocation)
-                        fab.getLocationInWindow(hostLocation)
-                        drawIntoCanvas { canvas ->
-                            val nativeCanvas = canvas.nativeCanvas
-                            val saveCount = nativeCanvas.save()
-                            nativeCanvas.translate(
-                                (sourceLocation[0] - hostLocation[0]).toFloat(),
-                                (sourceLocation[1] - hostLocation[1]).toFloat(),
-                            )
-                            source.draw(nativeCanvas)
-                            nativeCanvas.restoreToCount(saveCount)
-                        }
-                    }
+                    glass.Capture(Modifier.fillMaxSize())
                     LiquidGlassFab(
-                        backdrop = backdrop,
+                        backdrop = glass.backdrop,
+                        backdropRevision = glass::revisionTick,
                         contentDescription = publishLabel,
                         onClick = {
                             // 发表已改为独立页面；成功后回 RESULT_OK，这里再刷新时间线
@@ -253,7 +253,7 @@ class MomentsFragment : Fragment() {
                 if (page.size < MomentsApi.PAGE_SIZE) ended = true
                 fromFeedId = page.lastOrNull()?.feed_id ?: fromFeedId
                 adapter.append(visible)
-                binding.fabPublish.invalidate()
+                glassFab?.invalidate()
                 updateEmpty()
                 if (visible.isEmpty() && !ended && hiddenCount > 0) needMore = true
                 // 第一页存一份离线快照（写盘失败无所谓，见 MomentsCache.save）
@@ -315,7 +315,7 @@ class MomentsFragment : Fragment() {
                 adapter.submit(items - hidden.toSet())
                 // 快照只有一页，别再往下翻（翻了也是失败）
                 ended = true
-                view.fabPublish.invalidate()
+                glassFab?.invalidate()
                 updateEmpty()
                 toast(getString(R.string.moments_offline_toast))
                 return
@@ -355,7 +355,7 @@ class MomentsFragment : Fragment() {
         val hidden = allItems.filter { isFiltered(it) }
         hiddenCount = hidden.size
         adapter.submit(allItems - hidden.toSet())
-        binding.fabPublish.invalidate()
+        glassFab?.invalidate()
         updateEmpty()
     }
 
@@ -415,7 +415,7 @@ class MomentsFragment : Fragment() {
                     )
                 }
                 adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
-                binding.fabPublish.invalidate()
+                glassFab?.invalidate()
             } catch (e: Exception) {
                 toast(e.userMessage(requireContext(), R.string.moments_action_failed))
             }
@@ -457,7 +457,7 @@ class MomentsFragment : Fragment() {
                             item.comments.add(MomentsApi.localComment(feedId, text))
                         }
                         adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
-                binding.fabPublish.invalidate()
+                        glassFab?.invalidate()
                         toast(getString(R.string.moments_sent))
                     } catch (e: Exception) {
                         toast(e.userMessage(requireContext(), R.string.moments_send_failed))
@@ -498,7 +498,7 @@ class MomentsFragment : Fragment() {
                         withContext(Dispatchers.IO) { MomentsApi.deleteComment(feedId, cid) }
                         item.comments.removeIf { it.comment_id == cid }
                         adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
-                        binding.fabPublish.invalidate()
+                        glassFab?.invalidate()
                         toast(getString(R.string.moments_deleted))
                     } catch (e: Exception) {
                         toast(e.userMessage(requireContext(), R.string.moments_delete_failed))
@@ -531,7 +531,7 @@ class MomentsFragment : Fragment() {
                         allItems.removeAll { it.feed.feed_id == feedId }
                         if (wasHidden) hiddenCount = (hiddenCount - 1).coerceAtLeast(0)
                         adapter.remove(feedId)
-                        binding.fabPublish.invalidate()
+                        glassFab?.invalidate()
                         updateEmpty()
                         toast(getString(R.string.moments_deleted))
                     } catch (e: Exception) {

@@ -14,8 +14,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,11 +39,12 @@ fun LiquidGlassFab(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 采样源版本号，语义同 LiquidGlassBottomBar 的同名参数 */
+    backdropRevision: () -> Int = { 0 },
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val glassBase = MaterialTheme.colorScheme.surfaceContainerHigh
-    val containerColor = glassBase.copy(alpha = 0.84f)
-    val containerOutline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
+    // 与底栏同一配方（LiquidGlassBottomBar 层一）：40% 底色，否则两块玻璃同屏会一透一实
+    val containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.40f)
     val iconColor = if (isDark) {
         Color.White.copy(alpha = 0.70f)
     } else {
@@ -78,7 +79,6 @@ fun LiquidGlassFab(
                 shadow = { Shadow.Default },
                 onDrawSurface = {
                     drawCircle(containerColor)
-                    drawCircle(color = containerOutline, style = Stroke(1f.dp.toPx()))
                 },
             )
             .clickable(
@@ -86,7 +86,9 @@ fun LiquidGlassFab(
                 indication = null,
                 role = Role.Button,
                 onClick = onClick,
-            ),
+            )
+            // 读在图形层内部：列表滚动/加载完成时重录采样，别一直复放旧的模糊底图
+            .drawBehind { backdropRevision() },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
