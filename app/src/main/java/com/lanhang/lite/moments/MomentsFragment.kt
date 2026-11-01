@@ -1,5 +1,6 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.core.toast
 import android.app.Activity
 import android.content.res.Configuration
 import android.os.Bundle
@@ -7,7 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -542,9 +542,6 @@ class MomentsFragment : Fragment() {
             .show()
     }
 
-    private fun toast(msg: String) {
-        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         /** 整页被滤光时最多自动续翻几次（规则极严时不至于把时间线翻穿） */

@@ -1,10 +1,10 @@
 package com.lanhang.lite.settings
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -181,9 +181,6 @@ class DiagnosticsActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(send, getString(R.string.settings_diagnostics_chooser)))
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         fun start(context: Context) {

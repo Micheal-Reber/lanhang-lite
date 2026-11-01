@@ -1,12 +1,12 @@
 package com.lanhang.lite.grades
 
+import com.lanhang.lite.core.toast
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -20,7 +20,6 @@ import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentGradesBinding
 import com.lanhang.lite.session.Session
-import com.lanhang.lite.ui.showEmpty
 import com.lanhang.lite.ui.showFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -204,9 +203,6 @@ class GradesFragment : Fragment() {
         if (v == v.toLong().toDouble()) v.toLong().toString()
         else String.format(java.util.Locale.CHINA, "%.1f", v)
 
-    private fun toast(msg: String) {
-        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         fun scoreColor(score: Int, context: android.content.Context): Int = when {

@@ -1,5 +1,6 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.core.toast
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -17,7 +18,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -333,9 +333,6 @@ class PublishMomentActivity : AppCompatActivity() {
         refreshState()
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         const val MAX_IMAGES = 9

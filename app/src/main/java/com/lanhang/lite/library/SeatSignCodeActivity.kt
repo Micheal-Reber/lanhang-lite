@@ -1,10 +1,10 @@
 package com.lanhang.lite.library
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -117,9 +117,6 @@ class SeatSignCodeActivity : AppCompatActivity() {
         }
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         fun start(context: Context) {

@@ -1,5 +1,6 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -427,9 +427,6 @@ class MyMomentsActivity : AppCompatActivity() {
         )
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     /** 年份标题条：一年一条，不参与点击 */
     private class YearHeaderAdapter(private val label: String) :

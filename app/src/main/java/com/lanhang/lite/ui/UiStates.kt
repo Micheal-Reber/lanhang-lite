@@ -26,9 +26,3 @@ fun TextView.showFailure(error: Throwable, @StringRes operationRes: Int): Boolea
     isVisible = true
     return true
 }
-
-/** 空数据占位；[visible] 由调用方决定（通常 `scores.isEmpty()`） */
-fun TextView.showEmpty(@StringRes textRes: Int, visible: Boolean = true) {
-    text = context.getString(textRes)
-    isVisible = visible
-}

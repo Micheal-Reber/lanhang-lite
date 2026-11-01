@@ -1,5 +1,6 @@
 package com.lanhang.lite.schedule
 
+import com.lanhang.lite.core.toast
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -9,7 +10,6 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -386,7 +386,7 @@ class LocalCourseEditSheet : BottomSheetDialogFragment() {
     }
 
     private fun toast(res: Int) {
-        Toast.makeText(requireContext(), res, Toast.LENGTH_SHORT).show()
+        toast(requireContext().getString(res))
     }
 
     private fun dp(value: Int): Int =

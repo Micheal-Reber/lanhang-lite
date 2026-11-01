@@ -1,11 +1,11 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -415,9 +415,6 @@ class MomentMessagesActivity : AppCompatActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     companion object {
         private const val FILTER_ALL = 0

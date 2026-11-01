@@ -1,5 +1,6 @@
 package com.lanhang.lite.oa
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
@@ -269,12 +270,9 @@ class OaHallActivity : AppCompatActivity() {
     }
 
     private fun toast(resId: Int) {
-        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
+        toast(getString(resId))
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
 
     private companion object {
         /** 宫格左右各留 12dp（item 自带 4dp margin，视觉上与 16dp 页面留白对齐） */

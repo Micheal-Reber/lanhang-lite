@@ -1,7 +1,7 @@
 package com.lanhang.lite.moments
 
+import com.lanhang.lite.core.toast
 import android.widget.EditText
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -177,6 +177,6 @@ class MomentActions(
     }
 
     private fun toast(message: String) {
-        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        activity.toast(message)
     }
 }

@@ -1,8 +1,8 @@
 package com.lanhang.lite.campusnet
 
+import com.lanhang.lite.core.toast
 import android.content.Context
 import android.os.Bundle
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -325,7 +325,8 @@ class CampusNetActivity : AppCompatActivity() {
         }
     }
 
+    /** 校园网流程较长，提示停留久一点（[ToastExt] 的 long 版） */
     private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        toast(message, long = true)
     }
 }
