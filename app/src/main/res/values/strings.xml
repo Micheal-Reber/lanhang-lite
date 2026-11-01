@@ -145,6 +145,7 @@
     <string name="im_retry">重试</string>
     <string name="im_connecting">正在连接私信服务…</string>
     <string name="im_empty">还没有私信</string>
+    <string name="im_no_message">暂无消息</string>
     <string name="im_input_hint">发消息…</string>
     <string name="im_send">发送</string>
     <string name="im_send_failed">发送失败</string>

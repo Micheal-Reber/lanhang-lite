@@ -1,11 +1,16 @@
 package com.lanhang.lite.ui
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.widget.FrameLayout
 import android.widget.ImageView
 import coil.load
+import coil.request.Disposable
 import coil.transform.CircleCropTransformation
+import com.google.android.material.color.MaterialColors
+import com.lanhang.lite.R
 import com.lanhang.lite.schedule.AppContext
 import com.lanhang.lite.settings.Diagnostics
 
@@ -42,6 +47,15 @@ class AvatarView @JvmOverloads constructor(
     /** 每次 bind 自增；异步回调里对比，防止列表复用后把上一个用户的图贴到这一行 */
     private var generation = 0
 
+    /**
+     * 进行中的加载请求。
+     *
+     * 切到「群图标占位」时必须 `dispose()`：coil 在成功回调里**自己**会把 drawable 贴上，
+     * 不看我们的 generation —— 不取消的话，上一张（或上一次加载的）图会在几百毫秒后
+     * 盖住刚画好的图标，表现为「群图标闪一下就没了」。
+     */
+    private var request: Disposable? = null
+
     init {
         addView(photo, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
@@ -53,8 +67,10 @@ class AvatarView @JvmOverloads constructor(
      */
     fun bind(name: String?, url: String?, altUrl: String? = null) {
         val token = ++generation
-        // 先清空：换人或换地址时不能留着上一张图
+        request?.dispose()
+        // 先清空：换人或换地址时不能留着上一张图（也把群图标那套背景/着色清掉）
         photo.setImageDrawable(null)
+        resetPhotoStyle()
         val primary = url?.takeIf { it.isNotBlank() }
         val alt = altUrl?.takeIf { it.isNotBlank() && it != primary }
         if (primary == null) {
@@ -68,8 +84,63 @@ class AvatarView @JvmOverloads constructor(
         loadPhoto(primary, alt, token)
     }
 
-    private fun loadPhoto(url: String, alt: String?, token: Int) {
-        photo.load(url) {
+    /**
+     * 群头像：有 `portrait_url` 就显示照片；**没有地址或加载失败时画群图标**。
+     *
+     * 为什么群可以放占位而人不可以：人像的「彩色姓名首字圆」会被误认成真头像
+     * （2026-10-26 用户明确否掉）。群本来就没有脸，双人剪影能立刻把「群聊」和「单聊」
+     * 区分开；而且我们这边的群名常是「240853H」这种编号，取首字显示出来只是一串数字。
+     *
+     * 学校的群大多没设 `portrait_url`（官方客户端是用成员头像拼合图，见反编译
+     * `GroupTask.GROUP_PORTRAIT_COMPOSITE_MAX_NUMBER = 9`），所以这条路是常态而不是兜底。
+     */
+    fun bindGroup(name: String?, url: String?, altUrl: String? = null) {
+        val token = ++generation
+        request?.dispose()
+        photo.setImageDrawable(null)
+        val primary = url?.takeIf { it.isNotBlank() }
+        if (primary == null) {
+            showGroupPlaceholder()
+            return
+        }
+        resetPhotoStyle()
+        loadPhoto(primary, altUrl, token) { showGroupPlaceholder() }
+    }
+
+    /** 群图标占位：圆形浅色底 + 居中双人剪影（颜色全部走主题，深色模式自动反色） */
+    private fun showGroupPlaceholder() {
+        photo.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        photo.imageTintList = ColorStateList.valueOf(
+            MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSecondaryContainer)
+        )
+        photo.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(
+                MaterialColors.getColor(this@AvatarView, com.google.android.material.R.attr.colorSecondaryContainer)
+            )
+        }
+        photo.setImageResource(R.drawable.ic_group)
+        // 图标四周留白 = 边长的 26%（在圆形底里视觉刚好，太大像缩略图、太小顶边）
+        post {
+            val side = minOf(photo.width, photo.height)
+            if (side > 0) {
+                val pad = (side * 0.26f).toInt()
+                photo.setPadding(pad, pad, pad, pad)
+            }
+        }
+    }
+
+    /** 回到「纯照片」状态（照片是 CENTER_CROP、无底色、无着色、无内边距） */
+    private fun resetPhotoStyle() {
+        photo.scaleType = ImageView.ScaleType.CENTER_CROP
+        photo.imageTintList = null
+        photo.background = null
+        photo.setPadding(0, 0, 0, 0)
+    }
+
+    private fun loadPhoto(url: String, alt: String?, token: Int, onExhausted: (() -> Unit)? = null) {
+        request?.dispose()
+        request = photo.load(url) {
             crossfade(true)
             transformations(CircleCropTransformation())
             listener(
@@ -78,7 +149,9 @@ class AvatarView @JvmOverloads constructor(
                     photo.setImageDrawable(null)
                     // 主地址挂了就试备用尺寸；都挂了就留空
                     if (alt != null) {
-                        loadPhoto(alt, null, token)
+                        loadPhoto(alt, null, token, onExhausted)
+                    } else if (onExhausted != null) {
+                        onExhausted()
                     } else {
                         recordProblem(url, result.throwable)
                     }

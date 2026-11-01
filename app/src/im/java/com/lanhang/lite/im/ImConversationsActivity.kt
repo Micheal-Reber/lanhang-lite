@@ -298,14 +298,23 @@ class ImConversationsActivity : AppCompatActivity() {
                     ImConversation.PreviewKind.IMAGE -> getString(R.string.im_preview_image)
                     ImConversation.PreviewKind.OTHER -> getString(R.string.im_preview_other)
                     ImConversation.PreviewKind.TEXT -> conversation.preview.ifBlank {
-                        getString(R.string.im_empty)
+                        // 群可能只是本地还没有消息（从「我加入的群」补进来的），
+                        // 那不是说「还没有私信」——群是存在的
+                        if (conversation.isGroup) getString(R.string.im_no_message)
+                        else getString(R.string.im_empty)
                     }
                 }
                 b.tvTime.text = formatTime(conversation.time)
                 b.tvUnread.isVisible = conversation.unread > 0
                 b.tvUnread.text = if (conversation.unread > 99) "99+" else conversation.unread.toString()
-                val brief = if (conversation.isGroup) null else UserInfoCache.get(conversation.peerId)
-                b.ivAvatar.bind(title, brief?.bestPortrait)
+                if (conversation.isGroup) {
+                    // 群：有 portrait_url 显示照片，没有就画群图标（学校基本都没设，
+                    // 官方也是拿成员头像拼的，见 AvatarView.bindGroup 注释）
+                    b.ivAvatar.bindGroup(title, conversation.portrait)
+                } else {
+                    val brief = UserInfoCache.get(conversation.peerId)
+                    b.ivAvatar.bind(title, brief?.bestPortrait)
+                }
                 b.root.setOnClickListener {
                     ImChatActivity.start(
                         b.root.context,

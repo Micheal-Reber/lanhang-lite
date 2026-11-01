@@ -148,6 +148,7 @@
     <string name="im_retry">Retry</string>
     <string name="im_connecting">Connecting to messaging…</string>
     <string name="im_empty">No messages yet</string>
+    <string name="im_no_message">No messages</string>
     <string name="im_input_hint">Message…</string>
     <string name="im_send">Send</string>
     <string name="im_send_failed">Failed to send</string>

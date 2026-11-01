@@ -35,6 +35,8 @@ data class ImConversation(
     val unread: Int,
     /** 最后一条消息的类型：文本才有 [preview]，图片/其它由界面换成对应文案 */
     val previewKind: PreviewKind = PreviewKind.TEXT,
+    /** 群头像（`/groups/mine` 的 portrait_url）；单聊为 null，头像按 peerId 查人员资料 */
+    val portrait: String? = null,
 ) {
     enum class PreviewKind { TEXT, IMAGE, OTHER }
 }
@@ -139,6 +141,13 @@ object ImClient {
 
     /** 会话列表（已按时间倒序） */
     var conversations: List<ImConversation> = emptyList()
+
+    /**
+     * 「我加入的群」（来自 `GET /groups/mine`）；本地没有消息的群也靠它才能出现在列表里。
+     * 在 IO 线程写入、在 SDK 回调线程读取，所以要 `@Volatile`。
+     */
+    @Volatile
+    private var joinedGroups: List<ImConversation> = emptyList()
         private set
 
     /** 每个会话最近的消息；key 见 [threadKey] */
@@ -311,6 +320,8 @@ object ImClient {
                 retryAttempt = 0
                 notifyChanged()
                 refreshConversations()
+                // 会话列表是本地库，本地没有的群要另外问服务端（见 loadGroups）
+                loadGroups()
             }
 
             override fun onError(e: RongIMClient.ErrorCode?) {
@@ -600,21 +611,33 @@ object ImClient {
                         }
                         .map { c ->
                             val isGroup = c.conversationType == Conversation.ConversationType.GROUP
+                            // 群会话刚生成时 conversationTitle 常为空（本地库还没同步群资料），
+                            // 用 /groups/mine 拿到真名顶上，否则列表里只剩「群聊 · 1a2b」
+                            val known = if (isGroup) {
+                                joinedGroups.firstOrNull { it.peerId == c.targetId }
+                            } else {
+                                null
+                            }
                             ImConversation(
                                 peerId = c.targetId.orEmpty(),
                                 isGroup = isGroup,
-                                title = c.conversationTitle.orEmpty(),
+                                title = c.conversationTitle.orEmpty().ifBlank { known?.title.orEmpty() },
                                 preview = previewOf(c),
                                 time = maxOf(c.sentTime, c.receivedTime),
                                 unread = c.unreadMessageCount,
                                 previewKind = previewKindOf(c),
+                                portrait = known?.portrait,
                             )
                         }
                         .filter { it.peerId.isNotBlank() }
-                        .sortedByDescending { it.time }
-                    Log.i(TAG, "conversations total=${list?.size ?: 0} kept=${mapped.size}")
+                    val merged = mergeGroups(mapped)
+                    Log.i(
+                        TAG,
+                        "conversations total=${list?.size ?: 0} kept=${mapped.size} " +
+                            "groups=${joinedGroups.size} merged=${merged.size}"
+                    )
                     main.post {
-                        conversations = mapped
+                        conversations = merged
                         notifyChanged()
                     }
                 }
@@ -623,6 +646,108 @@ object ImClient {
                     Log.w(TAG, "conversations error=$e")
                 }
             }
+        )
+    }
+
+    /**
+     * 拉「我加入的群」，合进会话列表。
+     *
+     * 为什么必须有这一步：融云的会话列表是**本地 sqlite** 里的记录，只有往来过消息的会话才存在。
+     * 全新装的客户端本地库是空的 —— 用户在官方 App 里早就加入的群，只要最近没有新消息
+     * （或离线消息补偿时限已过），`getConversationList` 里根本没有它，界面上就是「我的群不见了」。
+     *
+     * SDK 2.9 又**没有** `getGroups()`（只有 join / quit / sync 三个），群清单只能问学校：
+     * `GET /groups/mine`（官方 `GroupTask.GROUP_LIST`）。
+     */
+    private fun loadGroups() {
+        io.launch {
+            val raw = try {
+                RceApi.myGroupsRaw()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Log.w(TAG, "groups failed: ${e.javaClass.simpleName} ${e.message}")
+                return@launch
+            }
+            if (raw == null) {
+                Log.w(TAG, "groups blank body")
+                return@launch
+            }
+            var groups = parseGroups(raw)
+            Log.i(
+                TAG,
+                "groups total=${groups.size} portraits=${groups.count { !it.portrait.isNullOrBlank() }} -> " +
+                    groups.joinToString { "${it.peerId}:${it.title}:${it.portrait?.take(60)}" }.take(400)
+            )
+            if (groups.isEmpty()) {
+                // type=0 解析不出来时：先把原文留一行（限长，不刷屏），再用空 type 试一次 ——
+                // 官方常量是 `/groups/mine?...&type=%s`，type 的取值没有文档，只能实测
+                Log.w(TAG, "groups raw(type=0)=${raw.take(400)}")
+                val retry = runCatching { RceApi.myGroupsRaw(type = "") }.getOrNull()
+                if (retry != null && retry != raw) {
+                    groups = parseGroups(retry)
+                    Log.i(TAG, "groups retry(type=) total=${groups.size} raw=${retry.take(300)}")
+                }
+            }
+            joinedGroups = groups
+            main.post { notifyChanged() }
+            refreshConversations()
+        }
+    }
+
+    /**
+     * 解析 `/groups/mine`。
+     *
+     * 结构没得抄（官方反编译里这个常量没有任何引用），所以按「常见形状」兜底：
+     * `result` 直接是数组，或 `result.data / groups / list / items` 里的数组。
+     * 单群字段也兼容 `id|group_id`、`name|group_name`、`portrait_url|portrait`。
+     */
+    private fun parseGroups(raw: String): List<ImConversation> {
+        val root = runCatching {
+            com.google.gson.JsonParser.parseString(raw).asJsonObject
+        }.getOrNull() ?: return emptyList()
+        val result = root.get("result") ?: return emptyList()
+        val array = when {
+            result.isJsonArray -> result.asJsonArray
+            result.isJsonObject -> {
+                val obj = result.asJsonObject
+                listOf("data", "groups", "list", "items", "records")
+                    .firstNotNullOfOrNull { key -> obj.get(key)?.takeIf { it.isJsonArray }?.asJsonArray }
+            }
+            else -> null
+        } ?: return emptyList()
+        return array.mapNotNull { element ->
+            val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val id = obj.text("id") ?: obj.text("group_id") ?: return@mapNotNull null
+            if (id.isBlank()) return@mapNotNull null
+            ImConversation(
+                peerId = id,
+                isGroup = true,
+                title = obj.text("name") ?: obj.text("group_name").orEmpty(),
+                preview = "",
+                // time = 0 表示本地还没有消息，排序时会落到有消息的会话后面
+                time = 0L,
+                unread = 0,
+                portrait = obj.text("portrait_url") ?: obj.text("portrait"),
+            )
+        }
+    }
+
+    private fun com.google.gson.JsonObject.text(key: String): String? =
+        get(key)?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }
+
+    /**
+     * 把「本地没消息的群」补进会话列表。
+     *
+     * 有消息的会话以本地数据为准（预览、时间、未读都是真的），只把本地缺的群追加进去。
+     * 排序：按时间倒序，`time = 0` 的群自然落在最后，同一档内按群名。
+     */
+    private fun mergeGroups(base: List<ImConversation>): List<ImConversation> {
+        if (joinedGroups.isEmpty()) return base.sortedByDescending { it.time }
+        val known = base.mapTo(mutableSetOf()) { it.peerId to it.isGroup }
+        val extra = joinedGroups.filter { (it.peerId to it.isGroup) !in known }
+        return (base + extra).sortedWith(
+            compareByDescending<ImConversation> { it.time }.thenBy { it.title }
         )
     }
 
@@ -667,6 +792,8 @@ object ImClient {
                     }
                     // 历史里的图片可能没落盘（换机、清过缓存），补一次下载，下完界面自动出图
                     list.forEach { ensureImageDownloaded(it) }
+                    // 本地一条都没有（刚加入的群、换过设备）→ 问服务端要一页
+                    if (list.isEmpty()) loadRemoteHistory(peerId, isGroup, count)
                 }
 
                 override fun onError(e: RongIMClient.ErrorCode?) {
@@ -674,6 +801,44 @@ object ImClient {
                 }
             }
         )
+    }
+
+    /**
+     * 本地没有历史时向服务端要一页（云端历史消息）。
+     *
+     * 用 `getRemoteHistoryMessages`，别用那几个 `getHistoryMessages` 重载：
+     * 2.9 里它们的参数是 `(type, targetId, oldestMessageId, count, ???)`，
+     * 第 5 个 int 的含义反编译看不出、也没有文档，猜错就是「一条都不返回」。
+     * `getRemoteHistoryMessages(type, targetId, sentTime, count, cb)` 语义明确：
+     * 取 `sentTime` 之前（含）的 count 条，且一定走服务端。
+     *
+     * 学校没开通「历史消息云存储」时会回空或报错，界面保持空态即可，不影响发新消息。
+     */
+    private fun loadRemoteHistory(peerId: String, isGroup: Boolean, count: Int) {
+        val type = if (isGroup) Conversation.ConversationType.GROUP
+        else Conversation.ConversationType.PRIVATE
+        runCatching {
+            RongIMClient.getInstance().getRemoteHistoryMessages(
+                type, peerId, System.currentTimeMillis(), count,
+                object : RongIMClient.ResultCallback<List<Message>>() {
+                    override fun onSuccess(messages: List<Message>?) {
+                        val list = messages.orEmpty()
+                        Log.i(TAG, "remote history ${threadKey(peerId, isGroup)} n=${list.size}")
+                        if (list.isEmpty()) return
+                        val mapped = list.mapNotNull { toImMessage(it) }.sortedBy { it.time }
+                        main.post {
+                            threads[threadKey(peerId, isGroup)] = mapped.toMutableList()
+                            notifyChanged()
+                        }
+                        list.forEach { ensureImageDownloaded(it) }
+                    }
+
+                    override fun onError(e: RongIMClient.ErrorCode?) {
+                        Log.w(TAG, "remote history error=$e")
+                    }
+                }
+            )
+        }.onFailure { Log.w(TAG, "remote history failed: ${it.javaClass.simpleName}") }
     }
 
     fun sendText(peerId: String, isGroup: Boolean, body: String) {
