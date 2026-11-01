@@ -42,9 +42,7 @@ import com.lanhang.lite.schedule.ScheduleData
 import com.lanhang.lite.schedule.ScheduleExporter
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
-import com.lanhang.lite.session.Logout
 import com.lanhang.lite.session.Session
-import com.lanhang.lite.ui.LoginActivity
 import com.lanhang.lite.ui.MainActivity
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
 import kotlinx.coroutines.CancellationException
@@ -146,7 +144,6 @@ class SettingsFragment : Fragment() {
         }
         bindImSummary()
         binding.rowAccount.setOnClickListener { openMyProfile() }
-        binding.rowLogout.setOnClickListener { confirmLogout() }
         binding.rowDiagnostics.setOnClickListener {
             // 2026-10-30 改成独立页面（原来是 AlertDialog，报错一多就挤成一坨灰墙，
             // 也没法只挑一行复制），见 DiagnosticsActivity
@@ -254,32 +251,6 @@ class SettingsFragment : Fragment() {
         } else {
             UserProfileActivity.start(requireContext(), id)
         }
-    }
-
-    /**
-     * 退出登录二次确认：退出是不可逆的会话操作，误触成本高（要重输账号密码），
-     * 所以先弹 M3 确认框。取消（含返回键/点外部）只关框，停留在当前页面。
-     */
-    private fun confirmLogout() {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.logout_confirm_title)
-            .setMessage(R.string.logout_confirm_message)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.action_logout) { _, _ -> performLogout() }
-            .show()
-    }
-
-    private fun performLogout() {
-        val ctx = requireContext()
-        Logout.clear(ctx)
-        // 带 CLEAR_TASK：设置页可能正停在「外观 / 工具 / 关于」这几个二级态上，
-        // 只 finish 会留下一层已经没会话的空壳返回栈（返回键能退回到旧界面，点哪都报重新登录）
-        startActivity(
-            Intent(ctx, LoginActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            }
-        )
-        activity?.finish()
     }
 
     /** 「1.2.3 (45)」：版本名 + 构建号，参考 Hoshi 关于页的版本写法 */

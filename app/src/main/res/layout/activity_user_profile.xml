@@ -331,6 +331,23 @@
                     android:layout_marginTop="@dimen/space_xl"
                     android:text="@string/moments_block_user"
                     android:visibility="gone" />
+
+                <!-- 退出登录（2026-11-01 从设置目录页搬到这里）：账号卡在设置页能点进这个页面，
+                     退出作用的对象是同一份会话，放在「我的资料」最下面更贴合语义，
+                     也让设置目录页只留「进去看看」的条目。只有自己看自己时出现。 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnLogout"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xl"
+                    android:layout_marginBottom="@dimen/space_sm"
+                    android:text="@string/action_logout"
+                    android:textColor="?attr/colorError"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_logout"
+                    app:iconTint="?attr/colorError"
+                    app:strokeColor="?attr/colorError" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 

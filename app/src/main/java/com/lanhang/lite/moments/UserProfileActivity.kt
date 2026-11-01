@@ -22,8 +22,10 @@ import com.lanhang.lite.databinding.ItemProfileRowBinding
 import com.lanhang.lite.net.RceApi
 import com.lanhang.lite.net.StaffBrief
 import com.lanhang.lite.net.UserStatus
+import com.lanhang.lite.session.Logout
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.settings.Diagnostics
+import com.lanhang.lite.ui.LoginActivity
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -103,6 +105,11 @@ class UserProfileActivity : AppCompatActivity() {
         // 自己看自己（设置 → 当前账号）只展示资料：不挂「个人动态」入口，
         // 「我的动态」在主导航已有独立入口，这里再放一次属于重复
         binding.cardPosts.isVisible = !isSelf
+
+        // 退出登录（2026-11-01 从设置目录页搬到本页最下面）：只有自己看自己时出现，
+        // 别人的资料页不该有「退出登录」
+        binding.btnLogout.isVisible = isSelf
+        binding.btnLogout.setOnClickListener { confirmLogout() }
 
         // 发私信：im 版才注入实现（lite 版 ImBridge 是空壳），且不给自己发
         val canMessage = !isSelf && com.lanhang.lite.core.ImBridge.canOpen()
@@ -400,6 +407,33 @@ class UserProfileActivity : AppCompatActivity() {
             if (i > 0 && seen) dividers.getOrNull(i - 1)?.isVisible = true
             seen = true
         }
+    }
+
+    /**
+     * 退出登录二次确认。
+     *
+     * 从设置目录页搬过来时整套照搬：退出不可逆（要重输学号密码），先弹 M3 确认框；
+     * 取消（含返回键、点外部）只关框，停在当前页。
+     */
+    private fun confirmLogout() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.logout_confirm_title)
+            .setMessage(R.string.logout_confirm_message)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.action_logout) { _, _ -> performLogout() }
+            .show()
+    }
+
+    private fun performLogout() {
+        Logout.clear(this)
+        // CLEAR_TASK：这一页是从设置页跳进来的，只 finish 会留下一层已经没有会话的空壳返回栈
+        // （返回键能退回去，点哪都提示重新登录）
+        startActivity(
+            Intent(this, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+        )
+        finish()
     }
 
     private fun showError(message: String) {
