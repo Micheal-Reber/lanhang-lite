@@ -191,6 +191,8 @@ object SchedulePreview {
             block.addView(TextView(ctx).apply {
                 text = room
                 textSize = 8f
+                // 和课表页保持一致：导出图里的教室也加粗，不然缩到 8sp 的常规字同样发虚
+                typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 setTextColor(blockText)
             })

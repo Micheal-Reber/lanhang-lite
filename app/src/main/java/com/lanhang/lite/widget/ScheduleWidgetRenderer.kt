@@ -250,6 +250,14 @@ object ScheduleWidgetRenderer {
      */
     private const val MIN_CARD_WHITE_CONTRAST = 3.2
 
+    /**
+     * 教室名的颜色：**纯白不透明**。
+     *
+     * 原来和时间共用 0xE6FFFFFF（90% 白）—— 在压深后的彩色卡片上偏灰，8dp 的小字几乎糊进背景。
+     * 教室是学生最想确认的信息（在哪上课），占比又最小，所以给它最高的白 + 加粗。
+     */
+    private const val ROOM_COLOR = 0xFFFFFFFF.toInt()
+
     /** 倒计时进入「快下课」的阈值（分钟）：≤10 分钟转红提醒 */
     private const val COUNTDOWN_URGENT_MINUTES = 10
 
@@ -402,7 +410,7 @@ object ScheduleWidgetRenderer {
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.textSize = dp(15f)
             paint.color = palette.onSurface
-            canvas.drawText(ellipsize(title, width * 0.62f), outerPad, centerY + paint.textSize * 0.35f, paint)
+            canvas.drawText(ellipsizeWith(paint, title, width * 0.62f), outerPad, centerY + paint.textSize * 0.35f, paint)
             paint.textAlign = Paint.Align.RIGHT
             paint.textSize = dp(14f)
             paint.color = palette.onSurfaceVariant
@@ -449,10 +457,15 @@ object ScheduleWidgetRenderer {
             val textW = (textRight - textLeft).coerceAtLeast(1f)
             val room = course.room
             val twoLine = rowH >= dp(26f)
+            // 两行版：课名上限从 13dp 抬到 14dp、并跟着行高走 —— 4×4 的行高通常 50dp 以上，
+            // 原来字号被死死钉在 13dp，卡片下半截全空着，教室那行自然也跟着挤到 8~9dp。
             val nameSize =
-                if (twoLine) minOf(dp(13f), rowH * 0.38f)
+                if (twoLine) minOf(dp(14f), rowH * 0.36f)
                 else (rowH * 0.58f).coerceIn(dp(10f), dp(14f))
-            val metaSize = (nameSize * 0.72f).coerceIn(dp(8f), dp(10f))
+            // 第二行（时间 · 教室）是 26dp 行高里唯一的小字，0.72 倍太小：
+            // 4×4 实际渲染出来教室只有 8~9dp，手机上要凑近才看清（2026-10-31 用户反馈）。
+            // 提到 0.80 倍、下限 9dp、上限 11.5dp，仍受 blockH ≤ rowH 约束，不会撑出卡片。
+            val metaSize = (nameSize * 0.82f).coerceIn(dp(9f), dp(12f))
 
             // 右侧状态：「剩 N 分」（上课中）优先，其次教室；两行版把教室放进第二行
             val status = when {
@@ -482,7 +495,7 @@ object ScheduleWidgetRenderer {
             paint.color = nameColor
             paint.alpha = 255
             paint.textAlign = Paint.Align.LEFT
-            canvas.drawText(ellipsize(course.name, nameAvail), textLeft, nameBaseline, paint)
+            canvas.drawText(ellipsizeWith(paint, course.name, nameAvail), textLeft, nameBaseline, paint)
 
             if (!status.isNullOrEmpty()) {
                 val statusBaseline = if (twoLine) {
@@ -492,7 +505,7 @@ object ScheduleWidgetRenderer {
                 }
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 paint.textSize = metaSize
-                val shown = ellipsize(status, statusW)
+                val shown = ellipsizeWith(paint, status, statusW)
                 if (countdown != null) {
                     // 「剩 N 分」先垫一块压暗的胶囊：蓝/红字在任何课程色卡片上都够对比，
                     // 也不会因为卡片恰好是蓝色系而糊在一起。
@@ -514,7 +527,8 @@ object ScheduleWidgetRenderer {
                     )
                     paint.color = countdownTextColor(countdown, badgeColor)
                 } else {
-                    paint.color = metaColor
+                    // 右侧这一档是「教室」：纯白 + 上面的 BOLD —— 和卡片同色系的 90% 白会灰掉
+                    paint.color = ROOM_COLOR
                 }
                 paint.textAlign = Paint.Align.RIGHT
                 canvas.drawText(
@@ -527,17 +541,37 @@ object ScheduleWidgetRenderer {
             }
 
             if (twoLine) {
-                val metaTop = blockTop + nameSize + dp(2f)
-                val meta = timeRange(course) + (if (room.isNotBlank()) " · $room" else "")
-                paint.typeface = Typeface.DEFAULT
+                // 第二行拆成「时间」「·」「教室」三段画，不再拼成一个字符串：
+                // 教室是这行的主角（用户要「清楚可见」），给它纯白 + 加粗；
+                // 时间是次要信息，保持 90% 白 + 常规字重。混在一个 paint 里就只能是同一种样式。
+                val metaBaseline = blockTop + nameSize + dp(2f) + metaSize * 0.82f
                 paint.textSize = metaSize
+                paint.textAlign = Paint.Align.LEFT
+                paint.typeface = Typeface.DEFAULT
                 paint.color = metaColor
-                canvas.drawText(
-                    ellipsize(meta, textW),
-                    textLeft,
-                    metaTop + metaSize * 0.82f,
-                    paint
-                )
+                var cursor = textLeft
+                var avail = textW
+                val timeText = timeRange(course)
+                if (timeText.isNotBlank()) {
+                    val shownTime = ellipsizeWith(paint, timeText, avail)
+                    canvas.drawText(shownTime, cursor, metaBaseline, paint)
+                    val w = paint.measureText(shownTime)
+                    cursor += w
+                    avail -= w
+                }
+                // 教室留不足 12dp 就整段不画，免得只剩一个「教」字看着像乱码
+                if (room.isNotBlank() && avail > dp(12f)) {
+                    val sep = if (avail > dp(20f)) " · " else ""
+                    if (sep.isNotEmpty()) {
+                        canvas.drawText(sep, cursor, metaBaseline, paint)
+                        val w = paint.measureText(sep)
+                        cursor += w
+                        avail -= w
+                    }
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    paint.color = ROOM_COLOR
+                    canvas.drawText(ellipsizeWith(paint, room, avail), cursor, metaBaseline, paint)
+                }
             }
         }
 
@@ -603,16 +637,6 @@ object ScheduleWidgetRenderer {
                 course.start.coerceIn(1, PeriodClock.count),
                 course.end.coerceIn(1, PeriodClock.count)
             )
-
-        private fun ellipsize(text: String, maxWidth: Float): String {
-            if (maxWidth <= 0f) return ""
-            if (paint.measureText(text) <= maxWidth) return text
-            var result = text
-            while (result.isNotEmpty() && paint.measureText("$result…") > maxWidth) {
-                result = result.dropLast(1)
-            }
-            return "$result…"
-        }
 
         private fun dp(value: Float): Float = value * density
     }
@@ -989,7 +1013,7 @@ object ScheduleWidgetRenderer {
             paint.color = textColor
             paint.alpha = 255
             canvas.drawText(
-                ellipsize(text, maxW),
+                ellipsizeWith(paint, text, maxW),
                 layout.left + layout.width / 2f,
                 layout.top + layout.height / 2f + size * 0.35f,
                 paint
@@ -1060,7 +1084,9 @@ object ScheduleWidgetRenderer {
          */
         private fun roomReserve(layout: CourseLayout): Float {
             if (layout.course.room.isBlank() || layout.height < dp(14f)) return 0f
-            return minOf(dp(12f), layout.height * 0.32f)
+            // 教室字号上限从 7dp 提到 9dp 后，字形顶部离底已经到 ~15dp：
+            // 还按 12dp 预留，最后一行课名会和教室叠在一起。同步抬到 14dp / 34%。
+            return minOf(dp(14f), layout.height * 0.34f)
         }
 
         /**
@@ -1113,15 +1139,17 @@ object ScheduleWidgetRenderer {
             val room = layout.course.room
             if (room.isBlank() || layout.height < dp(14f)) return
             val pad = dp(4f)
-            val roomSize = minOf(dp(7f), nameSize * 0.66f).coerceAtLeast(dp(4f))
-            paint.typeface = Typeface.DEFAULT
+            // 原来上限 7dp、下限 4dp，再套 0.82 透明度 + 常规字重 —— 4×4 的周网格里
+            // 教室只有 5~6dp 的灰字，基本看不清（2026-10-31 用户两次反馈）。
+            // 现在上限 9dp、下限 6dp，加粗、不压透明度：小字号下笔画粗细比字号更管用。
+            val roomSize = minOf(dp(9f), nameSize * 0.72f).coerceAtLeast(dp(6f))
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             paint.textAlign = Paint.Align.CENTER
             paint.textSize = roomSize
             paint.color = textColor
-            // 与课表页同口径：教室比课名淡一档（0.82），主次分明又不用第二种颜色
-            paint.alpha = (0.82f * 255f).toInt()
+            paint.alpha = 255
             val maxWidth = (layout.width - pad * 2f).coerceAtLeast(1f)
-            val text = ellipsize(room, maxWidth)
+            val text = ellipsizeWith(paint, room, maxWidth)
             // 只挤出「…」或「A…」时不如不画：一块没字的省略号比没有教室更让人困惑
             if (text.length <= 2 && text.endsWith("…")) return
             canvas.drawText(
@@ -1130,15 +1158,6 @@ object ScheduleWidgetRenderer {
                 layout.top + layout.height - pad - roomSize * 0.25f,
                 paint
             )
-        }
-
-        private fun ellipsize(text: String, maxWidth: Float): String {
-            if (paint.measureText(text) <= maxWidth) return text
-            var result = text
-            while (result.isNotEmpty() && paint.measureText("$result…") > maxWidth) {
-                result = result.dropLast(1)
-            }
-            return "$result…"
         }
 
         private fun layoutLanes(courses: List<CourseBlock>): List<LaneCourse> {
@@ -1244,4 +1263,20 @@ object ScheduleWidgetRenderer {
             )
         }
     }
+}
+
+/**
+ * 按像素宽度截断并补省略号（**两套渲染器共用**）。
+ *
+ * 原来「今天列表」和「周网格」各自写了一份 `ellipsize`，其中一份还漏了 `maxWidth <= 0` 的判断
+ * —— 传入 0 时会一路删到空串再拼「…」，返回一个孤零零的省略号。合并到这里后只有一份口径。
+ */
+private fun ellipsizeWith(paint: android.graphics.Paint, text: String, maxWidth: Float): String {
+    if (maxWidth <= 0f) return ""
+    if (paint.measureText(text) <= maxWidth) return text
+    var result = text
+    while (result.isNotEmpty() && paint.measureText("$result…") > maxWidth) {
+        result = result.dropLast(1)
+    }
+    return "$result…"
 }

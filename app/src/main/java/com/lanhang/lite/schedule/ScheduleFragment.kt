@@ -98,7 +98,8 @@ class ScheduleFragment : Fragment() {
             LocalCourseEditSheet.RESULT_KEY,
             viewLifecycleOwner
         ) { _, _ ->
-            if (view != null) pager.rebuild(currentWeek)
+            // view 是 onViewCreated 的形参，恒非空；原来那层判空是多余的
+            pager.rebuild(currentWeek)
         }
         swipeRefresh = view.findViewById(R.id.swipeRefresh)
         bgSolidLayer = view.findViewById(R.id.bgSolidLayer)
@@ -1334,7 +1335,13 @@ class ScheduleFragment : Fragment() {
                         text = roomText
                         setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
                         setTextColor(blockText)
-                        alpha = 0.82f
+                        // 🔴 不要给教室压 alpha（原来 0.82）：它本来就只有 8~11sp，再降透明度
+                        // 在彩色卡片上基本糊成一片（2026-10-31 用户反馈「教室名字颜色不够明显」）。
+                        // 课名靠字号和行高区分层级就够了，教室不需要再淡一档。
+                        alpha = 1f
+                        // 加粗：小字号下笔画粗细对可读性的影响比字号更大，而教室都是 4~6 个字符，
+                        // 加粗后并不会抢过课名（课名是常规字重 + 自适应用满剩余高度）
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
                         gravity = Gravity.CENTER
                         maxLines = 2
                         includeFontPadding = false
@@ -1344,8 +1351,10 @@ class ScheduleFragment : Fragment() {
                             LinearLayout.LayoutParams.MATCH_PARENT,
                             LinearLayout.LayoutParams.WRAP_CONTENT
                         )
+                        // 上限从 11 放到 12：像「F604」「国103」这种短教室能多吃一点字号，
+                        // 放不下的仍由 autoSize 自己往下缩，不会溢出
                         TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                            this, 8, 11, 1, TypedValue.COMPLEX_UNIT_SP
+                            this, 9, 12, 1, TypedValue.COMPLEX_UNIT_SP
                         )
                     })
                 }
