@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 轻量版：不带私信（见 src/im/res/values/bools.xml 的说明） -->
+<resources>
+    <bool name="has_im">false</bool>
+</resources>

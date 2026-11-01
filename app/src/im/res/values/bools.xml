@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  IM 版（com.lanhang.lite.im）的能力开关。
+
+  共享代码（src/main）只认这个布尔值决定要不要显示私信入口 —— 这样 main 里不出现
+  任何 io.rong.* 符号，IMLib 只会被编进 im 变体。lite 变体里同名资源是 false。
+
+  新增 flavor 必须两个都定义，漏了会在编译期报「找不到 R.bool.has_im」，不会静默变 false。
+-->
+<resources>
+    <bool name="has_im">true</bool>
+</resources>

@@ -332,6 +332,80 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
+                    <View
+                        android:id="@+id/dividerIm"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant"
+                        android:visibility="gone" />
+
+                    <!--
+                      私信（2026-10-31，只有 im 版显示）：和同学的聊天记录都在这里。
+                      紧接「成员录」下方 —— 成员录是「找到人」，私信是「跟这个人说话」，两件事挨着。
+                      lite 版 ImBridge 没有注入实现，整行（含上面的分隔线）一起 GONE。
+                      平时就是单行（图标 + 标题 + chevron）；**有未读时才长出第二行**显示条数，
+                      不要再写「和老师同学单聊、群聊」这种说明文字（2026-10-31 用户要求去掉）。
+                    -->
+                    <LinearLayout
+                        android:id="@+id/rowIm"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_single"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_lg"
+                            android:layout_height="@dimen/icon_lg"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_mode_comment"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/list_icon_gap"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/im_entry_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <!-- 只在有未读时出现（"N 条未读"），否则整行 GONE，行恢复单行高度 -->
+                            <TextView
+                                android:id="@+id/tvImSummary"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_md"
+                            android:layout_height="@dimen/icon_md"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

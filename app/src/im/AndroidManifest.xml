@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  IM 版专属清单（lite 变体里不存在这个文件，所以两个 Activity / provider 也就不在包里）。
+  IMLib 自己的 manifest 会带 `:ipc` 进程、service 等组件，由 manifest merger 合入。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      IMLib 自带的 WRITE_EXTERNAL_STORAGE 本项目用不到：targetSdk 29+ 已失效，只是给旧版本存的图用。
+      留着会让安装时的权限列表多一项。
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:node="remove" />
+
+    <!--
+      定位：私信「+ → 位置」要发当前位置（2026-10-31 用户要求接上位置功能）。
+      ⚠️ 这里**不能**再写 tools:node="remove" —— 加回来的第一版忘了删，merger 会同时看到
+      「声明」和「移除」两条指令直接报冲突。粗定位一并声明：Android 12+ 用户可能只给「大致位置」。
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application>
+
+        <!-- 私信列表：入口在「设置 → 私信」和「设置 → 成员录」顶部那一行 -->
+        <activity
+            android:name=".im.ImConversationsActivity"
+            android:exported="false"
+            android:label="@string/im_title" />
+
+        <!-- 聊天页：要弹输入法，adjustResize 兜底 Android 14-（15+ 由 ime inset 处理） -->
+        <activity
+            android:name=".im.ImChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 进程启动即把私信入口注入 ImBridge（ContentProvider.onCreate 早于 Application.onCreate） -->
+        <provider
+            android:name=".im.ImInitializer"
+            android:authorities="${applicationId}.im-init"
+            android:exported="false" />
+
+        <!--
+          调试用：手动弹一条私信通知（只在 debug 生效，见 ImDebugReceiver 里对 FLAG_DEBUGGABLE 的判断）。
+          真人发消息才能验证通知的话，排查一次要等半天；用它一条命令就能看到渠道/图标/点击去处。
+
+          exported 必须是 true：`run-as` 在本机上报 "unknown package"，而 shell（uid 2000）给
+          exported=false 的组件发显式广播会被拒。不设 intent-filter，外部必须写全类名才打得到，
+          且 release 包里这个方法第一时间就 return，不会做任何事。
+        -->
+        <receiver
+            android:name=".im.ImDebugReceiver"
+            android:exported="true" />
+
+        <!--
+          不接第三方推送（本项目在前台由 SDK 回调、后台后续用系统通知）。
+          IMLib 自带的推送组有两个问题：
+          1. `PushService` 会再起一个 `io.rong.push` 常驻进程，纯耗内存；
+          2. `PushReceiver` 声明了 intent-filter 却没有 `android:exported`，
+             targetSdk 31+ 的 manifest merger 会直接报错（缺省值不再允许）。
+          整组移除，两个问题一起解决。
+        -->
+        <service
+            android:name="io.rong.push.rongpush.PushService"
+            tools:node="remove" />
+        <receiver
+            android:name="io.rong.push.rongpush.PushReceiver"
+            tools:node="remove" />
+    </application>
+</manifest>

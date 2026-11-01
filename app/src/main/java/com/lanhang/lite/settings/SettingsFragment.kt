@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -132,6 +133,18 @@ class SettingsFragment : Fragment() {
             com.lanhang.lite.directory.DirectoryActivity.start(requireContext())
         }
         binding.rowAbout.setOnClickListener { openDetail(PAGE_ABOUT) }
+        // 私信入口：只有 im 版存在（lite 版 ImBridge 是空壳，canOpen() 恒 false）。
+        // 直接开独立页面而不是二级页 —— 聊天记录是独立 Activity 的活，塞进设置页的
+        // detailContainer 里会和「返回层级」纠缠（设置页的返回键是给自己二级页用的）。
+        val imAvailable = com.lanhang.lite.core.ImBridge.canOpen()
+        binding.rowIm.isVisible = imAvailable
+        binding.dividerIm.isVisible = imAvailable
+        if (imAvailable) {
+            binding.rowIm.setOnClickListener {
+                com.lanhang.lite.core.ImBridge.open(requireContext())
+            }
+        }
+        bindImSummary()
         binding.rowAccount.setOnClickListener { openMyProfile() }
         binding.rowLogout.setOnClickListener { confirmLogout() }
         binding.rowDiagnostics.setOnClickListener {
@@ -147,6 +160,25 @@ class SettingsFragment : Fragment() {
             openDetail(restored, syncToolbar = false)
         }
         syncToolbar()
+    }
+
+    /**
+     * 「私信」那一行的第二行：**只在有未读时出现**，显示「N 条未读」。
+     *
+     * 没有未读就整行 GONE（用户 2026-10-31 明确要求不要「和老师同学单聊、群聊」这类说明文字），
+     * 行高这时退回单行。不做实时刷新：与其他摘要一样只在 onResume 重算。
+     */
+    private fun bindImSummary() {
+        val b = _binding ?: return
+        if (!com.lanhang.lite.core.ImBridge.canOpen()) return
+        val unread = com.lanhang.lite.core.ImBridge.unread()
+        b.tvImSummary.isVisible = unread > 0
+        if (unread > 0) {
+            b.tvImSummary.text = getString(
+                R.string.im_unread_summary,
+                if (unread > 99) "99+" else unread.toString()
+            )
+        }
     }
 
     /** 目录页最顶端的账号卡：姓名 + 学号 */
@@ -283,6 +315,8 @@ class SettingsFragment : Fragment() {
         refreshMomentsFilterSummary()
         // 资料页可能刚回填过头像地址，回到设置页顺手对齐一次（命中缓存时不发请求）
         bindAvatar()
+        // 从私信列表回来时未读可能清零了
+        bindImSummary()
     }
 
 

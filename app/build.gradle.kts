@@ -27,6 +27,35 @@ android {
         versionName = "0.9.1"
     }
 
+    /**
+     * 两个版本（2026-10-31 用户决定）：
+     * - **lite**：轻量版，不含私信，维持 3 MB 左右；
+     * - **im**：带私信（融云 IMLib 私有云）。IMLib 的 aar 自带 so，只保留 arm64-v8a，
+     *   预计 +2.7 MB（so 1.46 MB + dex 约 1.3 MB）。
+     *
+     * im 版加了 `.im` 后缀：两个包**可以共存安装**，代价是各自登录一次、课表缓存各一份
+     * （SharedPreferences / filesDir 按 applicationId 隔离，互不影响）。
+     *
+     * 共享代码里一律只看 `R.bool.has_im` 决定要不要显示私信入口，
+     * `src/main` 里**不出现任何 IM 符号** —— 这条是保证 lite 版真的不带 IMLib 的唯一手段，
+     * 一旦 main 里 import 了 io.rong.*，lite 变体要么编译失败，要么把 SDK 拖进包体。
+     */
+    flavorDimensions += "edition"
+    productFlavors {
+        create("lite") {
+            dimension = "edition"
+        }
+        create("im") {
+            dimension = "edition"
+            applicationIdSuffix = ".im"
+            // IMLib 的 so 在 v7a 上还要多 0.8 MB，而这个学校场景基本见不到 32 位设备；
+            // 只留 arm64 的代价是 32 位机装不上（会解析失败），换来包体小一档
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -101,6 +130,16 @@ dependencies {
             )
         }
         implementation(files("libs/engine.aar"))
+    }
+
+    // 私信：融云 IMLib **2.9.24**（本地 aar，不走 Maven）。
+    // 为什么不走 Maven：学校私有云 navi 只认 2.9 这一代（官方蓝航 1.0.14 内置 2.9.19），
+    // 5.x/4.x 连上去直接 RC_CONN_TOKEN_INCORRECT；且 aar 里有两处必须自己 patch
+    // （PendingIntent flags=0 崩 :ipc 进程、support-compat 与 androidx 撞类），
+    // 详见 AGENTS.md §5「已批准例外」。
+    // 只有 im flavor 带它 —— lite 变体连编译都碰不到，这是轻量版体积的唯一保证。
+    if (file("libs/im_lib-2.9.24-patched.aar").exists()) {
+        "imImplementation"(files("libs/im_lib-2.9.24-patched.aar"))
     }
 
     // 1.17.0：Android 16「实时动态通知」（NotificationCompat.setRequestPromotedOngoing）

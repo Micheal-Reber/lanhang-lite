@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 未读徽标：胶囊形，跟随主题主色（数字多一位就横向长一点，不做固定圆点） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="9dp" />
+    <solid android:color="?attr/colorPrimary" />
+</shape>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 视频时长胶囊：半透明黑底 + 6dp 圆角 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#6A000000" />
+    <corners android:radius="6dp" />
+</shape>

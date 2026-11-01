@@ -108,6 +108,9 @@ class DirectoryActivity : AppCompatActivity() {
             insets
         }
 
+        // 私信入口 2026-10-31 从成员录撤掉：设置目录页已经有独立入口，两处重复。
+        // 成员录只负责「找到人」，跟人说话走个人主页的「发私信」或设置 → 私信。
+
         adapter = DirectoryAdapter(
             onDeptClick = { openDept(it) },
             onMemberClick = { openProfile(it.id) },

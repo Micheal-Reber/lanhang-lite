@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 见 values/strings.xml 的说明：这里只覆盖应用名 -->
+<resources>
+    <string name="app_name">Lanhang Lite IM</string>
+</resources>

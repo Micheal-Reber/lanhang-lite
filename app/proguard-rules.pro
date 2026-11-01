@@ -42,3 +42,14 @@
 
 # Coil
 -dontwarn coil.**
+
+# ------------------------------------------------------------------ 私信（融云 IMLib）
+# 只有 im flavor 会带这个 SDK（lite 变体的类路径里根本没有 io.rong.*，下面这些规则对它是空转）。
+# IMLib 大量类靠 JNI 反调和反射回调，名字一改就连不上 / 收不到消息，必须整体 keep。
+-keep class io.rong.** { *; }
+-keep interface io.rong.** { *; }
+-keep class com.lanhang.lite.im.** { *; }
+# SDK 内部用 AIDL 跨 :ipc 进程通信，aidl 生成的接口不能被裁
+-keep class * implements android.os.IInterface { *; }
+-dontwarn io.rong.**
+-dontwarn com.rong.**

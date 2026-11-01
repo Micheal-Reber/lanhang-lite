@@ -104,6 +104,13 @@ class UserProfileActivity : AppCompatActivity() {
         // 「我的动态」在主导航已有独立入口，这里再放一次属于重复
         binding.cardPosts.isVisible = !isSelf
 
+        // 发私信：im 版才注入实现（lite 版 ImBridge 是空壳），且不给自己发
+        val canMessage = !isSelf && com.lanhang.lite.core.ImBridge.canOpen()
+        binding.cardMessage.isVisible = canMessage
+        binding.rowMessage.setOnClickListener {
+            com.lanhang.lite.core.ImBridge.openChat(this, targetId)
+        }
+
         if (targetId.isBlank()) {
             showError(getString(R.string.user_profile_not_found))
             return

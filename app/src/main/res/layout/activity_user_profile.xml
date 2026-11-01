@@ -82,6 +82,58 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!--
+                  发私信（2026-10-31，im 版专属）：看自己、或 lite 版没有私信实现时整卡隐藏。
+                  工作圈点头像进到这里 → 也能发起私信，所以工作圈不需要额外的私信图标。
+                -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardMessage"
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/card_gap"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/rowMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_single"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_lg"
+                            android:layout_height="@dimen/icon_lg"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_mode_comment"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/list_icon_gap"
+                            android:layout_weight="1"
+                            android:text="@string/im_open_chat"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_md"
+                            android:layout_height="@dimen/icon_md"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- 快捷入口：个人动态（第二级页）。自己看自己时整卡隐藏（设置→当前账号只要资料） -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardPosts"

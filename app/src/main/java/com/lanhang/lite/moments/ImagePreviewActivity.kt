@@ -99,6 +99,16 @@ class ImagePreviewActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: VH, position: Int) {
             holder.iv.load(urls[position]) {
                 crossfade(150)
+                // 🔴 解码尺寸必须**大于控件尺寸**：coil 默认按 View 测量值取样，而这一页是 MATCH_PARENT
+                // → 正好等于屏宽。那样双指放到 2.5x 只是把 1080 的位图拉伸，看着就是一片糊
+                // （2026-10-31 用户对比「放大很模糊」）。这里按最长边的 1.5 倍解码并封顶 2000px：
+                // 放到 1.5x 以内是 1:1 像素，再大也只是轻度插值；上限是为了不 OOM（ViewPager2 会留 3 页）。
+                val longSide = maxOf(
+                    holder.iv.resources.displayMetrics.widthPixels,
+                    holder.iv.resources.displayMetrics.heightPixels,
+                )
+                val target = (longSide * 1.5f).toInt().coerceAtMost(2000)
+                size(target, target)
             }
         }
 

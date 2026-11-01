@@ -607,6 +607,9 @@ class MainActivity : AppCompatActivity() {
         // 工作圈互动的定时检查：每次回到 App 都重排一次（闹钟不长命，链式续期），
         // 顺带保证「登录后 / 从后台回来」都能恢复正常节奏
         com.lanhang.lite.moments.MomentMessageWatcher.arm(this)
+        // 私信（im 版）：让长连接在后台也保持在线 —— 只有客户端在线才收得到消息、
+        // 才有系统通知。lite 版没有注入实现，这里是空操作；未登录时内部也直接跳过。
+        com.lanhang.lite.core.ImBridge.warmUp(this)
         // 顶栏铃铛的未读红点（节流，见 refreshUnreadBadge）
         refreshUnreadBadge()
     }

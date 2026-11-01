@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  只覆盖应用名：两个包共存时桌面要能分清（其余私信文案放在 src/main，
+  因为 tools/check_strings.py 只扫 main 的资源目录，放这里会被误判成未定义）。
+-->
+<resources>
+    <string name="app_name">蓝航Lite 私信</string>
+</resources>
