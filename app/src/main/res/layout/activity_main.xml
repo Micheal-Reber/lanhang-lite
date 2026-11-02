@@ -133,7 +133,7 @@
     <!--
       原生底栏（2026-11-02）：设置 → 外观 → 底栏 里可以选，与上面的液态玻璃互斥显示，
       同一时刻只有一个 VISIBLE。两条约束完全一样（贴父容器底部），差别只在形态：
-      玻璃是浮起 10dp 的圆角胶囊、高 64dp；这个贴底、全宽、高 80dp（M3 规范），
+      玻璃是浮起 10dp 的圆角胶囊、高 64dp；这个贴底、全宽、高 72dp（比 M3 默认的 80dp 压矮一档），
       背景 colorSurfaceContainer + 选中态胶囊指示器都由 Widget.Material3 默认值给，
       **不要在这里覆盖 itemIconTint / itemTextColor**：默认色对（未选中 onSurfaceVariant、
       选中 onSecondaryContainer）且已经带了深色变体。
@@ -141,7 +141,7 @@
       默认 gone：新装和升级上来的人看到的第一帧仍是液态玻璃，和以前一致；
       由 MainActivity.applyBottomBarStyle() 按偏好决定显示哪一个。
 
-      高度走 Widget.Lanhang.BottomNav（64dp，比 M3 默认的 80dp 压矮），
+      高度走 Widget.Lanhang.BottomNav（72dp，比 M3 默认的 80dp 压矮一档），
       底部安全区由 activity root 的 paddingBottom 负责 —— BottomNavigationView 自己还会再垫一次
       系统导航栏 inset，那段在 MainActivity.setupNativeBottomBar 里被移除了，否则会变成 64 + inset。
     -->

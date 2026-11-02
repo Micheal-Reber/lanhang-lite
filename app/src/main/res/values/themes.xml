@@ -205,10 +205,12 @@
 
     <!--
       原生底栏（2026-11-02）。默认的 Widget.Material3.BottomNavigationView 是 80dp：
-      图标 24 + 文字 12sp，上下各留 12/16dp。用户实测觉得太高，压到 64dp。
+      图标 24 + 文字 12sp，上下各留 12/16dp。用户实测觉得太高，压到 72dp
+      （先试过 64dp，太扁，又抬回 8dp）。
 
-      压高度靠三处一起改，只改 minHeight 没用 —— item 自身有 padding，会把控件重新撑回 80：
-      ① minHeight 64dp；② item 上下 padding 各 8dp；③ 文字降一档到 11sp（12sp 在 64dp 里会顶到图标）。
+      压高度靠两处一起改，只改 minHeight 没用 —— item 自身有 padding，会把控件重新撑回 80：
+      ① minHeight 72dp；② item 上下 padding 各 10dp。
+      文字保持 M3 默认的 12sp：72dp 放得下，不必再降字号。
       底部安全区不在这里处理：activity root 已经让开过系统导航栏，而 BottomNavigationView 自己
       还会再垫一次 inset（见 MainActivity.setupNativeBottomBar 里移除该监听的那段）。
     -->
@@ -216,13 +218,6 @@
         <item name="android:minHeight">@dimen/bottom_nav_height</item>
         <item name="itemPaddingTop">@dimen/bottom_nav_item_padding</item>
         <item name="itemPaddingBottom">@dimen/bottom_nav_item_padding</item>
-        <item name="itemTextAppearanceActive">@style/TextAppearance.Lanhang.BottomNavLabel</item>
-        <item name="itemTextAppearanceInactive">@style/TextAppearance.Lanhang.BottomNavLabel</item>
-    </style>
-
-    <!-- 底栏文字：11sp，比 M3 默认的 12sp 小一档，64dp 高度下才不至于挤 -->
-    <style name="TextAppearance.Lanhang.BottomNavLabel" parent="TextAppearance.Material3.LabelMedium">
-        <item name="android:textSize">11sp</item>
     </style>
 
     <!-- 图片预览：恒定黑底 -->

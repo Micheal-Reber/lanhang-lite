@@ -91,14 +91,15 @@
     <dimen name="content_padding_bottom">112dp</dimen>
     <!--
       原生底栏模式的内容底部留白（2026-11-02）。
-      原生底栏贴底、高 64dp，用上面的 112dp 会在列表末尾多出一大截空档（用户实测觉得空）。
-      64dp 底栏 + 16dp 呼吸 = 80dp。取值在 BottomBarDims（按当前底栏形态二选一），
+      原生底栏贴底、高 72dp，用上面的 112dp 会在列表末尾多出一大截空档（用户实测觉得空）。
+      72dp 底栏 + 16dp 呼吸 = 88dp。取值在 BottomBarDims（按当前底栏形态二选一），
       **不要在布局里直接引用这两个 dimen 给主 Tab 页**，否则切换形态后不会跟着变。
     -->
-    <dimen name="content_padding_bottom_native">80dp</dimen>
-    <!-- 原生底栏高度（M3 默认 80dp，用户觉得太高 → 64dp；两项 item padding 见 Widget.Lanhang.BottomNav） -->
-    <dimen name="bottom_nav_height">64dp</dimen>
-    <dimen name="bottom_nav_item_padding">8dp</dimen>
+    <dimen name="content_padding_bottom_native">88dp</dimen>
+    <!-- 原生底栏高度：M3 默认 80dp 太高，先压到 64dp 又太扁（用户两轮反馈）→ 72dp 折中。
+         item 上下 padding 见 Widget.Lanhang.BottomNav -->
+    <dimen name="bottom_nav_height">72dp</dimen>
+    <dimen name="bottom_nav_item_padding">10dp</dimen>
     <!-- 工作圈发表按钮的直径：玻璃球与原生 FAB 共用同一个值，切换形态时不跳位。
          原生 FAB 是不透明实心，会压住列表最后一条，所以列表底部还要再多让出「本值 + 8dp」 -->
     <dimen name="fab_size">56dp</dimen>

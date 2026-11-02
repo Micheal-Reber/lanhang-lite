@@ -420,8 +420,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupNativeBottomBar() {
         val nav = binding.bottomNavNative
         // Material 的 NavigationBarView 会把「系统导航栏 inset」垫到自己 paddingBottom 上，
-        // 而 activity root（见 onCreate 的 inset 监听）已经让开过一次 —— 两处叠加，64dp 的底栏
-        // 会被撑成 64 + 导航栏高度（实测 96dp，用户报「太高」有一半是这个）。
+        // 而 activity root（见 onCreate 的 inset 监听）已经让开过一次 —— 两处叠加，底栏会被撑高
+        // 一整个导航栏（实测 80dp 的底栏量出来 96dp，用户报「太高」有一半是这个）。
         // 这里把它的自动处理摘掉，底部安全区仍然由 root 的 paddingBottom 保证。
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(nav) { v, _ ->
             v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, 0)

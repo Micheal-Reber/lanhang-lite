@@ -60,7 +60,7 @@
       两者是同一套视觉，混着用会很突兀。与上面的 ComposeView 互斥显示，
       尺寸一致（`@dimen/fab_size`），位置差一档：
       玻璃 FAB 底边 96dp（对应 74dp 的玻璃胶囊 + 22dp 间隙），
-      原生 FAB 底边 80dp（对应 64dp 的底栏 + 16dp 间隙，取 content_padding_bottom_native 同一个值）。
+      原生 FAB 底边 88dp（对应 72dp 的底栏 + 16dp 间隙，取 content_padding_bottom_native 同一个值）。
 
       配色走「主色底 + onPrimary 图标」，这是 Material 里主操作按钮的常见用法：
       默认的 primaryContainer 在深色主题下是低饱和的深蓝灰，和 surfaceContainer 的底栏挨在一起
