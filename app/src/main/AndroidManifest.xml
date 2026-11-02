@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
+        应用内更新（update/UpdateInstaller）：下载完要拉起系统安装器。
+        这是 **normal 权限**，安装即授予；但 Android 8+ 还需要用户在本机打开
+        「允许安装未知应用」，代码里用 canRequestPackageInstalls() 判断并跳设置页。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!--
         校园网认证（campusnet/SrunApi.localIpv4）要读「当前承载流量的网卡」的 IPv4，
         ConnectivityManager.getActiveNetwork()/getLinkProperties() 需要这一条。
         这是 **normal 权限**：安装即授予，不会弹运行时对话框，也不需要用户去设置里开。
@@ -55,6 +61,32 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LanhangLite"
         android:usesCleartextTraffic="true">
+
+        <!--
+            更新包要通过 content:// 交给系统安装器（Android 7 起禁止 file:// 暴露）。
+            路径见 res/xml/file_paths.xml：只开放两个下载目录，别写成 root-path。
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!--
+            更新包下载完成（应用内更新）：系统把 ACTION_DOWNLOAD_COMPLETE 显式发回发起下载的应用，
+            所以 exported=false。没有它，用户点完下载就切走时「已下载」状态永远写不进去。
+        -->
+        <receiver
+            android:name=".update.UpdateDownloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".widget.ScheduleWidgetProvider"

@@ -49,6 +49,9 @@ class App : Application(), coil.ImageLoaderFactory {
         // 桌面小组件的状态可能已经过时（比如在别的设备/网页上把网线下了），
         // App 启动时同步一次（内部走协程查网络，不阻塞启动）
         com.lanhang.lite.widget.CampusNetWidgetProvider.refreshAll(this)
+        // 应用内更新：距上次检查超过一天就静默查一次（相当于 Hoshi 的每日周期任务，
+        // 但我们不引 WorkManager，改成「App 启动时查」；debug 包内部直接跳过）
+        com.lanhang.lite.update.UpdateScheduler.checkOnStart(this)
 
         // 上课提醒：先建通知渠道（提前建，用户能在系统设置里更早看到这个分类），
         // 再重排一次闹钟。重排要读整学期课表缓存（几十到几百 KB）+ 排若干个闹钟，

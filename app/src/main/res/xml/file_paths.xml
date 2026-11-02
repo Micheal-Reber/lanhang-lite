@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 暴露给系统安装器的路径（应用内更新用）。
+  只开放「更新包实际会落到的两个目录」：
+  - external-files-path ➜ getExternalFilesDir(DIRECTORY_DOWNLOADS)
+  - files-path          ➜ filesDir（外部目录不可用时的退路）
+  ⛔ 不要写 root-path / external-path：那等于把整个存储交给任何拿到 uri 的应用。
+-->
+<paths>
+    <external-files-path
+        name="updates_external"
+        path="Download/" />
+    <files-path
+        name="updates_internal"
+        path="downloads/" />
+</paths>

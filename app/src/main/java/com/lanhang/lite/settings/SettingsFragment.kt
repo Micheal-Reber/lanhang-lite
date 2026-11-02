@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
 import com.lanhang.lite.core.StorageJanitor
+import com.lanhang.lite.core.toast
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.campusnet.CampusNetActivity
 import com.lanhang.lite.databinding.FragmentSettingsBinding
@@ -44,6 +45,13 @@ import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.MainActivity
+import com.lanhang.lite.update.DownloadState
+import com.lanhang.lite.update.UpdateCheck
+import com.lanhang.lite.update.UpdateChecker
+import com.lanhang.lite.update.UpdateDownloadManager
+import com.lanhang.lite.update.UpdateInstaller
+import com.lanhang.lite.update.UpdateStatus
+import com.lanhang.lite.update.UpdateStore
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -519,6 +527,7 @@ class SettingsFragment : Fragment() {
                     .setOnClickListener { openUrl(REPO_URL) }
                 root.findViewById<View>(R.id.rowLicense)
                     .setOnClickListener { openUrl("$REPO_URL/blob/main/LICENSE") }
+                bindUpdateRow(root)
             }
         }
     }
@@ -901,6 +910,162 @@ class SettingsFragment : Fragment() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(send, getString(R.string.schedule_export_chooser)))
+    }
+
+    // ---------------------------------------------------------------- 应用内更新
+
+    /** 下载进度轮询任务；离开关于页或装完就取消 */
+    private var updatePollJob: Job? = null
+
+    /**
+     * 关于页的「检查更新」行。
+     *
+     * 状态机与 Hoshi 一致：可检查 → 发现新版本（稍后 / 跳过此版本 / 下载）→ 下载中（显示百分比）
+     * → 已下载（点行拉起安装器）。点击行为随状态变化，副标题就是状态本身。
+     */
+    private fun bindUpdateRow(root: View) {
+        val summary = root.findViewById<TextView>(R.id.tvUpdateSummary)
+        val row = root.findViewById<View>(R.id.rowUpdate)
+        val ctx = requireContext()
+
+        row.setOnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                when (UpdateDownloadManager.state(ctx)) {
+                    is DownloadState.Ready -> installDownloaded()
+                    is DownloadState.Downloading -> Unit // 副标题已经在显示进度
+                    else -> runUpdateCheck(summary, silent = false)
+                }
+            }
+        }
+        // 进页面先把本地记录 / 下载状态画出来；24 小时内查过就不再自动查
+        viewLifecycleOwner.lifecycleScope.launch {
+            refreshDownloadState(ctx, summary)
+            if (UpdateStore.shouldAutoCheck(ctx)) runUpdateCheck(summary, silent = true)
+        }
+    }
+
+    /** 把本地记录 + DownloadManager 的真实状态映射到副标题；下载中就挂一个轮询 */
+    private suspend fun refreshDownloadState(ctx: android.content.Context, summary: TextView) {
+        when (val state = UpdateDownloadManager.state(ctx)) {
+            is DownloadState.Ready -> {
+                summary.setText(R.string.update_ready)
+                stopUpdatePolling()
+            }
+            is DownloadState.Downloading -> {
+                summary.text = if (state.progress >= 0) {
+                    getString(R.string.update_downloading, state.progress)
+                } else {
+                    getString(R.string.update_checking)
+                }
+                startUpdatePolling(ctx, summary)
+            }
+            is DownloadState.Failed -> {
+                summary.setText(R.string.update_download_failed)
+                stopUpdatePolling()
+            }
+            DownloadState.Idle -> {
+                stopUpdatePolling()
+                // 只检查到、还没开始下载的记录：副标题直接写版本号
+                val record = UpdateStore.load(ctx)
+                if (record != null && record.status == UpdateStatus.AVAILABLE) {
+                    summary.text = getString(R.string.update_available, record.versionName)
+                }
+            }
+        }
+    }
+
+    /**
+     * 每秒问一次 DownloadManager。
+     *
+     * 不用 `ACTION_DOWNLOAD_COMPLETE` 广播来刷新 UI？广播是用来**写状态**的（进程被杀也能收），
+     * 页面开着时轮询更简单，切走就随 lifecycle 停掉。
+     */
+    private fun startUpdatePolling(ctx: android.content.Context, summary: TextView) {
+        if (updatePollJob?.isActive == true) return
+        updatePollJob = viewLifecycleOwner.lifecycleScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                if (!isAdded) return@launch
+                val state = UpdateDownloadManager.state(ctx)
+                refreshDownloadState(ctx, summary)
+                if (state !is DownloadState.Downloading) return@launch
+            }
+        }
+    }
+
+    private fun stopUpdatePolling() {
+        updatePollJob?.cancel()
+        updatePollJob = null
+    }
+
+    /** @param silent 自动检查时失败不弹 toast（副标题仍会写出来） */
+    private fun runUpdateCheck(summary: TextView, silent: Boolean) {
+        val ctx = requireContext()
+        summary.setText(R.string.update_checking)
+        viewLifecycleOwner.lifecycleScope.launch {
+            // 手动点：ignoreSkipped = true，用户主动问了就要告诉他
+            when (val result = UpdateChecker.check(ctx, ignoreSkipped = !silent)) {
+                is UpdateCheck.UpToDate -> {
+                    UpdateStore.markChecked(ctx)
+                    summary.setText(R.string.update_latest)
+                }
+                is UpdateCheck.Available -> {
+                    UpdateStore.markChecked(ctx)
+                    summary.text = getString(R.string.update_available, result.versionName)
+                    if (!silent) showUpdateDialog(result)
+                }
+                is UpdateCheck.Skipped -> {
+                    UpdateStore.markChecked(ctx)
+                    summary.text = getString(R.string.update_available, result.versionName)
+                }
+                UpdateCheck.NoAsset -> summary.setText(R.string.update_no_asset)
+                is UpdateCheck.Failed -> {
+                    summary.text = result.message
+                    if (!silent) toast(result.message)
+                }
+            }
+        }
+    }
+
+    /**
+     * 发现新版本：稍后 / 跳过此版本 / 下载并安装。
+     *
+     * **debug 版不给下载按钮**：release 与 debug 签名不同，覆盖安装必然失败
+     * （`INSTALL_FAILED_UPDATE_INCOMPATIBLE`），与其让人点了报错，不如直接开 Release 页面。
+     * 检查本身在 debug 上照常跑 —— 否则这个功能自己永远测不到。
+     */
+    private fun showUpdateDialog(update: UpdateCheck.Available) {
+        val ctx = requireContext()
+        val debug = UpdateChecker.isDebugBuild(ctx)
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(getString(R.string.update_dialog_title, update.versionName))
+            .setMessage(
+                if (debug) R.string.update_dialog_message_dev else R.string.update_dialog_message
+            )
+            .setNeutralButton(R.string.update_action_skip) { _, _ ->
+                UpdateStore.skip(ctx, update)
+                toast(getString(R.string.update_skipped, update.versionName))
+            }
+            .setNegativeButton(R.string.update_action_later, null)
+            .setPositiveButton(
+                if (debug) R.string.update_action_open_release else R.string.update_action_download
+            ) { _, _ ->
+                if (debug) {
+                    openUrl(update.releaseUrl)
+                } else if (UpdateDownloadManager.enqueue(ctx, update) != null) {
+                    toast(getString(R.string.update_downloading, 0))
+                } else {
+                    toast(getString(R.string.update_download_failed))
+                }
+            }
+            .show()
+    }
+
+    /** 拉起系统安装器；失败原因（权限/被拦）直接 toast */
+    private fun installDownloaded() {
+        val ctx = requireContext()
+        val message = UpdateInstaller.install(ctx, UpdateDownloadManager.file(ctx))
+        if (message != null) toast(message)
     }
 
     companion object {
