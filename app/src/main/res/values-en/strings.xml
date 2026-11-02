@@ -188,6 +188,10 @@
     <string name="settings_language_system">System default</string>
     <string name="settings_language_zh">简体中文</string>
     <string name="settings_language_en">English</string>
+    <!-- Bottom bar style: liquid glass (floating blurred pill) / native (full-width Material bar) -->
+    <string name="settings_bottom_bar">Bottom bar</string>
+    <string name="settings_bottom_bar_glass">Liquid glass</string>
+    <string name="settings_bottom_bar_native">Native</string>
     <string name="settings_week_empty">Week %1$d has no data</string>
     <string name="settings_diagnostics_subject">Lanhang Lite diagnostics</string>
     <string name="settings_diagnostics_chooser">Share diagnostics</string>

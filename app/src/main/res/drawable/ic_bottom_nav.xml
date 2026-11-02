@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底栏形态：上面两行是内容，下面贴底一整条是底栏，条里三个点是 Tab。
+     底栏画得比内容行宽（贴到 2..22），对应「原生底栏是全宽贴底的那一条」 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M4,4h16v2H4zM4,8h11v2H4zM2,14h20v6H2zM6,16.5h2v1.5H6zM11,16.5h2v1.5h-2zM16,16.5h2v1.5h-2z" />
+</vector>

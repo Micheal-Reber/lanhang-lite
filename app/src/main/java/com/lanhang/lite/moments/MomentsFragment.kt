@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -30,6 +31,9 @@ import com.lanhang.lite.net.MomentsApi
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.settings.Diagnostics
 import com.lanhang.lite.ui.LanhangTheme
+import com.lanhang.lite.ui.navigation.BottomBarDims
+import com.lanhang.lite.ui.navigation.BottomBarPrefs
+import com.lanhang.lite.ui.navigation.BottomBarStyle
 import com.lanhang.lite.ui.navigation.ViewBackdrop
 import com.lanhang.lite.ui.navigation.rememberViewBackdrop
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +47,16 @@ class MomentsFragment : Fragment() {
 
     /** FAB 玻璃的采样桥（由 Compose 侧赋值），见 ui/navigation/ViewBackdrop.kt */
     private var glassFab: ViewBackdrop? = null
+
+    /**
+     * 当前底栏是不是原生那套。
+     *
+     * 切换形态会 `recreate()` 整个 Activity，Fragment 跟着重建，所以读一次就够。
+     * 只在 onViewCreated 之后访问（lazy 里要用 requireContext）。
+     */
+    private val nativeBar: Boolean by lazy {
+        BottomBarPrefs.current(requireContext()) == BottomBarStyle.NATIVE
+    }
 
     /**
      * 列表滚动时通知宿主（[MainActivity]）：底栏玻璃的底图也要重录。
@@ -110,11 +124,24 @@ class MomentsFragment : Fragment() {
             },
             onDelete = { item -> confirmDeletePost(item) }
         )
-        setupGlassFab()
+        setupPublishFab()
         binding.root.viewTreeObserver.addOnScrollChangedListener(onFabScroll)
         binding.root.viewTreeObserver.addOnGlobalLayoutListener(onFabLayout)
         binding.recycler.layoutManager = LinearLayoutManager(requireContext())
         binding.recycler.adapter = adapter
+        // 底部留白按底栏形态给（玻璃 112dp / 原生 96dp）：xml 里写死的话切换形态不会跟着变。
+        // clipToPadding=false 已在布局里设好，滚到底时这段留白是可见的。
+        // 原生 FAB 是不透明实心，光靠底栏留白会让它压住最后一条 → 再让出 FAB 高度 + 8dp；
+        // 玻璃球是半透明的、透出底下的内容，不需要这一份额外空间。
+        val fabExtra = if (nativeBar) {
+            resources.getDimensionPixelSize(R.dimen.fab_size) +
+                resources.getDimensionPixelSize(R.dimen.space_sm)
+        } else {
+            0
+        }
+        binding.recycler.updatePadding(
+            bottom = BottomBarDims.contentBottomPadding(requireContext()) + fabExtra
+        )
         // 双击（正文/空白处）回到顶部；落在图片、头像、赞/评论上时不接管
         binding.recycler.attachDoubleTapToTop(
             onBeforeScroll = { adapter.cancelPendingRowClick() },
@@ -171,6 +198,30 @@ class MomentsFragment : Fragment() {
         glassFab = null
     }
 
+    /**
+     * 发表按钮：跟着底栏形态二选一。
+     *
+     * 玻璃底栏配玻璃球、原生底栏配 Material FAB —— 两套是同一个视觉系统，
+     * 只换底栏不换按钮会很突兀（用户 2026-11-02 指出）。
+     * 两者位置尺寸一致（bottom|end、20dp / 96dp、56dp），切换形态时不会跳位。
+     */
+    private fun setupPublishFab() {
+        if (nativeBar) {
+            binding.fabPublish.visibility = View.GONE
+            binding.fabNative.visibility = View.VISIBLE
+            binding.fabNative.setOnClickListener { openPublish() }
+            // 原生 FAB 不采样内容，glassFab 保持 null；下面那些
+            // `glassFab?.invalidate()` 就自动变成空操作，不用逐个加分支
+            return
+        }
+        setupGlassFab()
+    }
+
+    /** 打开发表页；成功后回 RESULT_OK，由 publishLauncher 刷新时间线 */
+    private fun openPublish() {
+        context?.let { publishLauncher.launch(PublishMomentActivity.intent(it)) }
+    }
+
     /** 与底栏同款：Compose Canvas 录一层内容做实时 backdrop，玻璃 FAB 从中采样 */
     private fun setupGlassFab() {
         val publishLabel = getString(R.string.moments_cd_publish)
@@ -193,12 +244,7 @@ class MomentsFragment : Fragment() {
                         backdrop = glass.backdrop,
                         backdropRevision = glass::revisionTick,
                         contentDescription = publishLabel,
-                        onClick = {
-                            // 发表已改为独立页面；成功后回 RESULT_OK，这里再刷新时间线
-                            context?.let {
-                                publishLauncher.launch(PublishMomentActivity.intent(it))
-                            }
-                        },
+                        onClick = { openPublish() },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

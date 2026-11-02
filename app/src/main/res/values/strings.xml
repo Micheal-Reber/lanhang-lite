@@ -515,6 +515,10 @@
     <string name="settings_language_system">跟随系统</string>
     <string name="settings_language_zh">简体中文</string>
     <string name="settings_language_en">English</string>
+    <!-- 底栏形态：液态玻璃（浮起的模糊胶囊）/ 原生（贴底全宽的 Material 底栏） -->
+    <string name="settings_bottom_bar">底栏</string>
+    <string name="settings_bottom_bar_glass">液态玻璃</string>
+    <string name="settings_bottom_bar_native">原生</string>
     <string name="settings_week_empty">第 %1$d 周课表为空</string>
     <string name="settings_diagnostics_subject">蓝航 Lite 诊断日志</string>
     <string name="settings_diagnostics_chooser">分享诊断信息</string>

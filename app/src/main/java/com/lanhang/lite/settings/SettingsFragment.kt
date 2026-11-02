@@ -17,6 +17,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -45,6 +46,9 @@ import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.MainActivity
+import com.lanhang.lite.ui.navigation.BottomBarDims
+import com.lanhang.lite.ui.navigation.BottomBarPrefs
+import com.lanhang.lite.ui.navigation.BottomBarStyle
 import com.lanhang.lite.update.DownloadState
 import com.lanhang.lite.update.UpdateCheck
 import com.lanhang.lite.update.UpdateChecker
@@ -164,6 +168,11 @@ class SettingsFragment : Fragment() {
         if (restored in intArrayOf(PAGE_APPEARANCE, PAGE_TOOLS, PAGE_ABOUT, PAGE_CACHE)) {
             openDetail(restored, syncToolbar = false)
         }
+        // 目录页的底部留白按底栏形态给（玻璃 112dp / 原生 96dp）。
+        // 写在 xml 里的话切换形态后不会跟着变 —— 见 BottomBarDims 的说明。
+        binding.contentDirectory.updatePadding(
+            bottom = BottomBarDims.contentBottomPadding(requireContext())
+        )
         syncToolbar()
     }
 
@@ -478,6 +487,10 @@ class SettingsFragment : Fragment() {
                 root.findViewById<TextView>(R.id.tvLanguageSummary).text = currentLanguageLabel()
                 root.findViewById<View>(R.id.rowLanguage)
                     .setOnClickListener { showLanguageDialog() }
+                // 底栏形态（2026-11-02）：液态玻璃 / 原生 Material3 底栏
+                root.findViewById<TextView>(R.id.tvBottomBarSummary).text = currentBottomBarLabel()
+                root.findViewById<View>(R.id.rowBottomBar)
+                    .setOnClickListener { showBottomBarDialog() }
             }
             PAGE_TOOLS -> {
                 root.findViewById<View>(R.id.rowClassReminder).setOnClickListener {
@@ -557,6 +570,35 @@ class SettingsFragment : Fragment() {
         val label = themeOptions.firstOrNull { it.first == Session.themeMode }?.second
             ?: R.string.settings_theme_system
         return getString(label)
+    }
+
+    /** 「底栏」行副标题：当前选中的形态 */
+    private fun currentBottomBarLabel(): String =
+        getString(BottomBarPrefs.current(requireContext()).labelRes)
+
+    /**
+     * 底栏形态二选一。
+     *
+     * 定下来就 `recreate()`：底栏是在 `MainActivity.onCreate` 里一次性搭起来的
+     * （Compose 玻璃树 / BottomNavigationView 二选一，还带着 ViewBackdrop 采样器），
+     * 原地换 View 要先拆采样器再重建，比直接重建 Activity 风险大得多。
+     * 重建后设置页靠 `KEY_DETAIL` 自动回到外观页，用户不会掉到目录页。
+     */
+    private fun showBottomBarDialog() {
+        val options = BottomBarStyle.entries
+        val current = BottomBarPrefs.current(requireContext())
+        val labels = options.map { getString(it.labelRes) }.toTypedArray()
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_bottom_bar)
+            .setSingleChoiceItems(labels, options.indexOf(current).coerceAtLeast(0)) { dialog, which ->
+                val style = options[which]
+                dialog.dismiss()
+                if (style == current) return@setSingleChoiceItems
+                BottomBarPrefs.set(requireContext(), style)
+                requireActivity().recreate()
+            }
+            .setNegativeButton(R.string.schedule_export_cancel, null)
+            .show()
     }
 
     /** 二级页开着时刷新主题副标题（不在外观页时找不到这个 TextView，直接跳过） */

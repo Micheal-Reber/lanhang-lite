@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  原生底栏（BottomNavigationView）的四个 Tab。
+  id 与 MainActivity 的 TAB_* 顺序一致：switchTab 靠 menu item 的 order 定位下标，
+  顺序改了要同步 MainActivity.tabOfMenuItem。
+  图标复用液态玻璃底栏那四张矢量图，两个底栏长得一样、只是容器不同。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_schedule"
+        android:icon="@drawable/ic_calendar"
+        android:title="@string/tab_schedule" />
+    <item
+        android:id="@+id/nav_grades"
+        android:icon="@drawable/ic_school"
+        android:title="@string/tab_grades" />
+    <item
+        android:id="@+id/nav_moments"
+        android:icon="@drawable/ic_dynamic_feed"
+        android:title="@string/tab_moments" />
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/tab_settings" />
+</menu>

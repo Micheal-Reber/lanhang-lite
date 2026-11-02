@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +21,7 @@ import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentGradesBinding
 import com.lanhang.lite.session.Session
+import com.lanhang.lite.ui.navigation.BottomBarDims
 import com.lanhang.lite.ui.showFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,6 +53,10 @@ class GradesFragment : Fragment() {
         adapter = GradeAdapter()
         binding.recycler.layoutManager = LinearLayoutManager(requireContext())
         binding.recycler.adapter = adapter
+        // 底部留白按底栏形态给（玻璃 112dp / 原生 96dp），见 BottomBarDims
+        binding.contentGrades.updatePadding(
+            bottom = BottomBarDims.contentBottomPadding(requireContext())
+        )
         binding.swipe.setOnRefreshListener {
             if (selectedTerm.isNotEmpty()) loadScores(selectedTerm, network = true)
         }

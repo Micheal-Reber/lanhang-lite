@@ -29,6 +29,7 @@ import com.lanhang.lite.R
 import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.ui.Motion
+import com.lanhang.lite.ui.navigation.BottomBarDims
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -628,7 +629,7 @@ class ScheduleFragment : Fragment() {
             isFillViewport = true
             overScrollMode = View.OVER_SCROLL_NEVER
             clipToPadding = false
-            setPadding(0, 0, 0, dimen(R.dimen.content_padding_bottom))
+            setPadding(0, 0, 0, BottomBarDims.contentBottomPadding(ctx))
         }
         val content = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(
@@ -914,7 +915,7 @@ class ScheduleFragment : Fragment() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
             clipToPadding = false
             overScrollMode = View.OVER_SCROLL_NEVER
-            setPadding(0, 0, 0, dimen(R.dimen.content_padding_bottom))
+            setPadding(0, 0, 0, BottomBarDims.contentBottomPadding(ctx))
         }
         scroll.addView(
             container,

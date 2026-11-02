@@ -16,11 +16,11 @@
             android:fillViewport="true">
 
             <LinearLayout
+                android:id="@+id/contentGrades"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingTop="@dimen/space_lg"
-                android:paddingBottom="96dp">
+                android:paddingTop="@dimen/space_lg">
 
                 <LinearLayout
                     android:layout_width="match_parent"

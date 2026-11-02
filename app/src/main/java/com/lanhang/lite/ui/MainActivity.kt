@@ -27,6 +27,8 @@ import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ActivityMainBinding
 import com.lanhang.lite.moments.MomentsFragment
 import com.lanhang.lite.session.Session
+import com.lanhang.lite.ui.navigation.BottomBarPrefs
+import com.lanhang.lite.ui.navigation.BottomBarStyle
 import com.lanhang.lite.ui.navigation.LanhangTab
 import com.lanhang.lite.ui.navigation.LiquidGlassBottomBar
 import com.lanhang.lite.ui.navigation.ViewBackdrop
@@ -81,6 +83,14 @@ class MainActivity : AppCompatActivity() {
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
+
+    /**
+     * 底栏形态（设置 → 外观 → 底栏）。
+     *
+     * 切换时设置页会 `recreate()` 整个 Activity，所以这里读一次就够 ——
+     * 不要做成可变状态再原地换 View，玻璃那套 Composable 与采样器拆不干净。
+     */
+    private val bottomBarStyle: BottomBarStyle by lazy { BottomBarPrefs.current(this) }
 
     /**
      * 课表页顶栏是透明浮层（背景要铺满整屏透上来），所以标题/图标的颜色
@@ -138,59 +148,19 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // 液态玻璃底栏：照抄 PocketDiary LiquidGlassBottomBar（Compose + backdrop 库）
-        val night = nightMode
-        binding.bottomNav.setContent {
-            LanhangTheme(darkTheme = night) {
-                // 本地矢量图替代 material-icons-extended（vectorResource 是 @Composable，须在 setContent 内）
-                val tabs = listOf(
-                    LanhangTab(
-                        ImageVector.vectorResource(R.drawable.ic_calendar),
-                        ImageVector.vectorResource(R.drawable.ic_calendar),
-                        stringResource(R.string.tab_schedule),
-                    ),
-                    LanhangTab(
-                        ImageVector.vectorResource(R.drawable.ic_school),
-                        ImageVector.vectorResource(R.drawable.ic_school),
-                        stringResource(R.string.tab_grades),
-                    ),
-                    LanhangTab(
-                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
-                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
-                        stringResource(R.string.tab_moments),
-                    ),
-                    LanhangTab(
-                        ImageVector.vectorResource(R.drawable.ic_settings),
-                        ImageVector.vectorResource(R.drawable.ic_settings),
-                        stringResource(R.string.tab_settings),
-                    ),
-                )
-                // 玻璃的采样源 = 当前可见的 Fragment 视图。重放与重录都交给 ViewBackdrop，
-                // 底栏与工作圈 FAB 共用同一套实现（见 ui/navigation/ViewBackdrop.kt）。
-                val glass = rememberViewBackdrop(
-                    source = { binding.fragmentContainer },
-                    host = { binding.bottomNav },
-                )
-                DisposableEffect(glass) {
-                    glassBackdrop = glass
-                    onDispose { if (glassBackdrop === glass) glassBackdrop = null }
-                }
-                Box(Modifier.fillMaxSize()) {
-                    glass.Capture(Modifier.fillMaxSize())
-                    LiquidGlassBottomBar(
-                        tabs = tabs,
-                        selectedIndex = tabState.intValue,
-                        onNavigate = { tab -> switchTab(tabs.indexOf(tab)) },
-                        backdrop = glass.backdrop,
-                        backdropRevision = glass::revisionTick,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(horizontal = 16.dp),
-                    )
-                }
-            }
+        // 底栏两种形态二选一（设置 → 外观 → 底栏）：液态玻璃 / 原生 BottomNavigationView。
+        // 默认走玻璃，和以前完全一致；选了原生就只建原生那套，Compose 树根本不组合
+        // （GONE 的 ComposeView 本来也不会组合，这里显式跳过是为了不白建 ViewBackdrop）。
+        val glassBar = bottomBarStyle == BottomBarStyle.GLASS
+        if (glassBar) {
+            setupGlassBottomBar()
+            // 玻璃底栏是一个 128dp 高的浮层，实际胶囊只占下面 64dp，上面那块空白必须把触摸
+            // 透传给内容；原生底栏自己就贴在底部、不遮挡内容，不需要这套转发。
+            binding.bottomNav.setOnTouchListener { _, event -> forwardTouchOutsideBar(event) }
+        } else {
+            setupNativeBottomBar()
         }
-        binding.bottomNav.setOnTouchListener { _, event -> forwardTouchOutsideBar(event) }
+
 
         scheduleFragment = supportFragmentManager.findFragmentByTag(TAG_SCHEDULE)
         gradesFragment = supportFragmentManager.findFragmentByTag(TAG_GRADES)
@@ -208,6 +178,8 @@ class MainActivity : AppCompatActivity() {
                 else -> TAB_SCHEDULE
             }
             tabState.intValue = restored
+            // 恢复分支不走 switchTab，原生底栏的选中态要在这里补一次
+            syncBottomBarSelection(restored)
             showToolbarMain(when (restored) {
                 TAB_MOMENTS -> getString(R.string.tab_moments)
                 TAB_SETTINGS -> getString(R.string.tab_settings)
@@ -243,6 +215,9 @@ class MainActivity : AppCompatActivity() {
         // 靠它区分「切过来」和「再点一次」（后者才是回顶的信号）。
         val previousTab = tabState.intValue
         tabState.intValue = tab
+        // 原生底栏要显式回写选中态（玻璃读 tabState 自动跟随）。
+        // 这里 tabState 已经更新过，所以回写触发的 OnItemSelectedListener 会判定「相等」直接返回，不会递归。
+        syncBottomBarSelection(tab)
         val tx = supportFragmentManager.beginTransaction()
         val s = scheduleFragment ?: com.lanhang.lite.schedule.ScheduleFragment().also {
             scheduleFragment = it
@@ -374,10 +349,120 @@ class MainActivity : AppCompatActivity() {
         invalidateOptionsMenu()
     }
 
+    /**
+     * 液态玻璃底栏：照抄 PocketDiary LiquidGlassBottomBar（Compose + backdrop 库）。
+     *
+     * 玻璃的采样源 = 当前可见的 Fragment 视图，重放与重录都交给 ViewBackdrop，
+     * 底栏与工作圈 FAB 共用同一套实现（见 ui/navigation/ViewBackdrop.kt）。
+     * 与 [setupNativeBottomBar] 由设置里的「底栏」档位二选一，同一时刻只有一个 View 参与布局。
+     */
+    private fun setupGlassBottomBar() {
+        val night = nightMode
+        binding.bottomNav.setContent {
+            LanhangTheme(darkTheme = night) {
+                // 本地矢量图替代 material-icons-extended（vectorResource 是 @Composable，须在 setContent 内）
+                val tabs = listOf(
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_calendar),
+                        ImageVector.vectorResource(R.drawable.ic_calendar),
+                        stringResource(R.string.tab_schedule),
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_school),
+                        ImageVector.vectorResource(R.drawable.ic_school),
+                        stringResource(R.string.tab_grades),
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
+                        ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
+                        stringResource(R.string.tab_moments),
+                    ),
+                    LanhangTab(
+                        ImageVector.vectorResource(R.drawable.ic_settings),
+                        ImageVector.vectorResource(R.drawable.ic_settings),
+                        stringResource(R.string.tab_settings),
+                    ),
+                )
+                val glass = rememberViewBackdrop(
+                    source = { binding.fragmentContainer },
+                    host = { binding.bottomNav },
+                )
+                DisposableEffect(glass) {
+                    glassBackdrop = glass
+                    onDispose { if (glassBackdrop === glass) glassBackdrop = null }
+                }
+                Box(Modifier.fillMaxSize()) {
+                    glass.Capture(Modifier.fillMaxSize())
+                    LiquidGlassBottomBar(
+                        tabs = tabs,
+                        selectedIndex = tabState.intValue,
+                        onNavigate = { tab -> switchTab(tabs.indexOf(tab)) },
+                        backdrop = glass.backdrop,
+                        backdropRevision = glass::revisionTick,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 16.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 原生底栏（Material3 BottomNavigationView）。
+     *
+     * 选中态两个方向都要同步：
+     * - 用户点底栏 → [switchTab]；
+     * - 代码切 Tab（桌面小组件跳转、通知点进来、进程恢复）→ [switchTab] 里回写 selectedItemId。
+     * 回写会再次触发 OnItemSelectedListener，所以监听里先比 tabState，相等就什么都不做，
+     * 否则两者互相调用会递归。
+     */
+    private fun setupNativeBottomBar() {
+        val nav = binding.bottomNavNative
+        // Material 的 NavigationBarView 会把「系统导航栏 inset」垫到自己 paddingBottom 上，
+        // 而 activity root（见 onCreate 的 inset 监听）已经让开过一次 —— 两处叠加，64dp 的底栏
+        // 会被撑成 64 + 导航栏高度（实测 96dp，用户报「太高」有一半是这个）。
+        // 这里把它的自动处理摘掉，底部安全区仍然由 root 的 paddingBottom 保证。
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(nav) { v, _ ->
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, 0)
+            androidx.core.view.WindowInsetsCompat.CONSUMED
+        }
+        nav.setOnItemSelectedListener { item ->
+            val tab = TAB_OF_MENU[item.itemId]
+            if (tab != null && tab != tabState.intValue) switchTab(tab)
+            true
+        }
+    }
+
+    /**
+     * 把 [tab] 回写到原生底栏的选中态。
+     *
+     * 玻璃那套读 `tabState` 自动跟随，原生这套得显式设 `selectedItemId`；
+     * 进程恢复（savedInstanceState != null）时不会经过 [switchTab]，所以要单独调一次。
+     */
+    private fun syncBottomBarSelection(tab: Int) {
+        if (bottomBarStyle != BottomBarStyle.NATIVE) return
+        val id = menuIdOf(tab)
+        if (binding.bottomNavNative.selectedItemId != id) {
+            binding.bottomNavNative.selectedItemId = id
+        }
+    }
+
+
     // ------------------------------------------------------------------ 底栏显隐
 
     /** 「底栏该显示」的当前意图：淡出动画结束回调要读它，防止刚藏好又被要求显示时误设 GONE */
     private var bottomNavWanted = true
+
+    /**
+     * 当前生效的底栏 View。
+     *
+     * 显隐、淡入淡出都走这一个入口，两种底栏才会有一致的进出场；**不要直接引用
+     * `binding.bottomNav` 做动画** —— 那是玻璃那套，选了原生之后它是 GONE 的，
+     * 动画会打在看不见的 View 上，表现为「切二级页时原生底栏没退场」。
+     */
+    private fun activeBottomBar(): View =
+        if (bottomBarStyle == BottomBarStyle.GLASS) binding.bottomNav else binding.bottomNavNative
 
     /**
      * 底栏显隐。
@@ -396,7 +481,7 @@ class MainActivity : AppCompatActivity() {
      */
     fun setBottomNavVisible(visible: Boolean) {
         bottomNavWanted = visible
-        val nav = binding.bottomNav
+        val nav = activeBottomBar()
         nav.animate().cancel()
         if (visible) {
             if (nav.visibility == View.VISIBLE && nav.alpha >= 1f) return
@@ -666,6 +751,26 @@ class MainActivity : AppCompatActivity() {
         private const val TAB_GRADES = 1
         private const val TAB_MOMENTS = 2
         private const val TAB_SETTINGS = 3
+
+        /**
+         * 原生底栏菜单项 → Tab 下标。
+         *
+         * **不要用 menu item 的 order 反推下标**：菜单顺序由 `menu_bottom_nav.xml` 决定，
+         * 和这里一一对应的关系写在下面这张表里，任何一边改了都得同步。
+         */
+        private val TAB_OF_MENU = mapOf(
+            R.id.nav_schedule to TAB_SCHEDULE,
+            R.id.nav_grades to TAB_GRADES,
+            R.id.nav_moments to TAB_MOMENTS,
+            R.id.nav_settings to TAB_SETTINGS,
+        )
+
+        private fun menuIdOf(tab: Int): Int = when (tab) {
+            TAB_GRADES -> R.id.nav_grades
+            TAB_MOMENTS -> R.id.nav_moments
+            TAB_SETTINGS -> R.id.nav_settings
+            else -> R.id.nav_schedule
+        }
 
         const val EXTRA_OPEN_SCHEDULE = "com.lanhang.lite.extra.OPEN_SCHEDULE"
 
