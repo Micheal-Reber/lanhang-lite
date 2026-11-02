@@ -553,6 +553,9 @@
     <string name="moments_user_empty">No posts yet</string>
     <string name="moments_user_no_auth">This user\'s posts are not visible</string>
     <string name="common_retry">Retry</string>
+    <string name="image_save">Save photo</string>
+    <string name="image_saved">Saved to gallery</string>
+    <string name="image_save_failed">Could not save, please check your network</string>
     <string name="common_back">Back</string>
     <!-- Library seat reservation -->
     <string name="settings_library_seat">Library seats</string>

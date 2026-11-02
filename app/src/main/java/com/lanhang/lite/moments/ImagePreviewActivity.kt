@@ -4,15 +4,20 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import coil.load
 import com.lanhang.lite.R
-import com.lanhang.lite.databinding.ActivityImagePreviewBinding
+import com.lanhang.lite.core.ImageSaver
 import com.lanhang.lite.core.LocaleHelper
+import com.lanhang.lite.core.toast
+import com.lanhang.lite.databinding.ActivityImagePreviewBinding
+import kotlinx.coroutines.launch
 
 /** 工作圈图片全屏预览：左右滑动多图，双指/双击缩放，单击关闭 */
 class ImagePreviewActivity : AppCompatActivity() {
@@ -26,6 +31,31 @@ class ImagePreviewActivity : AppCompatActivity() {
     private lateinit var binding: ActivityImagePreviewBinding
     private val urls by lazy { intent.getStringArrayListExtra(EXTRA_URLS).orEmpty() }
 
+    /** 正在保存（防连点） */
+    private var saving = false
+
+    /** Q 以下走 SAF 时，下载好等用户选位置的那张图 */
+    private var pending: ImageSaver.Prepared? = null
+
+    /**
+     * Q 以下的保存落点。
+     *
+     * Android 10 起写相册不需要权限，10 之前要 `WRITE_EXTERNAL_STORAGE` 运行时权限 ——
+     * 为了少数老设备去申请一个已被 Google 废弃的权限不划算，这里改成让用户自己选位置。
+     * Q+ 根本不会走这个分支（见 [ImageSaver.canSaveToGallery]）。
+     */
+    private val createDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("image/*")
+    ) { uri ->
+        val prepared = pending
+        pending = null
+        if (uri == null || prepared == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val ok = ImageSaver.writeTo(this@ImagePreviewActivity, uri, prepared)
+            toast(getString(if (ok) R.string.image_saved else R.string.image_save_failed))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityImagePreviewBinding.inflate(layoutInflater)
@@ -34,13 +64,19 @@ class ImagePreviewActivity : AppCompatActivity() {
         binding.root.let { v ->
             ViewCompat.setOnApplyWindowInsetsListener(v) { _, insets ->
                 val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                val lp = binding.tvIndex.layoutParams as ViewGroup.MarginLayoutParams
-                lp.topMargin = 16 * resources.displayMetrics.density.toInt() + bars.top
-                binding.tvIndex.layoutParams = lp
+                val density = resources.displayMetrics.density
+                val indexLp = binding.tvIndex.layoutParams as ViewGroup.MarginLayoutParams
+                indexLp.topMargin = (16 * density).toInt() + bars.top
+                binding.tvIndex.layoutParams = indexLp
+                // 保存按钮和「2 / 5」用同一个基准线，状态栏高度变了也不会错位
+                val saveLp = binding.btnSave.layoutParams as ViewGroup.MarginLayoutParams
+                saveLp.topMargin = (12 * density).toInt() + bars.top
+                binding.btnSave.layoutParams = saveLp
                 insets
             }
         }
 
+        binding.btnSave.setOnClickListener { saveCurrent() }
         binding.pager.adapter = PreviewAdapter(urls) { finishWithFade() }
         binding.pager.setCurrentItem(
             intent.getIntExtra(EXTRA_INDEX, 0).coerceIn(0, urls.size - 1), false
@@ -71,6 +107,41 @@ class ImagePreviewActivity : AppCompatActivity() {
 
     private fun updateIndex(position: Int) {
         binding.tvIndex.text = if (urls.size > 1) "${position + 1} / ${urls.size}" else ""
+    }
+
+    /**
+     * 保存当前这张到相册。
+     *
+     * 下载 + 识别格式都在 IO（[ImageSaver.prepare]），按钮在过程中置灰：一张原图几 MB，
+     * 弱网下要等几秒，不给反馈用户会以为没点上而反复点。
+     */
+    private fun saveCurrent() {
+        if (saving) return
+        val url = urls.getOrNull(binding.pager.currentItem)?.takeIf { it.isNotBlank() } ?: return
+        saving = true
+        binding.btnSave.isEnabled = false
+        binding.btnSave.alpha = 0.4f
+        lifecycleScope.launch {
+            try {
+                val prepared = ImageSaver.prepare(url)
+                if (prepared == null) {
+                    toast(getString(R.string.image_save_failed))
+                    return@launch
+                }
+                if (ImageSaver.canSaveToGallery) {
+                    val ok = ImageSaver.saveToGallery(this@ImagePreviewActivity, prepared)
+                    toast(getString(if (ok) R.string.image_saved else R.string.image_save_failed))
+                } else {
+                    // 老系统：先把图下好，再让用户挑位置（记住 prepared，回调里用）
+                    pending = prepared
+                    createDocument.launch(prepared.fileName)
+                }
+            } finally {
+                saving = false
+                binding.btnSave.isEnabled = true
+                binding.btnSave.alpha = 1f
+            }
+        }
     }
 
     private fun finishWithFade() {

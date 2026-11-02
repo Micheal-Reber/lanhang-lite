@@ -482,6 +482,9 @@
     <string name="moments_user_empty">还没有发过动态</string>
     <string name="moments_user_no_auth">对方设置了动态不可见</string>
     <string name="common_retry">重试</string>
+    <string name="image_save">保存图片</string>
+    <string name="image_saved">已保存到相册</string>
+    <string name="image_save_failed">保存失败，请检查网络后重试</string>
 
     <!-- ==================== 设置 ==================== -->
     <string name="settings_language">语言</string>
