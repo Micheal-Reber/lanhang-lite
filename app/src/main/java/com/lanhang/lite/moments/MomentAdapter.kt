@@ -1,10 +1,14 @@
 package com.lanhang.lite.moments
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
@@ -350,6 +354,17 @@ class MomentAdapter(
                 }
                 val line = row.findViewById<TextView>(R.id.tvCommentLine)
                 line.text = buildCommentLine(c, link)
+                // 人名是 ClickableSpan，必须给 movementMethod 才会响应点击。
+                // ⚠️ 它同时会把 TextView 变成 clickable（TextView.fixFocusableAndClickableSettings），
+                // 于是「点正文回复」「长按打开我的评论」会被文字区域吞掉 —— 这两件事要在 TextView
+                // 上也挂一份；行上的监听保留，负责文字以外的内边距区域。
+                line.movementMethod = LinkMovementMethod.getInstance()
+                line.highlightColor = Color.TRANSPARENT
+                line.setOnClickListener { onReply(item, uid) }
+                line.setOnLongClickListener {
+                    onCommentsLongPress(item)
+                    true
+                }
 
                 row.setOnClickListener { onReply(item, uid) }
                 // 行本身 clickable 会吞掉触摸流，长按必须挂在行上；删除评论只有这一个入口
@@ -360,16 +375,31 @@ class MomentAdapter(
             }
         }
 
-        /** 「张三：内容」/「张三 回复 李四：内容」，人名染链接色；点击意图由整行监听统一处理 */
+        /**
+         * 「张三：内容」/「张三 回复 李四：内容」，人名染链接色。
+         *
+         * 人名单独吃点击 → 进个人主页；正文（以及行内边距）仍然是「回复这条评论」。
+         * 以前整行共用一个监听，点名字和点正文都变成回复，想看看说话的人是谁没办法
+         * （2026-11-02 用户反馈「点人名和点评论全是回复」）。
+         */
         private fun buildCommentLine(c: CommentEntry, link: Int): CharSequence {
             val sb = SpannableStringBuilder()
             fun appendName(id: String?) {
-                val name = UserInfoCache.nameOf(id) ?: UserInfoCache.fallbackName(itemView.context)
+                val uid = id ?: return
+                val name = UserInfoCache.nameOf(uid) ?: UserInfoCache.fallbackName(itemView.context)
                 val st = sb.length
                 sb.append(name)
-                sb.setSpan(
-                    ForegroundColorSpan(link), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
+                // onUser 为空的场景（不提供跳转的宿主）退回纯色文本，点击仍然走「回复」，
+                // 不会出现「点名字毫无反应」
+                if (onUser != null) {
+                    sb.setSpan(
+                        NameSpan(uid, link), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                } else {
+                    sb.setSpan(
+                        ForegroundColorSpan(link), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
             }
             appendName(c.user_id)
             val replyTo = c.reply_to?.takeIf { it.isNotEmpty() && it != c.user_id }
@@ -382,6 +412,26 @@ class MomentAdapter(
             sb.append(itemView.context.getString(R.string.moments_comment_separator))
             sb.append(c.content.orEmpty())
             return sb
+        }
+
+        /**
+         * 评论里的人名：点一下进个人主页。
+         *
+         * 不用默认样式（`ClickableSpan.updateDrawState` 默认会加蓝色下划线），
+         * 保持和工作圈其他地方一致的链接色，并去掉下划线。
+         */
+        private inner class NameSpan(
+            private val userId: String,
+            private val color: Int,
+        ) : ClickableSpan() {
+            override fun onClick(widget: View) {
+                onUser?.invoke(userId)
+            }
+
+            override fun updateDrawState(ds: TextPaint) {
+                ds.color = color
+                ds.isUnderlineText = false
+            }
         }
 
         private fun bindImages(media: List<MediaItem>?) {
