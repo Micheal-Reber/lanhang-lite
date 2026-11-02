@@ -25,6 +25,11 @@
 # directory 包（成员录：Department / OrgEntry / StaffSearchHit…）同样只靠 Gson 反射，
 # 字段经 @SerializedName 映射服务端下划线键名。往该包新增模型类自动生效。
 -keep class com.lanhang.lite.directory.** { *; }
+# update 包（GitHubReleaseJson / UpdateRecord / UpdateStatus）两边都吃 Gson：
+# 前者键名是 GitHub 的下划线字段（tag_name / browser_download_url / size），
+# 后者整条记录序列化进 SharedPreferences。没有这条 → release 包永远「已是最新版本」
+# 或「没有可用的安装包」，而且下载状态每次重启都丢，debug 包不复现。
+-keep class com.lanhang.lite.update.** { *; }
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
 
