@@ -1324,16 +1324,13 @@ class ScheduleFragment : Fragment() {
                         this, 9, 11, 1, TypedValue.COMPLEX_UNIT_SP
                     )
                 })
+                // 教室那一行只放教室（2026-11-03 用户要求）：自建课原来在这里加「自建 · 」前缀，
+                // 但自建卡已经有一圈中性描边，再占半行文字会挤掉教室本身 —— 窄格里尤其明显。
+                // 导出（.ics / .csv / 分享图）里的「自建」标注保留，那是给别人看的，需要能分辨来源。
                 val room = ci.course.room ?: ""
-                // 自建课在教室那一行加「自建 · 」前缀：窄格里也能一眼分辨来源
-                val roomText = when {
-                    !isLocal -> room
-                    room.isEmpty() -> ctx.getString(R.string.local_course_tag)
-                    else -> "${ctx.getString(R.string.local_course_tag)} · $room"
-                }
-                if (roomText.isNotEmpty()) {
+                if (room.isNotEmpty()) {
                     addView(TextView(ctx).apply {
-                        text = roomText
+                        text = room
                         setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
                         setTextColor(blockText)
                         // 🔴 不要给教室压 alpha（原来 0.82）：它本来就只有 8~11sp，再降透明度
