@@ -1011,6 +1011,11 @@ class SettingsFragment : Fragment() {
                 val record = UpdateStore.load(ctx)
                 if (record != null && record.status == UpdateStatus.AVAILABLE) {
                     summary.text = getString(R.string.update_available, record.versionName)
+                } else if (record == null && !UpdateStore.shouldAutoCheck(ctx)) {
+                    // 24 小时内查过、且没有待办记录 → 已经是最新版。
+                    // 典型场景：刚在这个版本上更新完，UpdateDownloadManager 把记录清掉了，
+                    // 不补这一句的话副标题会掉回「点击检查是否有新版本」，看着像没查过。
+                    summary.setText(R.string.update_latest)
                 }
             }
         }

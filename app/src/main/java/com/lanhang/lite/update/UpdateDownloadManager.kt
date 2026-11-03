@@ -75,6 +75,10 @@ object UpdateDownloadManager {
     /** 查询当前状态（UI 轮询用）；顺手把校验结果写回记录 */
     suspend fun state(context: Context): DownloadState = withContext(Dispatchers.IO) {
         val record = UpdateStore.load(context) ?: return@withContext DownloadState.Idle
+        if (isInstalledAlready(context, record)) {
+            UpdateStore.clear(context)
+            return@withContext DownloadState.Idle
+        }
         when (record.status) {
             UpdateStatus.DOWNLOADED -> {
                 val target = file(context)
@@ -128,8 +132,28 @@ object UpdateDownloadManager {
     suspend fun handleCompletion(context: Context, downloadId: Long) = withContext(Dispatchers.IO) {
         val record = UpdateStore.load(context) ?: return@withContext
         if (record.downloadId != downloadId) return@withContext
+        // 迟到的广播：包已经装上去了，这条记录没意义了。不拦的话会走 finish() →
+        // validate() 找不到文件（安装时被系统用掉了）→ 标成「下载失败」
+        if (isInstalledAlready(context, record)) {
+            runCatching { file(context).delete() }
+            UpdateStore.clear(context)
+            return@withContext
+        }
         if (record.status == UpdateStatus.DOWNLOADED) return@withContext
         finish(context, record, downloadId)
+    }
+
+    /**
+     * 这条记录对应的版本是不是已经装上了（或比当前还旧）。
+     *
+     * 为什么不能只看文件在不在：用户装完新版本后，下载目录里的 apk 会被系统安装器用掉、
+     * 或者被清理逻辑删掉，而本地记录还停在 DOWNLOADED —— 下次进设置页查到文件没了，
+     * 就标成「下载失败，请重试」。用户明明已经是最新版，却看到一行红字（2026-11-03 真机实测）。
+     * **版本号才是事实**：记录的版本不比当前新，就说明这件事已经完成。
+     */
+    private fun isInstalledAlready(context: Context, record: UpdateRecord): Boolean {
+        val current = UpdateChecker.currentVersionName(context)
+        return UpdateApi.compareVersion(record.versionName, current) <= 0
     }
 
     /** 放弃本次下载（用户改主意 / 换版本） */
