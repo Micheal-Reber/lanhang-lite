@@ -2,7 +2,7 @@
 <!-- 周视图的「一天」分组卡（M3 filled card，2026-10-25 重写） -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    style="@style/Widget.Lanhang.Card"
+    style="@style/Widget.Lanhang.Card.Large"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="@dimen/screen_padding_h"

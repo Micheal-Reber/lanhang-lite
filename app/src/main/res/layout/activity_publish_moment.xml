@@ -79,26 +79,29 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="@dimen/text_body_small" />
 
-            <!-- 输入区：无边框，与列表正文同字号 -->
-            <EditText
-                android:id="@+id/etContent"
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/contentCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_lg"
-                android:background="@null"
-                android:gravity="top|start"
-                android:hint="@string/moments_publish_hint"
-                android:importantForAutofill="no"
-                android:inputType="textMultiLine|textCapSentences"
-                android:lineSpacingExtra="6dp"
-                android:minLines="8"
-                android:paddingStart="0dp"
-                android:paddingTop="@dimen/space_sm"
-                android:paddingEnd="0dp"
-                android:paddingBottom="@dimen/space_sm"
-                android:textColor="?attr/colorOnSurface"
-                android:textColorHint="?attr/colorOnSurfaceVariant"
-                android:textSize="@dimen/text_body_large" />
+                style="@style/Widget.Lanhang.Card">
+
+                <EditText
+                    android:id="@+id/etContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:gravity="top|start"
+                    android:hint="@string/moments_publish_hint"
+                    android:importantForAutofill="no"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:lineSpacingExtra="6dp"
+                    android:minLines="8"
+                    android:padding="@dimen/card_padding"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
+                    android:textSize="@dimen/text_body_large" />
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- 图片区：缩略图 + 添加方块（由代码填充） -->
             <HorizontalScrollView

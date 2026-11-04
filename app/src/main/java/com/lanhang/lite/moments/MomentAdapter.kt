@@ -1,6 +1,8 @@
 package com.lanhang.lite.moments
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
@@ -19,8 +21,11 @@ import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.R as MaterialR
 import com.google.gson.JsonParser
 import com.lanhang.lite.R
+import com.lanhang.lite.core.toast
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.AvatarView
 import java.text.SimpleDateFormat
@@ -51,7 +56,7 @@ class MomentItem(val feed: MomentFeed) {
     }
     val likes = CopyOnWriteArrayList<LikeEntry>(feed.likes ?: emptyList())
     val comments = CopyOnWriteArrayList<CommentEntry>(feed.comments ?: emptyList())
-    var likeCount: Int = feed.likeCount ?: likes.size
+    var likeCount: Int = maxOf(feed.likeCount ?: 0, likes.size)
 
     val likedByMe: Boolean get() = likes.any { it.user_id == Session.userId }
 }
@@ -176,6 +181,8 @@ class MomentAdapter(
         private val tvText: TextView = itemView.findViewById(R.id.tvText)
         private val tvFilterTag: TextView = itemView.findViewById(R.id.tvFilterTag)
         private val rvImages: RecyclerView = itemView.findViewById(R.id.rvImages)
+        private val ivLikesSummary: ImageView = itemView.findViewById(R.id.ivLikesSummary)
+        private val ivCommentsSummary: ImageView = itemView.findViewById(R.id.ivCommentsSummary)
         private val tvLikes: TextView = itemView.findViewById(R.id.tvLikes)
         private val llComments: LinearLayout = itemView.findViewById(R.id.llComments)
         private val llInteract: View = itemView.findViewById(R.id.llInteract)
@@ -215,6 +222,14 @@ class MomentAdapter(
                 MomentTextMatcher.highlight(text, highlightWords, accentColor())
             }
             tvText.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+            tvText.setOnLongClickListener(
+                if (text.isBlank()) null else View.OnLongClickListener {
+                    val clipboard = ctx.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("moment", text))
+                    ctx.toast(R.string.moments_copied)
+                    true
+                }
+            )
 
             val filterTag = filterTagText?.invoke(item)
             tvFilterTag.visibility =
@@ -243,10 +258,9 @@ class MomentAdapter(
             val visibleLikeCount = (item.likeCount - hiddenLikeCount).coerceAtLeast(0)
 
             if (hasLikes) {
-                val names = visibleLikes.map { like ->
-                    UserInfoCache.nameOf(like.user_id) ?: UserInfoCache.fallbackName(ctx)
-                }
-                tvLikes.text = names.joinToString("，")
+                tvLikes.text = buildLikesLine(visibleLikes, linkColor())
+                tvLikes.movementMethod = LinkMovementMethod.getInstance()
+                tvLikes.highlightColor = Color.TRANSPARENT
                 likesRow.visibility = View.VISIBLE
             } else {
                 likesRow.visibility = View.GONE
@@ -265,6 +279,8 @@ class MomentAdapter(
             }
             dividerMid.visibility =
                 if (hasLikes && hasComments) View.VISIBLE else View.GONE
+            ivLikesSummary.setOnClickListener { onLike(item) }
+            ivCommentsSummary.setOnClickListener { onComment(item) }
 
             // 点赞明细受 like_size 限制，数量使用服务端返回的总数。
             tvLike.text = if (item.likedByMe) {
@@ -323,14 +339,38 @@ class MomentAdapter(
             }
         }
 
-        /**
-         * 高亮底色用的主色。
-         *
-         * 取 `@color/link` 而不是主题属性：`android.nonTransitiveRClass=true` 下 App 的 R 里
-         * 没有依赖库声明的 attr（`R.attr.colorPrimary` 编译不过），而 link 本来就是这一屏的强调色。
-         */
+        /** 工作圈互动强调色与课表顶栏、课程状态共用当前主题主色。 */
         private fun accentColor(): Int =
-            androidx.core.content.ContextCompat.getColor(itemView.context, R.color.link)
+            MaterialColors.getColor(itemView, MaterialR.attr.colorPrimary)
+
+        private fun linkColor(): Int = accentColor()
+
+        private fun buildLikesLine(likes: List<LikeEntry>, link: Int): CharSequence {
+            val sb = SpannableStringBuilder()
+            likes.forEachIndexed { index, like ->
+                if (index > 0) sb.append("，")
+                val userId = like.user_id
+                val name = UserInfoCache.nameOf(userId) ?: UserInfoCache.fallbackName(itemView.context)
+                val start = sb.length
+                sb.append(name)
+                if (onUser != null && !userId.isNullOrBlank()) {
+                    sb.setSpan(
+                        NameSpan(userId, link),
+                        start,
+                        sb.length,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                } else {
+                    sb.setSpan(
+                        ForegroundColorSpan(link),
+                        start,
+                        sb.length,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+            }
+            return sb
+        }
 
         /**
          * 每条评论独占一行：整行（正文 + 行末空白）点击都回复该评论作者。
@@ -341,7 +381,7 @@ class MomentAdapter(
          */
         private fun bindComments(item: MomentItem, list: List<CommentEntry>) {
             val ctx = itemView.context
-            val link = androidx.core.content.ContextCompat.getColor(ctx, R.color.link)
+            val link = linkColor()
             // 复用已有行，避免每次 bind 都 inflate
             while (llComments.childCount > list.size) {
                 llComments.removeViewAt(llComments.childCount - 1)

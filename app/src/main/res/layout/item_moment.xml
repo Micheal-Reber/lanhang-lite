@@ -116,11 +116,12 @@
                 android:visibility="gone">
 
                 <ImageView
+                    android:id="@+id/ivLikesSummary"
                     android:layout_width="@dimen/icon_sm"
                     android:layout_height="@dimen/icon_sm"
                     android:contentDescription="@string/moments_cd_like"
                     android:src="@drawable/ic_favorite_outline"
-                    app:tint="@color/link" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     android:id="@+id/tvLikes"
@@ -129,7 +130,7 @@
                     android:layout_marginStart="@dimen/space_sm"
                     android:layout_weight="1"
                     android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                    android:textColor="@color/link" />
+                    android:textColor="?attr/colorPrimary" />
             </LinearLayout>
 
             <View
@@ -149,12 +150,13 @@
                 android:visibility="gone">
 
                 <ImageView
+                    android:id="@+id/ivCommentsSummary"
                     android:layout_width="@dimen/icon_sm"
                     android:layout_height="@dimen/icon_sm"
                     android:layout_marginTop="@dimen/space_xxs"
                     android:contentDescription="@string/moments_cd_comment"
                     android:src="@drawable/ic_mode_comment"
-                    app:tint="@color/link" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:id="@+id/llComments"
@@ -177,7 +179,7 @@
                 android:id="@+id/llLike"
                 android:layout_width="wrap_content"
                 android:layout_height="@dimen/touch_target_min"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@null"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/space_md"
@@ -203,7 +205,7 @@
                 android:id="@+id/llComment"
                 android:layout_width="wrap_content"
                 android:layout_height="@dimen/touch_target_min"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@null"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/space_md"

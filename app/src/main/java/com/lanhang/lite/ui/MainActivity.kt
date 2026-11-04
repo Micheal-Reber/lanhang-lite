@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity() {
         // 课表页顶栏是透明浮层，内容会从其下方一直画到状态栏；
         // 显式抬高 Z，保证顶栏（标题/菜单图标）永远画在溢出的背景之上。1px 不产生可见阴影。
         binding.toolbar.translationZ = 1f
-        // 课表 Tab 的「标题 + 周次/视图切换」与 toolbar 共用同一块区域（见 activity_main.xml），
+        // 课表 Tab 的标题、居中周次导航和视图切换与 toolbar 共用同一块区域（见 activity_main.xml），
         // 再抬一层：绘制与触摸都排在 toolbar 之前，避免两者叠在同一位置时互相遮住。
         binding.scheduleHeader.translationZ = 2f
         binding.toolbar.setNavigationOnClickListener { toolbarBackAction?.invoke() }

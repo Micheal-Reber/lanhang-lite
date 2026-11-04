@@ -24,6 +24,7 @@ import com.lanhang.lite.R
 import com.lanhang.lite.core.attachDoubleTapToTop
 import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.core.scrollToTopNow
+import com.lanhang.lite.core.SwipeRefreshStyle
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentMomentsBinding
 import com.lanhang.lite.core.ApiException
@@ -129,6 +130,7 @@ class MomentsFragment : Fragment() {
         binding.root.viewTreeObserver.addOnGlobalLayoutListener(onFabLayout)
         binding.recycler.layoutManager = LinearLayoutManager(requireContext())
         binding.recycler.adapter = adapter
+        SwipeRefreshStyle.apply(binding.swipe)
         // 底部留白按底栏形态给（玻璃 112dp / 原生 96dp）：xml 里写死的话切换形态不会跟着变。
         // clipToPadding=false 已在布局里设好，滚到底时这段留白是可见的。
         // 原生 FAB 是不透明实心，光靠底栏留白会让它压住最后一条 → 再让出 FAB 高度 + 8dp；
@@ -502,7 +504,7 @@ class MomentsFragment : Fragment() {
                             item.comments.addAll(fresh.comments.orEmpty())
                             item.likes.clear()
                             item.likes.addAll(fresh.likes.orEmpty())
-                            item.likeCount = fresh.likeCount ?: item.likes.size
+                            item.likeCount = maxOf(fresh.likeCount ?: 0, item.likes.size)
                         } else {
                             item.comments.add(MomentsApi.localComment(feedId, text))
                         }

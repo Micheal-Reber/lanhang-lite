@@ -86,7 +86,7 @@ class MomentActions(
                             item.comments.addAll(fresh.comments.orEmpty())
                             item.likes.clear()
                             item.likes.addAll(fresh.likes.orEmpty())
-                            item.likeCount = fresh.likeCount ?: item.likes.size
+                            item.likeCount = maxOf(fresh.likeCount ?: 0, item.likes.size)
                         } else {
                             item.comments.add(MomentsApi.localComment(feedId, text))
                         }

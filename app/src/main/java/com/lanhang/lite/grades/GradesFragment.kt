@@ -18,6 +18,7 @@ import com.google.android.material.chip.Chip
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LoadState
 import com.lanhang.lite.core.isCancellation
+import com.lanhang.lite.core.SwipeRefreshStyle
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentGradesBinding
 import com.lanhang.lite.session.Session
@@ -57,6 +58,7 @@ class GradesFragment : Fragment() {
         binding.contentGrades.updatePadding(
             bottom = BottomBarDims.contentBottomPadding(requireContext())
         )
+        SwipeRefreshStyle.apply(binding.swipe)
         binding.swipe.setOnRefreshListener {
             if (selectedTerm.isNotEmpty()) loadScores(selectedTerm, network = true)
         }

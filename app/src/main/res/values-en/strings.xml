@@ -373,6 +373,7 @@
     <string name="moments_like">Like %1$d</string>
     <string name="moments_liked">Liked %1$d</string>
     <string name="moments_comment_count">Comment %1$d</string>
+    <string name="moments_copied">Post text copied</string>
     <string name="moments_reply_inline">replied to</string>
     <string name="moments_comment_separator">: </string>
     <string name="moments_server_no_id">The server did not return a post id</string>

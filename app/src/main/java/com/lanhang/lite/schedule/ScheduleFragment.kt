@@ -42,8 +42,6 @@ import kotlin.math.roundToInt
 class ScheduleFragment : Fragment() {
 
     private lateinit var tvWeekPill: MaterialButton
-    private lateinit var btnPrev: MaterialButton
-    private lateinit var btnNext: MaterialButton
     /** 网格/列表切换：单按钮点按（2026-10-25 由两段式分段按钮改回，让周次能真正居中） */
     private lateinit var btnViewSwitch: MaterialButton
     /** 承载所有周次页面的容器，每页一整个视图树，见 [ScheduleWeekPager] */
@@ -83,13 +81,11 @@ class ScheduleFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // 顶栏那组控件（上一周 / 周次胶囊 / 下一周 / 视图切换）自 2026-10-31 起住在
+        // 顶栏那组控件（周次数字 / 视图切换）自 2026-10-31 起住在
         // Activity 的顶栏里（跟「课表」标题同一行、整体靠右，见 activity_main.xml 的 scheduleHeader），
         // 所以从 activity 的视图树取 —— 不在本页的 view 里，view.findViewById 会抛空指针。
         val header = requireActivity()
         tvWeekPill = header.findViewById(R.id.tvWeekPill)
-        btnPrev = header.findViewById(R.id.btnPrevWeek)
-        btnNext = header.findViewById(R.id.btnNextWeek)
         btnViewSwitch = header.findViewById(R.id.btnViewSwitch)
         pagerHost = view.findViewById(R.id.pagerHost)
         tvEmpty = view.findViewById(R.id.tvEmpty)
@@ -136,9 +132,7 @@ class ScheduleFragment : Fragment() {
         style = ScheduleStyle.fromTheme(requireContext())
         applyChromeStyle()
 
-        btnPrev.setOnClickListener { switchWeek(currentWeek - 1) }
-        btnNext.setOnClickListener { switchWeek(currentWeek + 1) }
-        // 周次胶囊点一下 = 选周（原日历按钮，2026-10-31 合并：少一个图标，顶栏更清爽）
+        // 周次数字点一下 = 选周；翻周由横向滑动完成
         tvWeekPill.setOnClickListener { showWeekPicker() }
         // 单按钮切换：点一下就换到另一个视图（图标与无障碍描述见 updateViewSwitch）
         btnViewSwitch.setOnClickListener { switchView(!showingGrid) }
@@ -269,10 +263,6 @@ class ScheduleFragment : Fragment() {
 
     /** 顶栏、面板等「常驻视图」的配色随令牌刷新 */
     private fun applyChromeStyle() {
-        val iconTint = ColorStateList.valueOf(style.onBackgroundVariant)
-        // MaterialButton 用 iconTint（原来的自绘圆形底 + ImageButton 已删除）
-        btnPrev.iconTint = iconTint
-        btnNext.iconTint = iconTint
         tvEmpty.setTextColor(style.onBackgroundVariant)
         // 下拉指示器：默认是系统白圆盘（深色主题/深色背景上像一颗白球），
         // 改成 M3 的「容器色圆盘 + 主色弧」，跟课表自己的配色令牌一起走
@@ -521,7 +511,7 @@ class ScheduleFragment : Fragment() {
      * 无障碍描述要同时给出周号和动作，只留周号的话读屏用户不知道点开是什么。
      */
     private fun updateWeekPill() {
-        tvWeekPill.text = getString(R.string.schedule_week_format, currentWeek)
+        tvWeekPill.text = currentWeek.toString()
         tvWeekPill.contentDescription =
             getString(R.string.schedule_week_pill_desc, currentWeek)
         if (currentWeek == actualCurrentWeek) {
@@ -797,8 +787,9 @@ class ScheduleFragment : Fragment() {
             setTextColor(textColor)
         }
         view.findViewById<TextView>(R.id.tvMeta).apply {
-            text = "${ci.course.teacher ?: ""} · ${ci.course.room ?: ""}"
+            text = ci.course.room.orEmpty()
             setTextColor(textColor)
+            visibility = if (text.isNullOrBlank()) View.GONE else View.VISIBLE
         }
 
         view.setOnClickListener { showCourseDetail(ci) }

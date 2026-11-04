@@ -359,6 +359,7 @@
     <string name="moments_like">赞 %1$d</string>
     <string name="moments_liked">已赞 %1$d</string>
     <string name="moments_comment_count">评论 %1$d</string>
+    <string name="moments_copied">已复制文案</string>
     <string name="moments_reply_inline">回复</string>
     <string name="moments_comment_separator">：</string>
     <string name="moments_server_no_id">服务器未返回动态编号</string>
