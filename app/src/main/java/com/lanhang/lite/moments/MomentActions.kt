@@ -34,7 +34,9 @@ class MomentActions(
                     if (liked) MomentsApi.cancelLike(feedId) else MomentsApi.like(feedId)
                 }
                 if (liked) {
-                    item.likes.removeIf { it.user_id == Session.userId }
+                    if (item.likes.removeIf { it.user_id == Session.userId }) {
+                        item.likeCount = (item.likeCount - 1).coerceAtLeast(0)
+                    }
                 } else {
                     item.likes.add(
                         LikeEntry(
@@ -44,6 +46,7 @@ class MomentActions(
                             create_dt = System.currentTimeMillis()
                         )
                     )
+                    item.likeCount++
                 }
                 notifyItem(feedId)
             } catch (e: Exception) {
@@ -83,6 +86,7 @@ class MomentActions(
                             item.comments.addAll(fresh.comments.orEmpty())
                             item.likes.clear()
                             item.likes.addAll(fresh.likes.orEmpty())
+                            item.likeCount = fresh.likeCount ?: item.likes.size
                         } else {
                             item.comments.add(MomentsApi.localComment(feedId, text))
                         }

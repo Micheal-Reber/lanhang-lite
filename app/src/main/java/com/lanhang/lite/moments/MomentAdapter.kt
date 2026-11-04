@@ -51,6 +51,7 @@ class MomentItem(val feed: MomentFeed) {
     }
     val likes = CopyOnWriteArrayList<LikeEntry>(feed.likes ?: emptyList())
     val comments = CopyOnWriteArrayList<CommentEntry>(feed.comments ?: emptyList())
+    var likeCount: Int = feed.likeCount ?: likes.size
 
     val likedByMe: Boolean get() = likes.any { it.user_id == Session.userId }
 }
@@ -238,6 +239,8 @@ class MomentAdapter(
             val hasLikes = visibleLikes.isNotEmpty()
             val hasComments = visibleComments.isNotEmpty()
             llInteract.visibility = if (hasLikes || hasComments) View.VISIBLE else View.GONE
+            val hiddenLikeCount = item.likes.size - visibleLikes.size
+            val visibleLikeCount = (item.likeCount - hiddenLikeCount).coerceAtLeast(0)
 
             if (hasLikes) {
                 val names = visibleLikes.map { like ->
@@ -263,11 +266,11 @@ class MomentAdapter(
             dividerMid.visibility =
                 if (hasLikes && hasComments) View.VISIBLE else View.GONE
 
-            // 数字与上面列出来的名字 / 评论条数保持一致，否则「写了 3 个名字、标着 4 个赞」
+            // 点赞明细受 like_size 限制，数量使用服务端返回的总数。
             tvLike.text = if (item.likedByMe) {
-                ctx.getString(R.string.moments_liked, visibleLikes.size)
+                ctx.getString(R.string.moments_liked, visibleLikeCount)
             } else {
-                ctx.getString(R.string.moments_like, visibleLikes.size)
+                ctx.getString(R.string.moments_like, visibleLikeCount)
             }
             ivLike.setImageResource(if (item.likedByMe) R.drawable.ic_favorite else R.drawable.ic_favorite_outline)
             val tintRes = if (item.likedByMe) R.color.like_red else R.color.icon_muted
