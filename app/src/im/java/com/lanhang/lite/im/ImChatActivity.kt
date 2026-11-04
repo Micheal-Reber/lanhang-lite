@@ -53,6 +53,10 @@ class ImChatActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityImChatBinding
     private val adapter = Adapter()
+    private var navBottomInset = 0
+    private var inputBaseBottom = 0
+    private var emojiBaseBottom = 0
+    private var attachBaseBottom = 0
 
     private var peerId: String = ""
     private var isGroup: Boolean = false
@@ -96,18 +100,16 @@ class ImChatActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
 
         // 带输入框的页面必须同时消费 ime inset：只靠 adjustResize 在高版本上不生效
-        val inputBaseBottom = binding.inputBar.paddingBottom
+        inputBaseBottom = binding.inputBar.paddingBottom
+        emojiBaseBottom = binding.emojiPanel.paddingBottom
+        attachBaseBottom = binding.attachPanel.paddingBottom
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            navBottomInset = maxOf(bars.bottom, ime.bottom)
             val tb = binding.toolbar
             tb.setPadding(tb.paddingLeft, bars.top, tb.paddingRight, 0)
-            binding.inputBar.setPadding(
-                binding.inputBar.paddingLeft,
-                binding.inputBar.paddingTop,
-                binding.inputBar.paddingRight,
-                inputBaseBottom + maxOf(bars.bottom, ime.bottom)
-            )
+            applyComposerInsets()
             // 键盘一露头就把面板收掉：三者（键盘 / 表情 / 附件）同屏会把输入区顶掉半屏
             if (ime.bottom > 0) hidePanels()
             insets
@@ -229,6 +231,7 @@ class ImChatActivity : AppCompatActivity() {
         hideKeyboard()
         binding.attachPanel.isVisible = false
         binding.emojiPanel.isVisible = true
+        applyComposerInsets()
         scrollToBottom()
     }
 
@@ -236,12 +239,36 @@ class ImChatActivity : AppCompatActivity() {
         hideKeyboard()
         binding.emojiPanel.isVisible = false
         binding.attachPanel.isVisible = true
+        applyComposerInsets()
         scrollToBottom()
     }
 
     private fun hidePanels() {
         binding.emojiPanel.isVisible = false
         binding.attachPanel.isVisible = false
+        applyComposerInsets()
+    }
+
+    private fun applyComposerInsets() {
+        val panelVisible = binding.emojiPanel.isVisible || binding.attachPanel.isVisible
+        binding.inputBar.setPadding(
+            binding.inputBar.paddingLeft,
+            binding.inputBar.paddingTop,
+            binding.inputBar.paddingRight,
+            inputBaseBottom + if (panelVisible) 0 else navBottomInset
+        )
+        binding.emojiPanel.setPadding(
+            binding.emojiPanel.paddingLeft,
+            binding.emojiPanel.paddingTop,
+            binding.emojiPanel.paddingRight,
+            emojiBaseBottom + if (binding.emojiPanel.isVisible) navBottomInset else 0
+        )
+        binding.attachPanel.setPadding(
+            binding.attachPanel.paddingLeft,
+            binding.attachPanel.paddingTop,
+            binding.attachPanel.paddingRight,
+            attachBaseBottom + if (binding.attachPanel.isVisible) navBottomInset else 0
+        )
     }
 
     private fun hideKeyboard() {

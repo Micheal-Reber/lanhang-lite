@@ -4,9 +4,8 @@
   输入区在底部，必须消费 ime inset（项目红线：targetSdk 35 强制 edge-to-edge，
   不处理键盘时输入框会被键盘盖住）；manifest 里同时给 adjustResize 兜底 Android 14-。
 
-  表情面板 / 附件面板都放在输入条**上方**、默认 GONE：与键盘三者互斥
-  （同屏时输入区会被顶掉半个屏幕）。insets 只给 inputBar 加底部 padding，
-  面板夹在 recycler 与 inputBar 之间，键盘弹出时它们一起被顶上去 —— 但那时它们是收起的。
+  表情面板 / 附件面板都放在输入条**下方**、默认 GONE：与键盘三者互斥。
+  输入条始终紧贴消息列表底部，展开面板后面板继续向下延伸到导航栏上方。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -33,152 +32,6 @@
         android:paddingTop="@dimen/space_sm"
         android:paddingBottom="@dimen/space_sm"
         android:scrollbars="none" />
-
-    <!-- 表情面板：网格由代码填充（Unicode emoji，不放位图，包体积零增量） -->
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/emojiPanel"
-        android:layout_width="match_parent"
-        android:layout_height="208dp"
-        android:background="?attr/colorSurfaceVariant"
-        android:visibility="gone">
-
-        <GridLayout
-            android:id="@+id/emojiGrid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="8"
-            android:padding="@dimen/space_sm" />
-    </androidx.core.widget.NestedScrollView>
-
-    <!-- 附件面板：图片 / 视频 / 文件 / 位置（四格平分，微信式密度） -->
-    <LinearLayout
-        android:id="@+id/attachPanel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceVariant"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/space_lg"
-        android:paddingTop="@dimen/space_md"
-        android:paddingEnd="@dimen/space_lg"
-        android:paddingBottom="@dimen/space_md"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:id="@+id/attachImage"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_photo"
-                app:tint="?attr/colorOnSurfaceVariant" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_image"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/attachVideo"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_video"
-                app:tint="?attr/colorOnSurfaceVariant" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_video"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-        <LinearLayout
-            android:id="@+id/attachFile"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_file"
-                app:tint="?attr/colorOnSurfaceVariant" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_file"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/attachLocation"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_location"
-                app:tint="?attr/colorOnSurfaceVariant" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_location"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/inputBar"
@@ -237,5 +90,143 @@
             android:layout_height="wrap_content"
             android:contentDescription="@string/im_send"
             app:icon="@drawable/ic_im_send" />
+    </LinearLayout>
+
+    <!-- 表情面板：输入栏下方展开，网格由代码填充。 -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/emojiPanel"
+        android:layout_width="match_parent"
+        android:layout_height="208dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:visibility="gone">
+
+        <GridLayout
+            android:id="@+id/emojiGrid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="8"
+            android:padding="@dimen/space_sm" />
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- 附件面板：输入栏下方展开，图片 / 视频 / 文件 / 位置四格平分。 -->
+    <LinearLayout
+        android:id="@+id/attachPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceVariant"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_lg"
+        android:paddingTop="@dimen/space_md"
+        android:paddingEnd="@dimen/space_lg"
+        android:paddingBottom="@dimen/space_md"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/attachImage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_sm">
+            <ImageView
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_photo"
+                app:tint="?attr/colorOnSurfaceVariant" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                android:text="@string/im_attach_image"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/attachVideo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_sm">
+            <ImageView
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_im_video"
+                app:tint="?attr/colorOnSurfaceVariant" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                android:text="@string/im_attach_video"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/attachFile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_sm">
+            <ImageView
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_im_file"
+                app:tint="?attr/colorOnSurfaceVariant" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                android:text="@string/im_attach_file"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/attachLocation"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_sm">
+            <ImageView
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_im_location"
+                app:tint="?attr/colorOnSurfaceVariant" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                android:text="@string/im_attach_location"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
