@@ -119,12 +119,14 @@ object MomentCommentSheet {
             binding.etComment.requestFocus()
         }
 
-        // 评论只占键盘上方可用区域的下半屏，输入框始终贴着键盘顶部。
-        // 不再给内容根手动追加 IME padding，否则弹层会被撑成整屏。
-        dialog.behavior.isFitToContents = false
-        dialog.behavior.halfExpandedRatio = 0.5f
         dialog.behavior.skipCollapsed = true
         dialog.show()
-        dialog.behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+        // BottomSheetDialog 的 Window 只有 show() 后才存在；之前在 show() 前设置
+        // adjustResize 实际没有作用，键盘因此直接覆盖了弹层下半部分。
+        dialog.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+        )
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
     }
 }
