@@ -1103,7 +1103,7 @@ class ScheduleFragment : Fragment() {
                     topMargin = y
                 }
             )
-            cols.addView(
+            body.addView(
                 TextView(ctx).apply {
                     text = label
                     setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
