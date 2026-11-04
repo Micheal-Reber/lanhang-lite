@@ -77,13 +77,8 @@ object ClassReminderNotify {
     fun canNotify(context: Context): Boolean =
         NotifPermission.isGranted(context, CHANNEL_ID)
 
-    /**
-     * 弹一条课前提醒。
-     *
-     * @param minutesLeft 距离上课还有几分钟（按**当下**算，不是配置的提前量）：
-     *   闹钟晚到几分钟时，标题会跟着显示真实剩余时间，而不是骗人的「还有 15 分钟」。
-     */
-    fun show(context: Context, slot: ClassReminderPlan.Slot, minutesLeft: Int) {
+    /** 弹一条课前提醒；灵动岛的倒计时由系统按 [slot.startAt] 实时计算。 */
+    fun show(context: Context, slot: ClassReminderPlan.Slot) {
         if (slot.courses.isEmpty()) return
         if (!canNotify(context)) {
             Log.w(TAG, "skip class reminder period=${slot.period}: canNotify=false")
@@ -91,28 +86,24 @@ object ClassReminderNotify {
         }
         ensureChannel(context)
         val text = LocaleHelper.wrap(context)
-        val title = if (minutesLeft <= 0) {
-            text.getString(R.string.class_reminder_title_now)
-        } else {
-            text.getString(R.string.class_reminder_title_minutes, minutesLeft)
-        }
-        val range = PeriodClock.rangeText(slot.period, slot.courses.maxOf { it.end })
-        val lines = slot.courses.map { course ->
+        val courseLines = slot.courses.map { course ->
             if (course.room.isBlank()) {
                 course.name
             } else {
                 text.getString(R.string.class_reminder_course_line, course.name, course.room)
             }
-        } + range
-        val body = lines.filter { it.isNotBlank() }.joinToString("\n")
+        }.filter { it.isNotBlank() }
+        val courseText = courseLines.joinToString("、")
+        val body = (courseLines + PeriodClock.rangeText(slot.period, slot.courses.maxOf { it.end }))
+            .joinToString("\n")
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notifications)
             // 品牌蓝（#084168）：系统拿这个色当通知图标的**底色** —— 状态栏胶囊（Android 16
             // 实时动态 / 各家叫法不同）左上角那个图标圆底、以及通知栏里图标背后的色块，
             // 都取这里。不设的话系统给的是默认中性色，在深色胶囊上等于一块看不出品牌的灰底。
             .setColor(ContextCompat.getColor(context, R.color.notification_accent))
-            .setContentTitle(title)
-            .setContentText(lines.firstOrNull().orEmpty())
+            .setContentTitle(courseText)
+            .setContentText(PeriodClock.rangeText(slot.period, slot.courses.maxOf { it.end }))
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -126,6 +117,9 @@ object ClassReminderNotify {
             builder.setOngoing(true)
                 .setRequestPromotedOngoing(true)
                 .setOnlyAlertOnce(true)
+                // 不把提前量当成倒计时：系统按上课时刻实时显示剩余时间。
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
                 .setWhen(slot.startAt)
         } else {
             builder.setAutoCancel(true)

@@ -27,7 +27,7 @@
         上课提醒（schedule/ClassReminder）：每节课前 N 分钟要准点响。
         `SCHEDULE_EXACT_ALARM` 是**特殊权限**，Android 12+ 需要，且 Android 14 起对
         targetSdk>=33 的新装应用**默认拒绝**（本机 appops 实测就是 default）。
-        未授权时降级 setAndAllowWhileIdle（Doze 里可能延迟几分钟），并在页面上明示。
+        未授权时不上课前提醒闹钟，避免把可能严重延迟的非精确闹钟伪装成准时提醒。
 
         **不要改成 USE_EXACT_ALARM**：那是普通权限、安装即授予，但官方政策只给「闹钟/日历类
         核心功能」用，课表 App 申请有被驳回的风险，语义上我们也确实不是闹钟。
@@ -35,7 +35,7 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!--
         电池优化白名单：国产 ROM 的省电策略会把闹钟攒很久才放行。
-        只用于「去设置」里的一键申请，用户不放行也能用（只是可能延迟）。
+        只用于「去设置」里的一键申请；精确闹钟权限和厂商后台策略是两套独立条件。
     -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -232,7 +232,7 @@
                                 所有用户的提醒会静默消失到下次打开 App）；
           - TIME_SET / TIMEZONE_CHANGED 之前的触发时刻是按旧时钟算的；
           - SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
-                                用户刚在系统里给了精确闹钟权限，原来降级的闹钟要升级。
+                                用户刚在系统里给了精确闹钟权限，重新排入提醒。
         -->
         <receiver
             android:name=".schedule.ClassReminderReceiver"

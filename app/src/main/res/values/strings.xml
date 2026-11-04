@@ -766,6 +766,7 @@
     <string name="class_reminder_next_none">接下来 7 天没有课</string>
     <string name="class_reminder_next_disabled">提醒已关闭</string>
     <string name="class_reminder_next_no_permission">缺少通知权限，开了也不会响</string>
+    <string name="class_reminder_next_no_exact">缺少精确提醒权限，开了也不会准时响</string>
     <string name="class_reminder_section_permissions">权限自检</string>
     <string name="class_reminder_perm_notify">通知权限</string>
     <string name="class_reminder_perm_exact">精确提醒</string>
@@ -776,21 +777,14 @@
     <string name="class_reminder_battery_off">已限制：后台被冻结时，提醒要等你拿起手机才补响</string>
     <string name="class_reminder_channel">上课提醒</string>
     <string name="class_reminder_channel_desc">每节课开始前提醒，可在设置里调整提前量或关闭</string>
-    <string name="class_reminder_title_now">上课时间到了</string>
-    <string name="class_reminder_title_minutes">还有 %1$d 分钟上课</string>
     <string name="class_reminder_course_line">%1$s · %2$s</string>
     <string name="class_reminder_summary_off">已关闭</string>
     <string name="class_reminder_summary_on">已开启 · %1$s</string>
     <string name="class_reminder_summary_blocked">已开启，缺少通知权限</string>
+    <string name="class_reminder_summary_exact_blocked">已开启，缺少精确提醒权限</string>
     <string name="class_reminder_toast_need_notify">需要通知权限才能提醒</string>
     <string name="class_reminder_toast_notify_on">通知权限已开启，上课提醒已打开</string>
     <string name="class_reminder_toast_exact_granted">精确提醒已可用</string>
-    <string name="class_reminder_exact_dialog_title">开启精确提醒？</string>
-    <string name="class_reminder_exact_dialog_message">系统默认不允许应用使用精确闹钟。不开启时，提醒可能晚几分钟到一小时，甚至在上课之后才响——那样这条提醒会被跳过。\n\n这是系统权限，只能在这里跳过去手动开，应用自己开不了。</string>
-    <string name="class_reminder_exact_dialog_later">以后再说</string>
-    <string name="class_reminder_exact_dialog_open">去开启</string>
-    <!-- 「60 秒后测试」在缺少精确闹钟权限时会必然迟到，先说明原因再问要不要继续 -->
-
     <!-- ===== 自建课程（本地层，与学校课表分开存） ===== -->
     <string name="local_course_add">添加课程</string>
     <string name="local_course_edit">编辑课程</string>

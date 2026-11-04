@@ -46,7 +46,7 @@ class ClassReminderReceiver : BroadcastReceiver() {
                 // 用户改了时间 / 换了时区：之前按旧时区算出的触发时刻已经不对了
                 Intent.ACTION_TIME_CHANGED,
                 Intent.ACTION_TIMEZONE_CHANGED,
-                // 用户刚在系统设置里给了「闹钟和提醒」权限：原来降级的闹钟要升级成精确的
+                // 用户刚在系统设置里给了「闹钟和提醒」权限：重新排入精确闹钟
                 "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
                 -> ClassReminder.rearm(app)
             }

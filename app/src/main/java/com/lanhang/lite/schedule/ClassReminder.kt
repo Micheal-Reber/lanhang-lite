@@ -107,7 +107,10 @@ object ClassReminder {
         } else {
             null
         }
-        if (!store.enabled || data == null || !ClassReminderNotify.canNotify(app)) {
+        if (!store.enabled || data == null ||
+            !ClassReminderNotify.canNotify(app) ||
+            !canScheduleExact(app)
+        ) {
             cancelArmed(app, manager)
             // 提醒关掉了，别再让「上课勿扰」的残留档位挂着（下课那次闹钟可能永远不会来）
             ClassDnd.restore(app)
@@ -217,8 +220,7 @@ object ClassReminder {
         val lateBy = now - slot.startAt
         val tolerated = if (store.advanceMinutes <= 0) GRACE_WHEN_ON_TIME else 0L
         if (lateBy > tolerated) return
-        val minutesLeft = ((slot.startAt - now + 59_999L) / 60_000L).toInt().coerceAtLeast(0)
-        ClassReminderNotify.show(app, slot, minutesLeft)
+        ClassReminderNotify.show(app, slot)
         // 课前那条发出去之后，把「上课」「下课」两个边界也挂上，供课中提醒收尾
         armBoundaries(app, slot)
     }
@@ -317,7 +319,7 @@ object ClassReminder {
         return text.getString(R.string.class_reminder_next_value, whenText, courseText + more)
     }
 
-    /** 精确闹钟权限：false 时降级为非精确（Doze 里可能延迟几分钟） */
+    /** 精确闹钟权限；课前提醒没有精确权限时不排程，避免提前量失真。 */
     fun canScheduleExact(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val manager = context.getSystemService(AlarmManager::class.java) ?: return false
@@ -384,12 +386,7 @@ object ClassReminder {
         }
     }
 
-    /**
-     * 有精确闹钟权限用 `setExactAndAllowWhileIdle`，没有就降级 `setAndAllowWhileIdle`。
-     *
-     * 降级后仍要 `AllowWhileIdle`：普通的 `set()` 在 Doze 里会被推到维护窗口（可能几小时后），
-     * 那等于没提醒。降级后的误差是「9 分钟限频 + 系统攒批」，页面上的黄条要如实写「可能延迟」。
-     */
+    /** 课前提醒必须使用精确闹钟；没有权限时由 [rearm] 直接撤销，不排非精确替代品。 */
     private fun setAlarm(
         context: Context,
         manager: AlarmManager,
@@ -397,23 +394,13 @@ object ClassReminder {
         at: Long,
         pending: PendingIntent
     ) {
-        if (canScheduleExact(context)) {
-            runCatching {
-                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            }.onFailure {
-                if (it is SecurityException) {
-                    Log.w(TAG, "exact denied for $requestCode, fallback", it)
-                    runCatching {
-                        manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-                    }
-                } else {
-                    Log.w(TAG, "set exact failed for $requestCode", it)
-                }
-            }
+        if (!canScheduleExact(context)) {
+            Log.w(TAG, "exact alarm unavailable for $requestCode")
             return
         }
-        runCatching { manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending) }
-            .onFailure { Log.w(TAG, "set idle failed for $requestCode", it) }
+        runCatching {
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+        }.onFailure { Log.w(TAG, "set exact failed for $requestCode", it) }
     }
 
     /**

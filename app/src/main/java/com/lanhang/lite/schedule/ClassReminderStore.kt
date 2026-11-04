@@ -53,11 +53,6 @@ object ClassReminderStore {
         }
         set(value) = sp.edit().putInt("advance_minutes", value.coerceIn(0, 60)).apply()
 
-    /** 是否已经跳过一次精确闹钟授权页（避免每次进页面都把用户弹出去） */
-    var exactAsked: Boolean
-        get() = sp.getBoolean("exact_asked", false)
-        set(value) = sp.edit().putBoolean("exact_asked", value).apply()
-
     /**
      * 上课自动勿扰（上课切「仅闹钟」、下课恢复原档位）。
      *
@@ -76,6 +71,9 @@ object ClassReminderStore {
         if (!enabled) return text.getString(R.string.class_reminder_summary_off)
         if (!ClassReminderNotify.canNotify(context)) {
             return text.getString(R.string.class_reminder_summary_blocked)
+        }
+        if (!ClassReminder.canScheduleExact(context)) {
+            return text.getString(R.string.class_reminder_summary_exact_blocked)
         }
         return text.getString(R.string.class_reminder_summary_on, advanceLabel(context))
     }
