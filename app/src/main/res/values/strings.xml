@@ -273,8 +273,6 @@
     <string name="schedule_refresh_failed">刷新失败：%1$s</string>
     <string name="schedule_week_pill_desc">第 %1$d 周，点击切换周次</string>
     <string name="schedule_week_picker_title">选择周次</string>
-    <string name="schedule_prev_week">上一周</string>
-    <string name="schedule_next_week">下一周</string>
     <!-- 右上角按钮的语义：描述「点一下会切到哪个视图」，图标与之一致 -->
     <string name="schedule_switch_to_week">切换到周视图</string>
     <string name="schedule_switch_to_grid">切换到网格视图</string>

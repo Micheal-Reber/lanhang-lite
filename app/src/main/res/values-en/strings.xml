@@ -288,8 +288,6 @@
     <string name="schedule_refresh_failed">Refresh failed: %1$s</string>
     <string name="schedule_week_pill_desc">Week %1$d, tap to switch week</string>
     <string name="schedule_week_picker_title">Choose a week</string>
-    <string name="schedule_prev_week">Previous week</string>
-    <string name="schedule_next_week">Next week</string>
     <string name="schedule_switch_to_week">Switch to week view</string>
     <string name="schedule_switch_to_grid">Switch to grid view</string>
     <string name="schedule_break_noon">Lunch</string>

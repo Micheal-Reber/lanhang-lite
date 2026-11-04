@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -300,47 +299,9 @@ class MyMomentsActivity : AppCompatActivity() {
     }
 
     private fun askComment(item: MomentItem, replyToUserId: String? = null) {
-        val feedId = item.feed.feed_id ?: return
-        val input = EditText(this).apply {
-            hint = getString(R.string.moments_comment_hint)
-            setPadding(48, 32, 48, 16)
+        MomentCommentSheet.show(this, item, replyToUserId) {
+            item.feed.feed_id?.let { notifyFeedChanged(it) }
         }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(
-                if (replyToUserId.isNullOrEmpty()) getString(R.string.moments_comment_title)
-                else getString(
-                    R.string.moments_reply_title,
-                    UserInfoCache.nameOf(replyToUserId) ?: UserInfoCache.fallbackName(this)
-                )
-            )
-            .setView(input)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.common_send) { _, _ ->
-                val text = input.text.toString().trim()
-                if (text.isEmpty()) return@setPositiveButton
-                lifecycleScope.launch {
-                    try {
-                        val fresh = withContext(Dispatchers.IO) {
-                            MomentsApi.postComment(feedId, text, replyToUserId)
-                            runCatching { MomentsApi.getFeed(feedId) }.getOrNull()
-                        }
-                        if (fresh != null) {
-                            item.comments.clear()
-                            item.comments.addAll(fresh.comments.orEmpty())
-                            item.likes.clear()
-                            item.likes.addAll(fresh.likes.orEmpty())
-                            item.likeCount = maxOf(fresh.likeCount ?: 0, item.likes.size)
-                        } else {
-                            item.comments.add(MomentsApi.localComment(feedId, text))
-                        }
-                        notifyFeedChanged(feedId)
-                        toast(getString(R.string.moments_sent))
-                    } catch (e: Exception) {
-                        toast(e.userMessage(this@MyMomentsActivity, R.string.moments_send_failed))
-                    }
-                }
-            }
-            .show()
     }
 
     private fun showMyComments(item: MomentItem) {

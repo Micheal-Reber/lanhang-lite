@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -475,48 +474,12 @@ class MomentsFragment : Fragment() {
 
 
     private fun askComment(item: MomentItem, replyToUserId: String? = null) {
-        val feedId = item.feed.feed_id ?: return
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.moments_comment_hint)
-            setPadding(48, 32, 48, 16)
-        }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(
-                if (replyToUserId.isNullOrEmpty()) getString(R.string.moments_comment_title)
-                else getString(
-                    R.string.moments_reply_title,
-                    UserInfoCache.nameOf(replyToUserId) ?: UserInfoCache.fallbackName(requireContext())
-                )
-            )
-            .setView(input)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.common_send) { _, _ ->
-                val text = input.text.toString().trim()
-                if (text.isEmpty()) return@setPositiveButton
-                viewLifecycleOwner.lifecycleScope.launch {
-                    try {
-                        val fresh = withContext(Dispatchers.IO) {
-                            MomentsApi.postComment(feedId, text, replyToUserId)
-                            runCatching { MomentsApi.getFeed(feedId) }.getOrNull()
-                        }
-                        if (fresh != null) {
-                            item.comments.clear()
-                            item.comments.addAll(fresh.comments.orEmpty())
-                            item.likes.clear()
-                            item.likes.addAll(fresh.likes.orEmpty())
-                            item.likeCount = maxOf(fresh.likeCount ?: 0, item.likes.size)
-                        } else {
-                            item.comments.add(MomentsApi.localComment(feedId, text))
-                        }
-                        adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
-                        glassFab?.invalidate()
-                        toast(getString(R.string.moments_sent))
-                    } catch (e: Exception) {
-                        toast(e.userMessage(requireContext(), R.string.moments_send_failed))
-                    }
-                }
+        MomentCommentSheet.show(requireActivity(), item, replyToUserId) {
+            item.feed.feed_id?.let { feedId ->
+                adapter.notifyItemChanged(adapter.indexOf(feedId).coerceAtLeast(0))
             }
-            .show()
+            glassFab?.invalidate()
+        }
     }
 
     /** 长按评论区：列出自己发过的评论，可删除（DELETE /comment/{feed}/{comment}） */
