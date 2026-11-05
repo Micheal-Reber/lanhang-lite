@@ -765,14 +765,13 @@
     <string name="class_reminder_next_none">接下来 7 天没有课</string>
     <string name="class_reminder_next_disabled">提醒已关闭</string>
     <string name="class_reminder_next_no_permission">缺少通知权限，开了也不会响</string>
-    <string name="class_reminder_next_no_exact">缺少精确提醒权限，开了也不会准时响</string>
     <string name="class_reminder_section_permissions">权限自检</string>
     <string name="class_reminder_perm_notify">通知权限</string>
     <string name="class_reminder_perm_exact">精确提醒</string>
     <string name="class_reminder_perm_battery">电池优化</string>
     <string name="class_reminder_status_on">已开启</string>
     <string name="class_reminder_notify_off">未开启，提醒不会出现</string>
-    <string name="class_reminder_exact_off">未开启，提醒可能晚到甚至被跳过</string>
+    <string name="class_reminder_exact_off">未开启，系统可能延迟；开启后更准时</string>
     <string name="class_reminder_battery_off">已限制：后台被冻结时，提醒要等你拿起手机才补响</string>
     <string name="class_reminder_channel">上课提醒</string>
     <string name="class_reminder_channel_desc">每节课开始前提醒，可在设置里调整提前量或关闭</string>
@@ -780,7 +779,7 @@
     <string name="class_reminder_summary_off">已关闭</string>
     <string name="class_reminder_summary_on">已开启 · %1$s</string>
     <string name="class_reminder_summary_blocked">已开启，缺少通知权限</string>
-    <string name="class_reminder_summary_exact_blocked">已开启，缺少精确提醒权限</string>
+    <string name="class_reminder_summary_exact_blocked">已开启，系统可能延迟</string>
     <string name="class_reminder_toast_need_notify">需要通知权限才能提醒</string>
     <string name="class_reminder_toast_notify_on">通知权限已开启，上课提醒已打开</string>
     <string name="class_reminder_toast_exact_granted">精确提醒已可用</string>

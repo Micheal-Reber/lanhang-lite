@@ -68,8 +68,6 @@ class ClassReminderActivity : AppCompatActivity() {
      * 非精确闹钟在 Doze/国产 ROM 后台冻结下可能延迟数分钟到数小时，
      * 对「提前 N 分钟」这个功能来说等同于错误结果，所以不再先打开开关。
      */
-    private var pendingExactEnable = false
-
     /**
      * 「刚点了上课勿扰、但还没给勿扰权限」这个意图。
      *
@@ -138,15 +136,6 @@ class ClassReminderActivity : AppCompatActivity() {
         } else if (ClassReminderStore.enabled && !ClassReminderNotify.canNotify(this)) {
             ClassReminder.rearm(this)
         }
-        if (pendingExactEnable) {
-            if (ClassReminder.canScheduleExact(this)) {
-                pendingExactEnable = false
-                ClassReminderStore.enabled = true
-                ClassReminder.rearm(this)
-                Toast.makeText(this, R.string.class_reminder_toast_exact_granted, Toast.LENGTH_SHORT)
-                    .show()
-            }
-        }
         // 从勿扰权限页回来：给了就留下开关，没给就把开关弹回关态 ——
         // 留一个「开着但一次都不会生效」的开关，比不让开更误导
         if (pendingDnd) {
@@ -168,12 +157,6 @@ class ClassReminderActivity : AppCompatActivity() {
     private fun applyPendingEnable() {
         if (!pendingEnable) return
         pendingEnable = false
-        if (!ClassReminder.canScheduleExact(this)) {
-            pendingExactEnable = true
-            render()
-            requestExactPermission()
-            return
-        }
         ClassReminderStore.enabled = true
         render()
         ClassReminder.rearm(this)
@@ -199,13 +182,6 @@ class ClassReminderActivity : AppCompatActivity() {
                 setSwitchSilently(false)
                 render()
                 NotifPermission.request(this, notifyPermission, ClassReminderNotify.CHANNEL_ID)
-                return@setOnCheckedChangeListener
-            }
-            if (!ClassReminder.canScheduleExact(this)) {
-                pendingExactEnable = true
-                setSwitchSilently(false)
-                render()
-                requestExactPermission()
                 return@setOnCheckedChangeListener
             }
             ClassReminderStore.enabled = true
@@ -432,7 +408,6 @@ class ClassReminderActivity : AppCompatActivity() {
         binding.tvNext.text = when {
             !enabled -> getString(R.string.class_reminder_next_disabled)
             !notifyOk -> getString(R.string.class_reminder_next_no_permission)
-            !exactOk -> getString(R.string.class_reminder_next_no_exact)
             else -> ClassReminder.nextSlotText(this, data)
                 ?: getString(R.string.class_reminder_next_none)
         }

@@ -762,14 +762,13 @@
     <string name="class_reminder_next_none">No classes in the next 7 days</string>
     <string name="class_reminder_next_disabled">Reminders are off</string>
     <string name="class_reminder_next_no_permission">Notifications are blocked, so nothing will appear</string>
-    <string name="class_reminder_next_no_exact">Exact alarm permission is missing, so reminders will not be on time</string>
     <string name="class_reminder_section_permissions">Permissions</string>
     <string name="class_reminder_perm_notify">Notifications</string>
     <string name="class_reminder_perm_exact">Exact alarms</string>
     <string name="class_reminder_perm_battery">Battery optimization</string>
     <string name="class_reminder_status_on">Allowed</string>
     <string name="class_reminder_notify_off">Not allowed, reminders will not appear</string>
-    <string name="class_reminder_exact_off">Not allowed — reminders may arrive late or be skipped</string>
+    <string name="class_reminder_exact_off">Off — the system may delay reminders; enabling it improves timing</string>
     <string name="class_reminder_battery_off">Restricted: while the app is frozen, reminders only fire once you pick up the phone</string>
     <string name="class_reminder_channel">Class reminders</string>
     <string name="class_reminder_channel_desc">Reminds you before each class. Adjust the lead time or turn it off in settings.</string>
@@ -777,7 +776,7 @@
     <string name="class_reminder_summary_off">Off</string>
     <string name="class_reminder_summary_on">On · %1$s</string>
     <string name="class_reminder_summary_blocked">On, but notifications are blocked</string>
-    <string name="class_reminder_summary_exact_blocked">On, but exact alarm permission is missing</string>
+    <string name="class_reminder_summary_exact_blocked">On, but the system may delay reminders</string>
     <string name="class_reminder_toast_need_notify">Notification permission is required for reminders</string>
     <string name="class_reminder_toast_notify_on">Notifications allowed — class reminders are on</string>
     <string name="class_reminder_toast_exact_granted">Exact reminders are available</string>

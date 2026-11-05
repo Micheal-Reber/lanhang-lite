@@ -107,10 +107,7 @@ object ClassReminder {
         } else {
             null
         }
-        if (!store.enabled || data == null ||
-            !ClassReminderNotify.canNotify(app) ||
-            !canScheduleExact(app)
-        ) {
+        if (!store.enabled || data == null || !ClassReminderNotify.canNotify(app)) {
             cancelArmed(app, manager)
             // 提醒关掉了，别再让「上课勿扰」的残留档位挂着（下课那次闹钟可能永远不会来）
             ClassDnd.restore(app)
@@ -217,9 +214,10 @@ object ClassReminder {
         // 同一夜冻结里小组件 00:05 的午夜闹钟也是 08:47 才补投。排期没错，是后台被冻住、
         // 解冻后补发。留一行日志，下次「又晚了」能直接分清是排期还是投递。
         Log.i(TAG, "slot ${slot.key} delivered ${now - slot.triggerAt}ms after trigger")
-        val lateBy = now - slot.startAt
-        val tolerated = if (store.advanceMinutes <= 0) GRACE_WHEN_ON_TIME else 0L
-        if (lateBy > tolerated) return
+        if (now >= slot.startAt) {
+            Log.i(TAG, "skip started slot ${slot.key}: delivered after class start")
+            return
+        }
         ClassReminderNotify.show(app, slot)
         // 课前那条发出去之后，把「上课」「下课」两个边界也挂上，供课中提醒收尾
         armBoundaries(app, slot)
@@ -386,7 +384,10 @@ object ClassReminder {
         }
     }
 
-    /** 课前提醒必须使用精确闹钟；没有权限时由 [rearm] 直接撤销，不排非精确替代品。 */
+    /**
+     * 优先使用精确闹钟；没有特殊权限时仍使用允许待机的非精确闹钟。
+     * 精确闹钟权限是可选的系统特殊权限，不应成为提醒功能的隐形总开关。
+     */
     private fun setAlarm(
         context: Context,
         manager: AlarmManager,
@@ -394,13 +395,14 @@ object ClassReminder {
         at: Long,
         pending: PendingIntent
     ) {
-        if (!canScheduleExact(context)) {
-            Log.w(TAG, "exact alarm unavailable for $requestCode")
-            return
-        }
         runCatching {
-            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-        }.onFailure { Log.w(TAG, "set exact failed for $requestCode", it) }
+            if (canScheduleExact(context)) {
+                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            } else {
+                Log.w(TAG, "exact alarm unavailable for $requestCode; using fallback")
+                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            }
+        }.onFailure { Log.w(TAG, "set alarm failed for $requestCode", it) }
     }
 
     /**
@@ -485,5 +487,4 @@ object ClassReminder {
         )
 
     /** 提前量 0 时闹钟响在「上课那一刻」，系统投递本身就带几十毫秒延迟，不给宽限就永远不响 */
-    private const val GRACE_WHEN_ON_TIME = 3 * 60_000L
 }
