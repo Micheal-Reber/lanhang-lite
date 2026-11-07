@@ -741,48 +741,6 @@
     <string name="campus_net_err_expired">认证超时，请重试</string>
     <string name="campus_net_err_too_frequent">两次认证间隔太短，请 10 秒后再试</string>
     <string name="campus_net_err_locked">密码错误次数过多，账号已锁定，请 5 分钟后再试</string>
-    <!-- ========== 上课提醒（设置 → 工具 → 上课提醒） ========== -->
-    <string name="settings_class_reminder">上课提醒</string>
-    <string name="class_reminder_title">上课提醒</string>
-    <string name="class_reminder_enable">上课前提醒</string>
-    <string name="class_reminder_enable_desc">按课表在每节课开始前发一条通知。没有课的日子（含寒暑假）不会响。</string>
-    <string name="class_reminder_no_data">课表数据还没加载，先去课表页刷新一次，否则算不出上课时间。</string>
-    <string name="class_reminder_section_content">提醒内容</string>
-    <string name="class_reminder_advance">提前量</string>
-    <string name="class_reminder_advance_desc">提前量过大时，提醒可能落在上一节课的课堂上。</string>
-    <string name="class_reminder_advance_zero">上课时</string>
-    <string name="class_reminder_advance_value">%1$d 分钟前</string>
-    <string name="class_reminder_next">下一次提醒</string>
-    <string name="class_reminder_dnd">上课自动勿扰</string>
-    <string name="class_reminder_dnd_need_access">需要「勿扰权限」才能生效，点这一行去开启</string>
-    <string name="class_reminder_dnd_on">已授权，上课时自动切到仅闹钟</string>
-    <string name="class_reminder_dnd_toast_on">已开启上课自动勿扰</string>
-    <string name="class_reminder_dnd_toast_need">没有勿扰权限，上课勿扰不会生效</string>
-    <string name="class_reminder_promote_hint">状态栏上还没显示实时提醒：需要在系统设置里给本应用打开「实时活动 / 允许提升通知」。点这里去开。</string>
-    <string name="class_reminder_next_value">%1$s · %2$s</string>
-    <string name="class_reminder_next_more"> 等 %1$d 门</string>
-    <string name="class_reminder_next_no_course">（课程名缺失）</string>
-    <string name="class_reminder_next_none">接下来 7 天没有课</string>
-    <string name="class_reminder_next_disabled">提醒已关闭</string>
-    <string name="class_reminder_next_no_permission">缺少通知权限，开了也不会响</string>
-    <string name="class_reminder_section_permissions">权限自检</string>
-    <string name="class_reminder_perm_notify">通知权限</string>
-    <string name="class_reminder_perm_exact">精确提醒</string>
-    <string name="class_reminder_perm_battery">电池优化</string>
-    <string name="class_reminder_status_on">已开启</string>
-    <string name="class_reminder_notify_off">未开启，提醒不会出现</string>
-    <string name="class_reminder_exact_off">未开启，系统可能延迟；开启后更准时</string>
-    <string name="class_reminder_battery_off">已限制：后台被冻结时，提醒要等你拿起手机才补响</string>
-    <string name="class_reminder_channel">上课提醒</string>
-    <string name="class_reminder_channel_desc">每节课开始前提醒，可在设置里调整提前量或关闭</string>
-    <string name="class_reminder_course_line">%1$s · %2$s</string>
-    <string name="class_reminder_summary_off">已关闭</string>
-    <string name="class_reminder_summary_on">已开启 · %1$s</string>
-    <string name="class_reminder_summary_blocked">已开启，缺少通知权限</string>
-    <string name="class_reminder_summary_exact_blocked">已开启，系统可能延迟</string>
-    <string name="class_reminder_toast_need_notify">需要通知权限才能提醒</string>
-    <string name="class_reminder_toast_notify_on">通知权限已开启，上课提醒已打开</string>
-    <string name="class_reminder_toast_exact_granted">精确提醒已可用</string>
     <!-- ===== 自建课程（本地层，与学校课表分开存） ===== -->
     <string name="local_course_add">添加课程</string>
     <string name="local_course_edit">编辑课程</string>
@@ -867,4 +825,123 @@
     <string name="login_diag_dns">DNS 解析异常：连学校服务器的名字都解析不到</string>
     <string name="login_diag_ok">正常（%1$d 毫秒）</string>
     <string name="login_diag_conclusion">学校主接口不可达 —— 这就是登录失败的原因。请改用校园网或 VPN 再试。</string>
+    <!-- ==================== 课程提醒（移植 Sleepy） ==================== -->
+    <!-- 设置目录入口 -->
+    <string name="settings_reminder">提醒</string>
+    <string name="reminder_experimental_tag">实验</string>
+    <string name="settings_reminder_test_compatibility">测试与兼容性</string>
+    <string name="reminder_fluid_test_status_casting">投放中</string>
+    <string name="settings_reminder_permissions_attention">提醒权限需要处理</string>
+    <string name="settings_reminder_widget_optional">小组件仅作为诊断参考，不是接收提醒的必要条件。</string>
+
+    <!-- 页面标题与总开关 -->
+    <string name="reminder_title">提醒</string>
+    <string name="reminder_master_title">开启提醒</string>
+    <string name="reminder_master_sub">允许蓝航Lite 发送课程通知</string>
+
+    <!-- 每日提醒 -->
+    <string name="reminder_daily_title">每日提醒</string>
+    <string name="reminder_daily_sub">每天定时推送今日摘要与明日预告</string>
+    <string name="reminder_daily_today_toggle_title">今日摘要</string>
+    <string name="reminder_daily_today_toggle_sub">在设定时间推送今日课程摘要</string>
+    <string name="reminder_tomorrow_toggle_title">明日预告</string>
+    <string name="reminder_tomorrow_toggle_sub">前一天晚上推送明日课程摘要</string>
+    <string name="reminder_daily_time_label">今日摘要时间</string>
+    <string name="reminder_tomorrow_time_label">明日预告时间</string>
+    <string name="reminder_daily_preview">示例：今日 15 号，您有 3 节课。第一节课是「高等数学」，于 08:00 在教学楼A101 上课</string>
+    <string name="reminder_preview_today_date">今日 %1$s（%2$s）</string>
+    <string name="reminder_preview_tomorrow_date">明日 %1$s（%2$s）</string>
+    <string name="reminder_preview_date">%1$s（%2$s）</string>
+    <string name="reminder_preview_teacher">，老师：%1$s</string>
+    <string name="reminder_daily_preview_dynamic">示例：%1$s，您有 %2$d 节课。第一节课是「%3$s」，于 %4$s 在 %5$s 上课%6$s</string>
+    <string name="reminder_daily_preview_dynamic_no_course">示例：%1$s，暂无课程。</string>
+
+    <!-- 每节课前提醒 -->
+    <string name="reminder_before_class_title">每节课前提醒</string>
+    <string name="reminder_before_class_sub">在每节课开始前提醒下节课信息</string>
+    <string name="reminder_before_minutes_label">提前</string>
+    <string name="reminder_before_minutes_unit">分钟</string>
+    <string name="reminder_before_class_preview">示例：下节课「高等数学」于 08:00 在教学楼A101 上课</string>
+    <string name="reminder_before_class_preview_dynamic">示例：%1$s，下节课是「%2$s」，于 %3$s 在 %4$s 上课%5$s</string>
+    <string name="reminder_before_class_preview_dynamic_no_course">示例：未来没有可提醒的课程。</string>
+
+    <!-- 提醒形态与流体云 -->
+    <string name="reminder_fluid_title">流体云 / 超级岛</string>
+    <string name="reminder_mode_label">提醒形态</string>
+    <string name="reminder_mode_banner">横幅</string>
+    <string name="reminder_mode_fluid">流体云</string>
+    <string name="reminder_mode_banner_sub">系统通知栏普通横幅，可手动划掉；手环 / 手表同步不受影响</string>
+    <string name="reminder_mode_fluid_sub">在支持的小米 / vivo / 三星 / 魅族手机上显示实时课程卡片；系统不支持时可能不显示</string>
+    <string name="reminder_fluid_fields">胶囊主显示内容</string>
+    <string name="reminder_fluid_fields_hint">选择一个主显示内容</string>
+    <string name="reminder_fluid_field_name">课程名称</string>
+    <string name="reminder_fluid_field_time">上课时间</string>
+    <string name="reminder_fluid_field_room">上课地点</string>
+    <string name="reminder_fluid_field_countdown">倒计时</string>
+    <string name="reminder_fluid_note">点击通知后可展开课程详情。具体是否显示为流体云 / 超级岛由手机系统、通知权限和厂商服务资格决定。</string>
+    <string name="reminder_fluid_status_notification_required">需要通知权限才能开启此功能</string>
+    <string name="reminder_fluid_status_unknown">无法直接读取流体云 / 超级岛的授权状态。点击「去设置」跳转到通知设置，确认系统权限。</string>
+    <string name="reminder_fluid_status_enabled">已开启流体云 / 超级岛授权</string>
+    <string name="reminder_fluid_status_settings_required">需要先在系统设置中开启流体云 / 超级岛授权</string>
+    <string name="reminder_fluid_status_not_supported">当前设备系统不支持流体云 / 超级岛</string>
+    <string name="reminder_fluid_go_to_settings">去设置</string>
+    <string name="reminder_fluid_test_button">流体云测试</string>
+    <string name="reminder_fluid_test_started">流体云测试已发送，查看通知栏顶部卡片</string>
+    <string name="reminder_fluid_test_stop_button">结束投放</string>
+    <string name="reminder_fluid_test_start_failed">流体云测试启动失败，请重试</string>
+    <string name="reminder_fluid_test_stop_failed">流体云测试停止失败，请重试</string>
+    <string name="reminder_fluid_gate_title">投放前权限检查</string>
+    <string name="reminder_fluid_gate_message">以下条件未满足，直接投放可能看不到流体云：</string>
+    <string name="reminder_fluid_gate_notification">通知权限未授权</string>
+    <string name="reminder_fluid_gate_promoted">系统实时更新授权未开启</string>
+    <string name="reminder_fluid_gate_vendor">厂商实时卡片能力异常</string>
+    <string name="reminder_fluid_gate_cast_anyway">仍要投放</string>
+    <string name="reminder_fluid_gate_go_settings">去设置</string>
+    <string name="reminder_fluid_test_course">测试课程</string>
+    <string name="reminder_fluid_test_room">测试地点</string>
+
+    <!-- 上课自动勿扰 -->
+    <string name="reminder_class_dnd_title">上课自动勿扰</string>
+    <string name="reminder_class_dnd_sub">上课时段自动开启勿扰，下课自动恢复</string>
+    <string name="reminder_dnd_permission_needed">需要先在系统设置中允许本应用修改勿扰设置</string>
+
+    <!-- 后台可靠性 -->
+    <string name="reminder_reliability_title">权限与后台运行</string>
+    <string name="reminder_reliability_notification">通知权限：%1$s</string>
+    <string name="reminder_reliability_exact_alarm">精确提醒：%1$s</string>
+    <string name="reminder_reliability_battery">电池优化：%1$s</string>
+    <string name="reminder_reliability_widget">桌面小组件：%1$s</string>
+    <string name="reminder_reliability_vendor">厂商实时卡片：%1$s</string>
+    <string name="reminder_reliability_promoted">系统实时更新授权：%1$s</string>
+    <string name="reminder_reliability_not_applicable">系统不适用</string>
+    <string name="reminder_reliability_ready">已满足</string>
+    <string name="reminder_reliability_missing">未满足</string>
+    <string name="reminder_reliability_unknown">未知</string>
+    <string name="reminder_reliability_hint">点击「精确提醒」或「电池优化」可跳到对应的系统设置页。</string>
+    <string name="reminder_pick_time">选择提醒时间</string>
+
+    <!-- 通知渠道与通知正文 -->
+    <string name="notif_channel_daily">每日课程提醒</string>
+    <string name="notif_channel_daily_desc">每天在指定时间推送当天或明日课程摘要</string>
+    <string name="notif_channel_before_class">课前提醒</string>
+    <string name="notif_channel_before_class_desc">每节课开始前推送下节课信息</string>
+    <string name="notif_channel_fluid">流体云 / 超级岛</string>
+    <string name="notif_channel_fluid_desc">课前显示可展开的课程实时卡片</string>
+    <string name="notif_daily_title">今天有 %1$d 次课</string>
+    <string name="notif_daily_title_no_course">今天没有课</string>
+    <string name="notif_daily_text_no_course">好好休息，享受一天！</string>
+    <string name="notif_tomorrow_title">明天有 %1$d 次课</string>
+    <string name="notif_tomorrow_title_no_course">明天没有课</string>
+    <string name="notif_tomorrow_text_no_course">好好休息，享受一天！</string>
+    <string name="notif_date_title">%1$s · %2$d 次课</string>
+    <string name="notif_date_no_course">%1$s 没有课</string>
+    <string name="notif_before_class_compact">%1$s 开始 · %2$s</string>
+    <string name="notif_room_unknown">未知教室</string>
+    <string name="agenda_first">首课 %1$s</string>
+    <string name="agenda_more">另有 %1$d 次课</string>
+    <string name="agenda_time_unknown">时间待定</string>
+    <string name="default_course_name">课程</string>
+    <string name="default_room">上课地点</string>
+    <string name="fluid_coloros_countdown">%1$d 分钟后上课</string>
+    <string name="fluid_coloros_capsule">%1$d 分钟后</string>
 </resources>

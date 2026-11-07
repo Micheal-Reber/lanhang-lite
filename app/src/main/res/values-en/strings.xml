@@ -738,48 +738,6 @@
     <string name="campus_net_err_expired">Sign-in timed out, please try again</string>
     <string name="campus_net_err_too_frequent">Too soon after the last attempt, please retry in 10 seconds</string>
     <string name="campus_net_err_locked">Too many wrong passwords, the account is locked. Please retry in 5 minutes</string>
-    <!-- ========== Class reminders (Settings > Tools) ========== -->
-    <string name="settings_class_reminder">Class reminders</string>
-    <string name="class_reminder_title">Class reminders</string>
-    <string name="class_reminder_enable">Remind before class</string>
-    <string name="class_reminder_enable_desc">Sends a notification before each class, based on your timetable. Nothing is sent on days without classes, including holidays.</string>
-    <string name="class_reminder_no_data">Your timetable is not loaded yet. Refresh it on the schedule tab first, otherwise class times cannot be calculated.</string>
-    <string name="class_reminder_section_content">Reminder</string>
-    <string name="class_reminder_advance">Lead time</string>
-    <string name="class_reminder_advance_desc">With a long lead time, a reminder may arrive during the previous class.</string>
-    <string name="class_reminder_advance_zero">At class start</string>
-    <string name="class_reminder_advance_value">%1$d min before</string>
-    <string name="class_reminder_next">Next reminder</string>
-    <string name="class_reminder_dnd">Auto Do Not Disturb in class</string>
-    <string name="class_reminder_dnd_need_access">Needs Do Not Disturb access — tap this row to grant it</string>
-    <string name="class_reminder_dnd_on">Granted; alarms only during class</string>
-    <string name="class_reminder_dnd_toast_on">Auto DND in class is on</string>
-    <string name="class_reminder_dnd_toast_need">Without DND access this setting has no effect</string>
-    <string name="class_reminder_promote_hint">The status-bar live update is not shown yet: allow \"live updates / promoted notifications\" for this app in system settings. Tap here.</string>
-    <string name="class_reminder_next_value">%1$s, %2$s</string>
-    <string name="class_reminder_next_more"> +%1$d more</string>
-    <string name="class_reminder_next_no_course">(course name missing)</string>
-    <string name="class_reminder_next_none">No classes in the next 7 days</string>
-    <string name="class_reminder_next_disabled">Reminders are off</string>
-    <string name="class_reminder_next_no_permission">Notifications are blocked, so nothing will appear</string>
-    <string name="class_reminder_section_permissions">Permissions</string>
-    <string name="class_reminder_perm_notify">Notifications</string>
-    <string name="class_reminder_perm_exact">Exact alarms</string>
-    <string name="class_reminder_perm_battery">Battery optimization</string>
-    <string name="class_reminder_status_on">Allowed</string>
-    <string name="class_reminder_notify_off">Not allowed, reminders will not appear</string>
-    <string name="class_reminder_exact_off">Off — the system may delay reminders; enabling it improves timing</string>
-    <string name="class_reminder_battery_off">Restricted: while the app is frozen, reminders only fire once you pick up the phone</string>
-    <string name="class_reminder_channel">Class reminders</string>
-    <string name="class_reminder_channel_desc">Reminds you before each class. Adjust the lead time or turn it off in settings.</string>
-    <string name="class_reminder_course_line">%1$s, %2$s</string>
-    <string name="class_reminder_summary_off">Off</string>
-    <string name="class_reminder_summary_on">On · %1$s</string>
-    <string name="class_reminder_summary_blocked">On, but notifications are blocked</string>
-    <string name="class_reminder_summary_exact_blocked">On, but the system may delay reminders</string>
-    <string name="class_reminder_toast_need_notify">Notification permission is required for reminders</string>
-    <string name="class_reminder_toast_notify_on">Notifications allowed — class reminders are on</string>
-    <string name="class_reminder_toast_exact_granted">Exact reminders are available</string>
 
     <!-- ===== Custom courses (local layer, stored separately from the school schedule) ===== -->
     <string name="local_course_add">Add course</string>
@@ -865,4 +823,123 @@
     <string name="login_diag_dns">DNS problem: the school server name does not even resolve</string>
     <string name="login_diag_ok">OK (%1$d ms)</string>
     <string name="login_diag_conclusion">The school main API is unreachable — that is why the login failed. Try campus network or a VPN.</string>
+    <!-- ==================== Course reminders (ported from Sleepy) ==================== -->
+    <!-- Settings directory entry -->
+    <string name="settings_reminder">Reminders</string>
+    <string name="reminder_experimental_tag">Experimental</string>
+    <string name="settings_reminder_test_compatibility">Testing and compatibility</string>
+    <string name="reminder_fluid_test_status_casting">Casting</string>
+    <string name="settings_reminder_permissions_attention">Review reminder permissions</string>
+    <string name="settings_reminder_widget_optional">Widgets are optional and not required to receive reminders.</string>
+
+    <!-- Page title and master switch -->
+    <string name="reminder_title">Reminders</string>
+    <string name="reminder_master_title">Enable reminders</string>
+    <string name="reminder_master_sub">Allow LanhangLite to send course notifications</string>
+
+    <!-- Daily reminders -->
+    <string name="reminder_daily_title">Daily reminders</string>
+    <string name="reminder_daily_sub">Send the today summary and tomorrow preview at a fixed time</string>
+    <string name="reminder_daily_today_toggle_title">Today summary</string>
+    <string name="reminder_daily_today_toggle_sub">Push today\u2019s course summary at the set time</string>
+    <string name="reminder_tomorrow_toggle_title">Tomorrow preview</string>
+    <string name="reminder_tomorrow_toggle_sub">Push tomorrow\u2019s course summary the night before</string>
+    <string name="reminder_daily_time_label">Today summary time</string>
+    <string name="reminder_tomorrow_time_label">Tomorrow preview time</string>
+    <string name="reminder_daily_preview">Example: Today the 15th, you have 3 classes. The first is \"Advanced Mathematics\" at 08:00 in Room A101</string>
+    <string name="reminder_preview_today_date">Today %1$s (%2$s)</string>
+    <string name="reminder_preview_tomorrow_date">Tomorrow %1$s (%2$s)</string>
+    <string name="reminder_preview_date">%1$s (%2$s)</string>
+    <string name="reminder_preview_teacher">, teacher: %1$s</string>
+    <string name="reminder_daily_preview_dynamic">Example: %1$s you have %2$d classes. The first is \"%3$s\" at %4$s in %5$s%6$s</string>
+    <string name="reminder_daily_preview_dynamic_no_course">Example: %1$s, no classes.</string>
+
+    <!-- Before-class reminders -->
+    <string name="reminder_before_class_title">Before each class</string>
+    <string name="reminder_before_class_sub">Remind you of the next class before it starts</string>
+    <string name="reminder_before_minutes_label">Remind</string>
+    <string name="reminder_before_minutes_unit">min before</string>
+    <string name="reminder_before_class_preview">Example: Next class \"Advanced Mathematics\" at 08:00 in Room A101</string>
+    <string name="reminder_before_class_preview_dynamic">Example: %1$s, the next class is \"%2$s\" at %3$s in %4$s%5$s</string>
+    <string name="reminder_before_class_preview_dynamic_no_course">Example: no upcoming class to remind.</string>
+
+    <!-- Reminder style and fluid cloud -->
+    <string name="reminder_fluid_title">Fluid cloud / Super island</string>
+    <string name="reminder_mode_label">Reminder style</string>
+    <string name="reminder_mode_banner">Banner</string>
+    <string name="reminder_mode_fluid">Fluid cloud</string>
+    <string name="reminder_mode_banner_sub">A normal notification banner you can swipe away; syncing to watches is unaffected</string>
+    <string name="reminder_mode_fluid_sub">Shows a live course card on supported Xiaomi / vivo / Samsung / Meizu phones; it may not appear when the system does not support it</string>
+    <string name="reminder_fluid_fields">Capsule main content</string>
+    <string name="reminder_fluid_fields_hint">Pick one item to show first</string>
+    <string name="reminder_fluid_field_name">Course name</string>
+    <string name="reminder_fluid_field_time">Start time</string>
+    <string name="reminder_fluid_field_room">Room</string>
+    <string name="reminder_fluid_field_countdown">Countdown</string>
+    <string name="reminder_fluid_note">Tap the notification to expand the course details. Whether it renders as a fluid cloud / super island depends on the phone system, notification permission and vendor service eligibility.</string>
+    <string name="reminder_fluid_status_notification_required">Notification permission is required for this feature</string>
+    <string name="reminder_fluid_status_unknown">The fluid cloud / super island authorization cannot be read directly. Tap \"Go to settings\" to open notification settings and confirm the system permission.</string>
+    <string name="reminder_fluid_status_enabled">Fluid cloud / super island authorization is on</string>
+    <string name="reminder_fluid_status_settings_required">Enable the fluid cloud / super island authorization in system settings first</string>
+    <string name="reminder_fluid_status_not_supported">This device system does not support fluid cloud / super island</string>
+    <string name="reminder_fluid_go_to_settings">Go to settings</string>
+    <string name="reminder_fluid_test_button">Test fluid cloud</string>
+    <string name="reminder_fluid_test_started">Fluid cloud test sent; check the card at the top of the notification shade</string>
+    <string name="reminder_fluid_test_stop_button">Stop casting</string>
+    <string name="reminder_fluid_test_start_failed">Could not start the fluid cloud test, please retry</string>
+    <string name="reminder_fluid_test_stop_failed">Could not stop the fluid cloud test, please retry</string>
+    <string name="reminder_fluid_gate_title">Pre-cast permission check</string>
+    <string name="reminder_fluid_gate_message">The following conditions are not met, so the fluid cloud may not appear:</string>
+    <string name="reminder_fluid_gate_notification">Notification permission not granted</string>
+    <string name="reminder_fluid_gate_promoted">Live update authorization is off</string>
+    <string name="reminder_fluid_gate_vendor">Vendor live card capability is unavailable</string>
+    <string name="reminder_fluid_gate_cast_anyway">Cast anyway</string>
+    <string name="reminder_fluid_gate_go_settings">Go to settings</string>
+    <string name="reminder_fluid_test_course">Test course</string>
+    <string name="reminder_fluid_test_room">Test room</string>
+
+    <!-- Automatic DND during class -->
+    <string name="reminder_class_dnd_title">Auto DND during class</string>
+    <string name="reminder_class_dnd_sub">Turn on Do Not Disturb during class and restore it afterwards</string>
+    <string name="reminder_dnd_permission_needed">Allow this app to change Do Not Disturb in system settings first</string>
+
+    <!-- Background reliability -->
+    <string name="reminder_reliability_title">Permissions &amp; background</string>
+    <string name="reminder_reliability_notification">Notification permission: %1$s</string>
+    <string name="reminder_reliability_exact_alarm">Exact reminders: %1$s</string>
+    <string name="reminder_reliability_battery">Battery optimization: %1$s</string>
+    <string name="reminder_reliability_widget">Home widget: %1$s</string>
+    <string name="reminder_reliability_vendor">Vendor live cards: %1$s</string>
+    <string name="reminder_reliability_promoted">Live update authorization: %1$s</string>
+    <string name="reminder_reliability_not_applicable">Not applicable</string>
+    <string name="reminder_reliability_ready">OK</string>
+    <string name="reminder_reliability_missing">Missing</string>
+    <string name="reminder_reliability_unknown">Unknown</string>
+    <string name="reminder_reliability_hint">Tap \"Exact reminders\" or \"Battery optimization\" to jump to the matching system settings page.</string>
+    <string name="reminder_pick_time">Pick reminder time</string>
+
+    <!-- Notification channels and notification text -->
+    <string name="notif_channel_daily">Daily course reminders</string>
+    <string name="notif_channel_daily_desc">Push today or tomorrow course summary at the set time every day</string>
+    <string name="notif_channel_before_class">Before-class reminders</string>
+    <string name="notif_channel_before_class_desc">Push the next class info before each class starts</string>
+    <string name="notif_channel_fluid">Fluid cloud / Super island</string>
+    <string name="notif_channel_fluid_desc">Show an expandable live course card before class</string>
+    <string name="notif_daily_title">%1$d classes today</string>
+    <string name="notif_daily_title_no_course">No classes today</string>
+    <string name="notif_daily_text_no_course">Rest well and enjoy the day!</string>
+    <string name="notif_tomorrow_title">%1$d classes tomorrow</string>
+    <string name="notif_tomorrow_title_no_course">No classes tomorrow</string>
+    <string name="notif_tomorrow_text_no_course">Rest well and enjoy the day!</string>
+    <string name="notif_date_title">%1$s · %2$d classes</string>
+    <string name="notif_date_no_course">%1$s · no classes</string>
+    <string name="notif_before_class_compact">Starts %1$s · %2$s</string>
+    <string name="notif_room_unknown">Unknown room</string>
+    <string name="agenda_first">First class %1$s</string>
+    <string name="agenda_more">%1$d more classes</string>
+    <string name="agenda_time_unknown">Time TBD</string>
+    <string name="default_course_name">Course</string>
+    <string name="default_room">Room</string>
+    <string name="fluid_coloros_countdown">Starts in %1$d min</string>
+    <string name="fluid_coloros_capsule">In %1$d min</string>
 </resources>

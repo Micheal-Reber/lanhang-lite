@@ -86,7 +86,11 @@ object ScheduleRepository {
      * 网络拉取。week=null 表示不带周次参数（拿当前周次元信息），
      * 带周次则对齐官方 App 的 GetSchedule&week=N 请求。
      */
-    suspend fun refresh(week: Int? = null, updateWidget: Boolean = true): ScheduleResponse {
+    suspend fun refresh(
+        week: Int? = null,
+        updateWidget: Boolean = true,
+        reschedule: Boolean = true
+    ): ScheduleResponse {
         // 确保 miniapp 会话有效
         if (!hasMiniappSession()) {
             val ok = MiniappApi.handshake(Session.deviceId(AppContext.instance))
@@ -117,6 +121,10 @@ object ScheduleRepository {
         }
         Log.d(TAG, "refreshed week=$week ${raw.length} bytes")
         if (updateWidget) ScheduleWidgetUpdater.updateAll(AppContext.instance)
+        // 课表变了，课前提醒与勿扰窗口都必须重排（课程被撤/调课/换周次都会改变闹钟目标）。
+        // 走防抖枢纽：登录后「整学期 + 多周」连续刷新只排一次。
+        // 提醒调度器自己补周数据时传 reschedule=false，避免「刷新 → 重排 → 再刷新」绕圈。
+        if (reschedule) com.lanhang.lite.reminder.ReminderRescheduler.request()
         return resp
     }
 

@@ -256,7 +256,7 @@ class CampusNetWidgetProvider : AppWidgetProvider() {
          * 10 分钟一次足够——这个状态本身不要求实时，而小组件本来也不会自动重绘。
          *
          * 用 `ELAPSED_REALTIME`（非 WAKEUP）：熄屏时不唤醒设备，亮屏后补一次；
-         * 因此不需要 `SCHEDULE_EXACT_ALARM` 权限，也不会在兜里耗电。
+         * 因此不会在后台持续耗电。
          */
         private const val TICK_INTERVAL_MS = 10L * 60L * 1000L
 

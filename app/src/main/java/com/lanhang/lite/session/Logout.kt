@@ -34,11 +34,17 @@ object Logout {
         MomentNotify.cancel(app)
         MomentMessageStore.clear()
 
+        // 课程提醒是「按课表排好的系统闹钟」，会话没了就必须撤掉：
+        // 否则退出登录后旧账号的课仍会每天按时弹通知（闹钟不知道账号换了），
+        // 上课自动勿扰还会继续抢系统勿扰开关。偏好（开关/时间）保留，
+        // 新账号登录后 ScheduleRepository.refresh 会自动重新排一遍。
+        com.lanhang.lite.reminder.ReminderScheduler.cancelAllAsync()
+        com.lanhang.lite.reminder.ClassDndScheduler(app).disableAndRestore()
+        com.lanhang.lite.reminder.FluidCloudService.requestStop(app)
+        com.lanhang.lite.reminder.ReminderNotify.cancelAll(app)
+
         // 课表、成绩、工作圈全是按账号缓存的，留着就是串号
         app.cacheDir.deleteRecursively()
-        // 上课提醒的闹钟也要撤：课表是按账号的，不撤会在下一个人登录前继续为上一个账号响
-        com.lanhang.lite.schedule.ClassReminder.cancel(app)
-        com.lanhang.lite.schedule.ClassReminderNotify.cancelAll(app)
         // 桌面小组件还不知道账号换了，立刻按空会话重画一次
         ScheduleWidgetUpdater.updateAll(app)
     }

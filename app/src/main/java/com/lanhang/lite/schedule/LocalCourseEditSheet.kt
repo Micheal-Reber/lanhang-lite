@@ -378,10 +378,9 @@ class LocalCourseEditSheet : BottomSheetDialogFragment() {
             .show()
     }
 
-    /** 自建课变了 → 提醒重排 + 小组件刷新；顺序反了会先刷出旧数据 */
+    /** 自建课变了 → 刷新小组件 */
     private fun afterChange() {
         val app = requireContext().applicationContext
-        ClassReminder.rearm(app)
         ScheduleWidgetUpdater.updateAll(app)
     }
 

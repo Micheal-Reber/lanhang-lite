@@ -412,10 +412,6 @@ class ScheduleFragment : Fragment() {
                 currentWeek = target
                 updateWeekPill()
                 renderAll()
-                // 课表可能是换过/撤过课的：提醒的闹钟必须按新数据重排。
-                // 只在 refresh(null)（整学期全量）成功后调 —— 提醒只读整学期缓存，
-                // 切周拉的 schedule_wN.json 不参与计算。
-                context?.let { ClassReminder.rearm(it) }
             } catch (e: Exception) {
                 if (e.isCancellation) return@launch
                 Toast.makeText(

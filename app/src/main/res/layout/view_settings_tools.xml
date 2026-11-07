@@ -19,69 +19,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 上课提醒：课表的功能，和「导出课表」同类，所以放工具页最前 -->
-            <LinearLayout
-                android:id="@+id/rowClassReminder"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="@dimen/list_item_height_two_line"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/card_padding"
-                android:paddingTop="@dimen/space_lg"
-                android:paddingEnd="@dimen/card_padding"
-                android:paddingBottom="@dimen/space_lg">
-
-                <ImageView
-                    android:layout_width="@dimen/icon_lg"
-                    android:layout_height="@dimen/icon_lg"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_alarm"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/list_icon_gap"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_class_reminder"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
-                        android:textColor="?attr/colorOnSurface" />
-
-                    <TextView
-                        android:id="@+id/tvClassReminderSummary"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_xxs"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="@dimen/icon_lg"
-                    android:layout_height="@dimen/icon_lg"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_chevron_right"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/divider_thickness"
-                android:layout_marginStart="@dimen/card_padding"
-                android:layout_marginEnd="@dimen/card_padding"
-                android:background="?attr/colorOutlineVariant" />
-
             <LinearLayout
                 android:id="@+id/exportScheduleButton"
                 android:layout_width="match_parent"

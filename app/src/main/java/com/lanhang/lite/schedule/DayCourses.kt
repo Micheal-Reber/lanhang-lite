@@ -16,12 +16,18 @@ import com.lanhang.lite.core.LocaleHelper
  */
 object DayCourses {
 
-    /** 合并后的一节课：[start]~[end] 是节次区间（连堂会合成一条） */
+    /**
+     * 合并后的一节课：[start]~[end] 是节次区间（连堂会合成一条）。
+     *
+     * [teacher] 2026-11-06 为课程提醒（流体云卡片正文「时间 · 教室 · 教师」）补上；
+     * 自建课没有教师字段，恒为空串。
+     */
     data class Block(
         val name: String,
         val room: String,
         val start: Int,
-        val end: Int
+        val end: Int,
+        val teacher: String = ""
     )
 
     private val dayNames = listOf(
@@ -54,14 +60,14 @@ object DayCourses {
                         name = name,
                         room = course.room?.trim().orEmpty(),
                         start = number,
-                        end = number
+                        end = number,
+                        teacher = course.teacher?.trim().orEmpty()
                     )
                 )
             }
         }
         // 自建层：与网格同一套口径（1..PeriodClock.count 夹取、按周过滤），供小组件与上课提醒使用。
         // 与学校课同一时刻时，[merge] 的「相交即合并」只在同名同教室时生效，
-        // 不同课仍各自成块 —— 提醒按节次聚合成一条、正文列多门（见 ClassReminderPlan.slotsOn）。
         LocalCourseStore.forDay(data.termId.orEmpty(), dayIndex, week).forEach { lc ->
             val start = lc.startPeriod.coerceIn(1, PeriodClock.count)
             val end = lc.endPeriod.coerceIn(start, PeriodClock.count)
@@ -93,7 +99,11 @@ object DayCourses {
             val connects = item.start <= last.end + 1
             val crossesBreak = PeriodClock.breakAfterPeriods.any { it in last.start until mergedEnd }
             if (sameCourse && connects && !crossesBreak) {
-                result[result.lastIndex] = last.copy(end = mergedEnd)
+                result[result.lastIndex] = last.copy(
+                    end = mergedEnd,
+                    // 连堂合并时保留非空教师（服务端有的节次缺教师字段）
+                    teacher = last.teacher.ifBlank { item.teacher }
+                )
             } else {
                 result.add(item)
             }

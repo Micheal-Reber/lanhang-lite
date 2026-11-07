@@ -104,7 +104,7 @@ object ScheduleWidgetUpdater {
      * - 今天全上完 → 取消
      *
      * 用 [AlarmManager.ELAPSED_REALTIME]（非 WAKEUP）：熄屏时不唤醒设备，亮屏后补一次；
-     * 因此不需要 SCHEDULE_EXACT_ALARM 权限，也不会在兜里耗电。
+     * 因此不会在后台持续耗电。
      */
     fun refreshTick(context: Context) {
         val app = context.applicationContext

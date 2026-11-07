@@ -20,7 +20,7 @@ import com.lanhang.lite.R
  * 通知权限的**唯一**判定与引导入口。
  *
  * 工作圈互动（[com.lanhang.lite.moments.MomentNotify]）和上课提醒
- * （[com.lanhang.lite.schedule.ClassReminderNotify]）共用这一份，
+ * （工作圈和私信通知）共用这一份，
  * 因为「怎么判断有没有权限」和「没有权限时把用户送去哪」这两件事，
  * 两边各写一遍必然逐渐不一致（此前工作圈那份已经比上课提醒那份多考虑了
  * 「拒绝且不再询问」，就是同一份逻辑走岔的例子）。
@@ -100,7 +100,7 @@ object NotifPermission {
      * 引导用户去授权：能弹系统框就弹，弹不了就说明原因再跳设置页。
      *
      * 调用方拿到结果的方式：系统框走 [ActivityResultLauncher] 回调，设置页走
-     * `onResume` 复检（见 `ClassReminderActivity.onResume` 里的 `pendingEnable`）。
+     * 页面回到前台时复检。
      */
     fun request(
         activity: Activity,

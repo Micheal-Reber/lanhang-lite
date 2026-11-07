@@ -697,6 +697,11 @@ class MainActivity : AppCompatActivity() {
         com.lanhang.lite.core.ImBridge.warmUp(this)
         // 顶栏铃铛的未读红点（节流，见 refreshUnreadBadge）
         refreshUnreadBadge()
+        // 流体云兜底对账：只要「现在」落在某节课的 [上课-N 分钟, 上课] 窗口内，
+        // 就确保实时卡片在投放 —— 不依赖「正好提前 N 分钟那一秒」的闹钟是否响过。
+        lifecycleScope.launch {
+            runCatching { com.lanhang.lite.reminder.ReminderScheduler.reconcileFluidCloud() }
+        }
     }
 
     override fun onPause() {

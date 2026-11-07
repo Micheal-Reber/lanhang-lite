@@ -24,16 +24,6 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!--
-        上课提醒（schedule/ClassReminder）：每节课前 N 分钟要准点响。
-        `SCHEDULE_EXACT_ALARM` 是**特殊权限**，Android 12+ 需要，且 Android 14 起对
-        targetSdk>=33 的新装应用**默认拒绝**（本机 appops 实测就是 default）。
-        未授权时不上课前提醒闹钟，避免把可能严重延迟的非精确闹钟伪装成准时提醒。
-
-        **不要改成 USE_EXACT_ALARM**：那是普通权限、安装即授予，但官方政策只给「闹钟/日历类
-        核心功能」用，课表 App 申请有被驳回的风险，语义上我们也确实不是闹钟。
-    -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!--
         电池优化白名单：国产 ROM 的省电策略会把闹钟攒很久才放行。
         只用于「去设置」里的一键申请；精确闹钟权限和厂商后台策略是两套独立条件。
     -->
@@ -45,12 +35,32 @@
         系统不支持或用户关掉「实时活动」时，同一个 flag 只是被忽略，通知照常显示。
     -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+
+    <!--
+        课前流体云：前台服务让进度条每 15s 真实推进。
+        specialUse 是唯一能描述「课程实时卡片」的官方类型（不是 media / location 那些）。
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!--
+        课程提醒的精确闹钟：课前 N 分钟要在那一刻响，普通 set() 在 Doze 下会被推迟到亮屏。
+        SCHEDULE_EXACT_ALARM 由用户在系统页授予（Android 12+）；
+        USE_EXACT_ALARM 是闹钟类应用的常规声明，两者都声明后按系统实际授权降级。
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <!--
         上课自动勿扰：`setInterruptionFilter` 需要的敏感权限，**只能用户手动授予**
         （系统设置 → 勿扰权限），代码弹不出来。没授权时我们什么都不做，也不改用户设置。
     -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- 魅族 Flyme 实时通知总开关（普通权限，未授予时整条路径直接关闭） -->
+    <uses-permission
+        android:name="flyme.permission.READ_NOTIFICATION_LIVE_STATE"
+        android:maxSdkVersion="35" />
 
     <application
         android:name=".App"
@@ -222,38 +232,6 @@
             </intent-filter>
         </receiver>
 
-        <!--
-          上课提醒的闹钟接收器 + 链路自愈入口。
-          exported=false：只由本 App 的 PendingIntent 和系统广播投递。
-
-          下面这些 intent-filter **一个都不能少**：
-          - BOOT_COMPLETED     重启后闹钟不会被持久化，不重排就再也收不到；
-          - MY_PACKAGE_REPLACED 应用更新（**最容易漏**：只监听开机的话每次发版，
-                                所有用户的提醒会静默消失到下次打开 App）；
-          - TIME_SET / TIMEZONE_CHANGED 之前的触发时刻是按旧时钟算的；
-          - SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
-                                用户刚在系统里给了精确闹钟权限，重新排入提醒。
-        -->
-        <receiver
-            android:name=".schedule.ClassReminderReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.TIME_SET" />
-                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
-                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
-                <action android:name="com.lanhang.lite.schedule.CLASS_REMINDER_ALARM" />
-                <action android:name="com.lanhang.lite.schedule.CLASS_REMINDER_RESYNC" />
-            </intent-filter>
-        </receiver>
-
-        <!-- 上课提醒设置页（入口在「设置 → 工具 → 上课提醒」） -->
-        <activity
-            android:name=".schedule.ClassReminderActivity"
-            android:exported="false"
-            android:label="@string/class_reminder_title" />
-
         <activity
             android:name=".moments.UserProfileActivity"
             android:exported="false"
@@ -300,6 +278,57 @@
             android:exported="false"
             android:label="@string/campus_net_title"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- 课程提醒设置页（入口：设置目录一级行）：无底栏，与身份码/校园网等二级页一致 -->
+        <activity
+            android:name=".reminder.ReminderActivity"
+            android:exported="false"
+            android:label="@string/reminder_title"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 课前流体云：前台服务载体，存活期即投放期（进度条每 15s 推进） -->
+        <service
+            android:name=".reminder.FluidCloudService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!--
+            课程提醒的五个闹钟接收器（与 Sleepy 一一对应）：
+            今日摘要 / 明日预告 / 每日零点的窗口重同步 / 单节课课前提醒 / 上课自动勿扰边界。
+            全部 exported=false：只由本 App 的 PendingIntent 投递。
+        -->
+        <receiver
+            android:name=".reminder.DailyNotifyReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.TomorrowNotifyReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.BeforeClassScheduleReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.BeforeClassNotifyReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.ClassDndReceiver"
+            android:exported="false" />
+
+        <!--
+            开机 / 应用更新后重排：AlarmManager 的闹钟不跨重启，不重建就再也不响。
+            MY_PACKAGE_REPLACED 覆盖「升级安装把已排闹钟清掉」的情况。
+        -->
+        <receiver
+            android:name=".reminder.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -53,17 +53,17 @@ class App : Application(), coil.ImageLoaderFactory {
         // 但我们不引 WorkManager，改成「App 启动时查」；debug 包内部直接跳过）
         com.lanhang.lite.update.UpdateScheduler.checkOnStart(this)
 
-        // 上课提醒：先建通知渠道（提前建，用户能在系统设置里更早看到这个分类），
-        // 再重排一次闹钟。重排要读整学期课表缓存（几十到几百 KB）+ 排若干个闹钟，
-        // 单独线程做，不占冷启动的主线程。
-        // 这一步不能省：闹钟会因为「清数据 / 系统回收 / 未知原因」丢失，每次启动补一次最省心。
-        com.lanhang.lite.schedule.ClassReminderStore.init(this)
-        com.lanhang.lite.schedule.ClassReminderNotify.ensureChannel(this)
-        Thread({
-            // 失败必须留痕：rearm 一旦抛异常而没人看见，就是「提醒静默消失」的典型现场
-            runCatching { com.lanhang.lite.schedule.ClassReminder.rearm(applicationContext) }
-                .onFailure { android.util.Log.w("ClassReminder", "startup rearm failed", it) }
-        }, "class-reminder-rearm").start()
+        // 撤掉 2026-11-07 删除的旧版「上课提醒」还留在系统里的闹钟：旧类已不存在，
+        // 触发只会空唤醒。只跑一次（SP 标记）。
+        com.lanhang.lite.reminder.ReminderLegacyCleanup.runOnce(this)
+
+        // 课程提醒：渠道必须先建（通知渠道一旦创建就不能改重要性），随后按当前偏好
+        // 全量重排一次。闹钟不跨进程重启，冷启动是唯一能保证「开关关着也撤掉旧闹钟」的时机。
+        com.lanhang.lite.reminder.ReminderNotify.ensureChannels(this)
+        com.lanhang.lite.reminder.ReminderScheduler.scheduleAll()
+        // 上课自动勿扰：同样按偏好校准（内部只排下一次上/下课两颗边界闹钟）
+        com.lanhang.lite.reminder.ClassDndScheduler(this).syncFromPrefs()
+
     }
 
     /**

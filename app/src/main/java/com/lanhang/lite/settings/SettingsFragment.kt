@@ -36,8 +36,7 @@ import com.lanhang.lite.moments.UserProfileActivity
 import com.lanhang.lite.net.MiniappApi
 import com.lanhang.lite.net.StaffBrief
 import com.lanhang.lite.oa.OaHallActivity
-import com.lanhang.lite.schedule.ClassReminderActivity
-import com.lanhang.lite.schedule.ClassReminderStore
+import com.lanhang.lite.reminder.ReminderActivity
 import com.lanhang.lite.schedule.ScheduleBackdrop
 import com.lanhang.lite.schedule.ScheduleBackgroundActivity
 import com.lanhang.lite.schedule.ScheduleData
@@ -135,6 +134,9 @@ class SettingsFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
         binding.rowAppearance.setOnClickListener { openDetail(PAGE_APPEARANCE) }
+        binding.rowReminder.setOnClickListener {
+            startActivity(Intent(requireContext(), ReminderActivity::class.java))
+        }
         binding.rowTools.setOnClickListener { openDetail(PAGE_TOOLS) }
         binding.rowOaHall.setOnClickListener {
             startActivity(Intent(requireContext(), OaHallActivity::class.java))
@@ -298,7 +300,6 @@ class SettingsFragment : Fragment() {
         syncToolbar()
         refreshThemeSummary()
         refreshBackgroundSummary()
-        refreshClassReminderSummary()
         // 从过滤设置页返回时档位/词数可能变了，摘要跟着刷
         refreshMomentsFilterSummary()
         // 资料页可能刚回填过头像地址，回到设置页顺手对齐一次（命中缓存时不发请求）
@@ -396,13 +397,6 @@ class SettingsFragment : Fragment() {
         getString(R.string.settings_cache_ttl_days, days)
     }
 
-    /** 工具页里的上课提醒摘要（停在工具页时从提醒页返回要跟着变） */
-    private fun refreshClassReminderSummary() {
-        val b = _binding ?: return
-        b.detailContainer.findViewById<TextView>(R.id.tvClassReminderSummary)?.text =
-            ClassReminderStore.summary(requireContext())
-    }
-
     /** 工作圈过滤摘要：`已开启 · 广告推广 等 28 个关键词` / `已关闭`（行在工具页里） */
     private fun refreshMomentsFilterSummary() {
         val b = _binding ?: return
@@ -493,12 +487,6 @@ class SettingsFragment : Fragment() {
                     .setOnClickListener { showBottomBarDialog() }
             }
             PAGE_TOOLS -> {
-                root.findViewById<View>(R.id.rowClassReminder).setOnClickListener {
-                    ClassReminderActivity.start(requireContext())
-                }
-                // 摘要要读当前开关与提前量，所以每次打开工具页都现算
-                root.findViewById<TextView>(R.id.tvClassReminderSummary)?.text =
-                    ClassReminderStore.summary(requireContext())
                 root.findViewById<View>(R.id.exportScheduleButton)
                     .setOnClickListener { showExportSchedule() }
                 root.findViewById<View>(R.id.rowIdCard).setOnClickListener {
