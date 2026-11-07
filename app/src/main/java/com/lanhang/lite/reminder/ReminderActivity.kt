@@ -200,15 +200,17 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     /**
-     * 「提醒权限需要处理」按钮的显隐：通知权限没开，或者精确闹钟没放行，就呼点出来。
-     * （通知权限 = 提醒根本不会发；精确闹钟 = 闹钟被系统拖成非精确，课前提醒会延迟甚至不响。）
+     * 「提醒权限需要处理」按钮的显隐：通知权限没开、精确闹钟没放行、或电池优化没忽略，任一缺失就呼点。
+     * （通知权限 = 提醒根本不会发；精确闹钟 = 闹钟被系统拖成非精确，课前提醒会延迟甚至不响；
+     *  电池白名单 = 后台被冻结，闹钟照样排了没人理。）
      */
     private fun refreshPermissionHint() {
-        val notifGranted = NotifPermission.isGranted(this)
-        val exactAlarmAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            (getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true)
         binding.btnReliabilityAttention.visibility =
-            if (notifGranted && exactAlarmAllowed) View.GONE else View.VISIBLE
+            if (NotifPermission.isGranted(this) && exactAlarmGranted() && batteryOptimizationIgnored()) {
+                View.GONE
+            } else {
+                View.VISIBLE
+            }
     }
 
     // ==================== 每日提醒 ====================
@@ -519,12 +521,46 @@ class ReminderActivity : AppCompatActivity() {
             // 直接滚到权限卡，用户立刻看到该处理的是哪一项（Sleepy 的相同行为）
             binding.scroll.smoothScrollTo(0, binding.cardReliability.top)
         }
-        binding.tvRelNotification.setOnClickListener {
-            // 没权限才响应点击：已有权限时该行只是展示
+        binding.rowRelNotification.setOnClickListener {
             if (!NotifPermission.isGranted(this)) NotifPermission.request(this, permissionLauncher)
         }
-        binding.tvRelBattery.setOnClickListener { launchBatterySettings(this) }
-        binding.tvRelExactAlarm.setOnClickListener { openExactAlarmSettings() }
+        binding.rowRelExact.setOnClickListener {
+            if (!exactAlarmGranted()) openExactAlarmSettings()
+        }
+        binding.rowRelBattery.setOnClickListener {
+            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+        }
+        binding.rowRelDnd.setOnClickListener {
+            if (!policyAccessGranted()) {
+                runCatching {
+                    dndLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                }
+            }
+        }
+        binding.rowRelPromoted.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= 36 && !promotedOngoingAllowed()) openPromotedSettings()
+        }
+    }
+
+    private fun exactAlarmGranted(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true)
+
+    private fun batteryOptimizationIgnored(): Boolean =
+        getSystemService(android.os.PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) == true
+
+    private fun promotedOngoingAllowed(): Boolean =
+        Build.VERSION.SDK_INT >= 36 &&
+            (getSystemService(NotificationManager::class.java)?.let {
+                runCatching { it.canPostPromotedNotifications() }.getOrDefault(false)
+            } == true)
+
+    private fun openPromotedSettings() {
+        // Android 16 的实时更新授权页（ColorOS 16 流体云官方开关在此）
+        val intent = Intent(ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        val opened = runCatching { startActivity(intent); true }.getOrDefault(false)
+        if (!opened) NotifPermission.openSettings(this, ReminderNotify.CHANNEL_FLUID)
     }
 
     private fun refreshReliability() {
@@ -532,56 +568,121 @@ class ReminderActivity : AppCompatActivity() {
             val snapshot = withContext(Dispatchers.IO) { ReminderReliability.snapshot(this@ReminderActivity) }
             if (isFinishing || isDestroyed) return@launch
             val res = resources
-            // 可点击修复的行，未达标时染成主色（与 Sleepy 的 ReminderReliabilityCard 一致）
-            val primaryAttr = com.google.android.material.R.attr.colorPrimary
-            val variantAttr = com.google.android.material.R.attr.colorOnSurfaceVariant
-            val primaryColor = com.google.android.material.color.MaterialColors
-                .getColor(binding.tvRelNotification, primaryAttr)
-            val variantColor = com.google.android.material.color.MaterialColors
-                .getColor(binding.tvRelNotification, variantAttr)
-            binding.tvRelNotification.setTextColor(
-                if (snapshot.notificationPermissionGranted) variantColor else primaryColor
+
+            // 一行 = 状态一行 + 缺一个点就缺一个点，缺什么直接告诉用户，点它去补
+            bindPermissionRow(
+                row = binding.rowRelNotification,
+                icon = binding.icRelNotification,
+                body = binding.tvRelNotification,
+                action = binding.tvRelNotifAction,
+                ok = snapshot.notificationPermissionGranted,
+                bodyText = res.getString(
+                    if (snapshot.notificationPermissionGranted) R.string.reminder_rel_notif_ok
+                    else R.string.reminder_rel_notif_missing
+                ),
             )
-            binding.tvRelNotification.text = res.getString(
-                R.string.reminder_reliability_notification,
-                res.getString(ReminderReliability.statusRes(snapshot.notificationPermissionGranted))
+            bindPermissionRow(
+                row = binding.rowRelExact,
+                icon = binding.icRelExact,
+                body = binding.tvRelExactAlarm,
+                action = binding.tvRelExactAction,
+                ok = snapshot.exactAlarmAllowed,
+                bodyText = res.getString(
+                    if (snapshot.exactAlarmAllowed) R.string.reminder_rel_exact_ok
+                    else R.string.reminder_rel_exact_missing
+                ),
             )
-            binding.tvRelExactAlarm.setTextColor(
-                if (snapshot.exactAlarmAllowed) variantColor else primaryColor
+            bindPermissionRow(
+                row = binding.rowRelBattery,
+                icon = binding.icRelBattery,
+                body = binding.tvRelBattery,
+                action = binding.tvRelBatteryAction,
+                ok = snapshot.batteryOptimizationIgnored,
+                bodyText = res.getString(
+                    if (snapshot.batteryOptimizationIgnored) R.string.reminder_rel_battery_ok
+                    else R.string.reminder_rel_battery_missing
+                ),
             )
-            binding.tvRelExactAlarm.text = res.getString(
-                R.string.reminder_reliability_exact_alarm,
-                res.getString(ReminderReliability.statusRes(snapshot.exactAlarmAllowed))
+            bindPermissionRow(
+                row = binding.rowRelDnd,
+                icon = binding.icRelDnd,
+                body = binding.tvRelDnd,
+                action = binding.tvRelDndAction,
+                ok = policyAccessGranted(),
+                bodyText = res.getString(
+                    if (policyAccessGranted()) R.string.reminder_rel_dnd_ok
+                    else R.string.reminder_rel_dnd_missing
+                ),
             )
-            binding.tvRelBattery.setTextColor(
-                if (snapshot.batteryOptimizationIgnored) variantColor else primaryColor
-            )
-            binding.tvRelBattery.text = res.getString(
-                R.string.reminder_reliability_battery,
-                res.getString(ReminderReliability.statusRes(snapshot.batteryOptimizationIgnored))
-            )
-            binding.tvRelWidget.text = res.getString(
-                R.string.reminder_reliability_widget,
-                res.getString(ReminderReliability.statusRes(snapshot.widgetBound))
-            )
-            binding.tvRelVendor.text = res.getString(
-                R.string.reminder_reliability_vendor,
-                res.getString(ReminderReliability.vendorStateRes(snapshot.liveCardState))
-            )
-            binding.tvRelPromoted.visibility = if (snapshot.promotedOngoingAllowed == null) {
-                View.GONE
-            } else {
-                View.VISIBLE
-            }
-            if (snapshot.promotedOngoingAllowed != null) {
-                binding.tvRelPromoted.text = res.getString(
-                    R.string.reminder_reliability_promoted,
-                    res.getString(
-                        ReminderReliability.statusRes(snapshot.promotedOngoingAllowed)
-                    )
+
+            // 实时更新授权只在 Android 16+ 存在；低版本整行隐藏，不弹「系统不支持」吓人
+            if (Build.VERSION.SDK_INT >= 36) {
+                binding.rowRelPromoted.visibility = View.VISIBLE
+                bindPermissionRow(
+                    row = binding.rowRelPromoted,
+                    icon = binding.icRelPromoted,
+                    body = binding.tvRelPromoted,
+                    action = binding.tvRelPromotedAction,
+                    ok = snapshot.promotedOngoingAllowed == true,
+                    bodyText = res.getString(
+                        if (snapshot.promotedOngoingAllowed == true) R.string.reminder_rel_promoted_ok
+                        else R.string.reminder_rel_promoted_missing
+                    ),
                 )
+            } else {
+                binding.rowRelPromoted.visibility = View.GONE
             }
+
+            // 顶栏摘要：只统计用户能自己修的项（小组件不算）
+            var todo = 0
+            if (!snapshot.notificationPermissionGranted) todo++
+            if (!snapshot.exactAlarmAllowed) todo++
+            if (!snapshot.batteryOptimizationIgnored) todo++
+            if (Build.VERSION.SDK_INT >= 36 && snapshot.promotedOngoingAllowed == false) todo++
+            val errorColor = com.google.android.material.color.MaterialColors
+                .getColor(binding.tvRelSummary, com.google.android.material.R.attr.colorError)
+            val variantColor = com.google.android.material.color.MaterialColors
+                .getColor(binding.tvRelSummary, com.google.android.material.R.attr.colorOnSurfaceVariant)
+            binding.tvRelSummary.text = res.getString(
+                if (todo > 0) R.string.reminder_rel_summary_todo else R.string.reminder_rel_summary_ready,
+                todo
+            )
+            binding.tvRelSummary.setTextColor(if (todo > 0) errorColor else variantColor)
+
+            binding.tvRelWidget.text = res.getString(
+                R.string.reminder_rel_diag_widget,
+                res.getString(
+                    if (snapshot.widgetBound) R.string.reminder_rel_widget_bound
+                    else R.string.reminder_rel_widget_unbound
+                )
+            )
         }
+    }
+
+    /** 单行权限状态：√/× 图标 + 标题 + 正文 +（缺时）「去开启/去设置」文字；就绪时整行不可点。 */
+    private fun bindPermissionRow(
+        row: android.view.View,
+        icon: android.widget.ImageView,
+        body: android.widget.TextView,
+        action: android.widget.TextView,
+        ok: Boolean,
+        bodyText: String,
+        actionText: String? = null,
+    ) {
+        body.text = bodyText
+        action.visibility = if (ok) View.GONE else View.VISIBLE
+        action.text = actionText ?: getString(R.string.reminder_rel_action_open)
+        icon.setImageResource(if (ok) R.drawable.ic_check else R.drawable.ic_close)
+        icon.setColorFilter(
+            com.google.android.material.color.MaterialColors.getColor(
+                icon,
+                if (ok) com.google.android.material.R.attr.colorPrimary
+                else com.google.android.material.R.attr.colorError
+            )
+        )
+        // 就绪时整行不给出「可点」暗示；缺时可点且染红×号
+        row.isClickable = !ok
+        row.isFocusable = !ok
     }
 
     private fun openExactAlarmSettings() {

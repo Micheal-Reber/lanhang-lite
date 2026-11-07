@@ -833,6 +833,29 @@
     <string name="reminder_fluid_test_status_casting">投放中</string>
     <string name="settings_reminder_permissions_attention">提醒权限需要处理</string>
     <string name="settings_reminder_widget_optional">小组件仅作为诊断参考，不是接收提醒的必要条件。</string>
+    <string name="reminder_rel_summary_todo">%1$d 项需要处理</string>
+    <string name="reminder_rel_summary_ready">所有权限已就绪</string>
+    <string name="reminder_rel_section_diag">诊断</string>
+    <string name="reminder_rel_diag_widget">桌面小组件：%1$s</string>
+    <string name="reminder_rel_widget_bound">已绑定</string>
+    <string name="reminder_rel_widget_unbound">未绑定</string>
+    <string name="reminder_rel_notif_title">通知权限</string>
+    <string name="reminder_rel_notif_ok">已开启，提醒可以正常发出</string>
+    <string name="reminder_rel_notif_missing">未开启，提醒不会发出</string>
+    <string name="reminder_rel_exact_title">精确闹钟</string>
+    <string name="reminder_rel_exact_ok">已放行，提醒将准时触发</string>
+    <string name="reminder_rel_exact_missing">未放行，提醒可能延迟甚至不触发</string>
+    <string name="reminder_rel_battery_title">忽略电池优化</string>
+    <string name="reminder_rel_battery_ok">已忽略，后台不会被系统冻结</string>
+    <string name="reminder_rel_battery_missing">未忽略，后台可能被系统冻结</string>
+    <string name="reminder_rel_dnd_title">勿扰权限（上课自动勿扰用）</string>
+    <string name="reminder_rel_dnd_ok">已授权，上课自动进入勿扰</string>
+    <string name="reminder_rel_dnd_missing">未授权，上课时不会切换勿扰</string>
+    <string name="reminder_rel_promoted_title">实时更新授权（Android 16）</string>
+    <string name="reminder_rel_promoted_ok">已授权，实时卡片可上岛</string>
+    <string name="reminder_rel_promoted_missing">未授权，实时卡片不会上岛</string>
+    <string name="reminder_rel_action_open">去开启</string>
+    <string name="reminder_rel_action_settings">去设置</string>
 
     <!-- 页面标题与总开关 -->
     <string name="reminder_title">提醒</string>
@@ -880,10 +903,7 @@
     <string name="reminder_fluid_field_countdown">倒计时</string>
     <string name="reminder_fluid_note">点击通知后可展开课程详情。具体是否显示为流体云 / 超级岛由手机系统、通知权限和厂商服务资格决定。</string>
     <string name="reminder_fluid_status_notification_required">需要通知权限才能开启此功能</string>
-    <string name="reminder_fluid_status_unknown">无法直接读取流体云 / 超级岛的授权状态。点击「去设置」跳转到通知设置，确认系统权限。</string>
-    <string name="reminder_fluid_status_enabled">已开启流体云 / 超级岛授权</string>
-    <string name="reminder_fluid_status_settings_required">需要先在系统设置中开启流体云 / 超级岛授权</string>
-    <string name="reminder_fluid_status_not_supported">当前设备系统不支持流体云 / 超级岛</string>
+    <string name="reminder_fluid_status_unknown">系统不提供读取接口，App 判断不了。若你已在系统设置里打开，忽略这一条即可；不确定就点「去设置」看一眼。</string>
     <string name="reminder_fluid_go_to_settings">去设置</string>
     <string name="reminder_fluid_test_button">流体云测试</string>
     <string name="reminder_fluid_test_started">流体云测试已发送，查看通知栏顶部卡片</string>
@@ -907,16 +927,6 @@
 
     <!-- 后台可靠性 -->
     <string name="reminder_reliability_title">权限与后台运行</string>
-    <string name="reminder_reliability_notification">通知权限：%1$s</string>
-    <string name="reminder_reliability_exact_alarm">精确提醒：%1$s</string>
-    <string name="reminder_reliability_battery">电池优化：%1$s</string>
-    <string name="reminder_reliability_widget">桌面小组件：%1$s</string>
-    <string name="reminder_reliability_vendor">厂商实时卡片：%1$s</string>
-    <string name="reminder_reliability_promoted">系统实时更新授权：%1$s</string>
-    <string name="reminder_reliability_not_applicable">系统不适用</string>
-    <string name="reminder_reliability_ready">已满足</string>
-    <string name="reminder_reliability_missing">未满足</string>
-    <string name="reminder_reliability_unknown">未知</string>
     <string name="reminder_reliability_hint">点击「精确提醒」或「电池优化」可跳到对应的系统设置页。</string>
     <string name="reminder_pick_time">选择提醒时间</string>
 

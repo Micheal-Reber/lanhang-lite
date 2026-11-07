@@ -732,7 +732,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ==================== 后台可靠性 ==================== -->
+            <!-- ==================== 权限与后台运行 ==================== -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardReliability"
                 style="@style/Widget.Lanhang.Card"
@@ -754,34 +754,329 @@
                         android:textColor="?attr/colorOnSurface" />
 
                     <TextView
-                        android:id="@+id/tvRelNotification"
+                        android:id="@+id/tvRelSummary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_sm"
-                        android:background="?attr/selectableItemBackground"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                        android:layout_marginTop="@dimen/space_xxs"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <TextView
-                        android:id="@+id/tvRelExactAlarm"
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginTop="@dimen/space_md"
+                        android:layout_marginBottom="@dimen/space_sm"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <!-- ============ 通知权限：提醒能不能发出 ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelNotification"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_xs"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
                         android:background="?attr/selectableItemBackground"
-                        android:paddingTop="@dimen/space_xs"
-                        android:paddingBottom="@dimen/space_xs"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:id="@+id/icRelNotification"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_notif_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelNotification"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelNotifAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_open"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- ============ 精确闹钟：提醒准不准时 ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelExact"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:id="@+id/icRelExact"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_exact_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelExactAlarm"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelExactAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_open"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- ============ 忽略电池优化：后台会不会被冻结 ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelBattery"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:id="@+id/icRelBattery"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_battery_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelBattery"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelBatteryAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_open"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- ============ 勿扰权限：上课自动勿扰要用 ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelDnd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:id="@+id/icRelDnd"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_dnd_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelDnd"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelDndAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_open"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- ============ 实时更新授权：Android 16 promoted ongoing ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelPromoted"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/icRelPromoted"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_promoted_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelPromoted"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelPromotedAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_settings"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
 
                     <TextView
-                        android:id="@+id/tvRelBattery"
+                        android:id="@+id/tvRelDiag"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_xs"
-                        android:background="?attr/selectableItemBackground"
-                        android:paddingTop="@dimen/space_xs"
-                        android:paddingBottom="@dimen/space_xs"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginTop="@dimen/space_md"
+                        android:text="@string/reminder_rel_section_diag"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
@@ -799,22 +1094,6 @@
                         android:layout_marginTop="@dimen/space_xs"
                         android:text="@string/settings_reminder_widget_optional"
                         android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/tvRelVendor"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_xs"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/tvRelPromoted"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_xs"
-                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView

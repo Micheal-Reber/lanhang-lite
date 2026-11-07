@@ -831,6 +831,29 @@
     <string name="reminder_fluid_test_status_casting">Casting</string>
     <string name="settings_reminder_permissions_attention">Review reminder permissions</string>
     <string name="settings_reminder_widget_optional">Widgets are optional and not required to receive reminders.</string>
+    <string name="reminder_rel_summary_todo">%1$d items need attention</string>
+    <string name="reminder_rel_summary_ready">All permissions ready</string>
+    <string name="reminder_rel_section_diag">Diagnostics</string>
+    <string name="reminder_rel_diag_widget">Home screen widget: %1$s</string>
+    <string name="reminder_rel_widget_bound">bound</string>
+    <string name="reminder_rel_widget_unbound">not bound</string>
+    <string name="reminder_rel_notif_title">Notifications</string>
+    <string name="reminder_rel_notif_ok">On — reminders will arrive</string>
+    <string name="reminder_rel_notif_missing">Off — reminders will not appear</string>
+    <string name="reminder_rel_exact_title">Exact alarms</string>
+    <string name="reminder_rel_exact_ok">Allowed — reminders fire on time</string>
+    <string name="reminder_rel_exact_missing">Not allowed — reminders may be delayed</string>
+    <string name="reminder_rel_battery_title">Ignore battery optimization</string>
+    <string name="reminder_rel_battery_ok">Ignored — reminders will not be frozen</string>
+    <string name="reminder_rel_battery_missing">Not ignored — reminders may freeze</string>
+    <string name="reminder_rel_dnd_title">Do Not Disturb access (class DND)</string>
+    <string name="reminder_rel_dnd_ok">Granted — DND turns on during class</string>
+    <string name="reminder_rel_dnd_missing">Not granted — DND will not change</string>
+    <string name="reminder_rel_promoted_title">Live updates (Android 16)</string>
+    <string name="reminder_rel_promoted_ok">Granted — live cards can be promoted</string>
+    <string name="reminder_rel_promoted_missing">Not granted — live card stays a notification</string>
+    <string name="reminder_rel_action_open">Enable</string>
+    <string name="reminder_rel_action_settings">Settings</string>
 
     <!-- Page title and master switch -->
     <string name="reminder_title">Reminders</string>
@@ -878,10 +901,7 @@
     <string name="reminder_fluid_field_countdown">Countdown</string>
     <string name="reminder_fluid_note">Tap the notification to expand the course details. Whether it renders as a fluid cloud / super island depends on the phone system, notification permission and vendor service eligibility.</string>
     <string name="reminder_fluid_status_notification_required">Notification permission is required for this feature</string>
-    <string name="reminder_fluid_status_unknown">The fluid cloud / super island authorization cannot be read directly. Tap \"Go to settings\" to open notification settings and confirm the system permission.</string>
-    <string name="reminder_fluid_status_enabled">Fluid cloud / super island authorization is on</string>
-    <string name="reminder_fluid_status_settings_required">Enable the fluid cloud / super island authorization in system settings first</string>
-    <string name="reminder_fluid_status_not_supported">This device system does not support fluid cloud / super island</string>
+    <string name="reminder_fluid_status_unknown">The system exposes no API to read this. If you already turned it on in system settings, ignore this row; if unsure, tap \"Settings\" to take a look.</string>
     <string name="reminder_fluid_go_to_settings">Go to settings</string>
     <string name="reminder_fluid_test_button">Test fluid cloud</string>
     <string name="reminder_fluid_test_started">Fluid cloud test sent; check the card at the top of the notification shade</string>
@@ -905,16 +925,6 @@
 
     <!-- Background reliability -->
     <string name="reminder_reliability_title">Permissions &amp; background</string>
-    <string name="reminder_reliability_notification">Notification permission: %1$s</string>
-    <string name="reminder_reliability_exact_alarm">Exact reminders: %1$s</string>
-    <string name="reminder_reliability_battery">Battery optimization: %1$s</string>
-    <string name="reminder_reliability_widget">Home widget: %1$s</string>
-    <string name="reminder_reliability_vendor">Vendor live cards: %1$s</string>
-    <string name="reminder_reliability_promoted">Live update authorization: %1$s</string>
-    <string name="reminder_reliability_not_applicable">Not applicable</string>
-    <string name="reminder_reliability_ready">OK</string>
-    <string name="reminder_reliability_missing">Missing</string>
-    <string name="reminder_reliability_unknown">Unknown</string>
     <string name="reminder_reliability_hint">Tap \"Exact reminders\" or \"Battery optimization\" to jump to the matching system settings page.</string>
     <string name="reminder_pick_time">Pick reminder time</string>
 
