@@ -937,18 +937,18 @@
     <string name="notif_channel_before_class_desc">每节课开始前推送下节课信息</string>
     <string name="notif_channel_fluid">流体云 / 超级岛</string>
     <string name="notif_channel_fluid_desc">课前显示可展开的课程实时卡片</string>
-    <string name="notif_daily_title">今天有 %1$d 次课</string>
-    <string name="notif_daily_title_no_course">今天没有课</string>
+    <!-- 每日摘要文案对齐 Sleepy 1.0.61：「今日 8 号，您有 1 节课」/「第一节课 台球文化与运动 于 14:00 在 台球馆 上课」 -->
+    <string name="notif_daily_title">今日 %1$d 号，您有 %2$d 节课</string>
+    <string name="notif_daily_title_no_course">今日 %1$d 号，今天没有课程</string>
     <string name="notif_daily_text_no_course">好好休息，享受一天！</string>
-    <string name="notif_tomorrow_title">明天有 %1$d 次课</string>
-    <string name="notif_tomorrow_title_no_course">明天没有课</string>
-    <string name="notif_tomorrow_text_no_course">好好休息，享受一天！</string>
+    <string name="notif_daily_text_first">第一节课 %1$s 于 %2$s 在 %3$s 上课</string>
+    <string name="notif_tomorrow_title">明日 %1$d 号，您有 %2$d 节课</string>
+    <string name="notif_tomorrow_title_no_course">明日 %1$d 号，没有课程</string>
+    <string name="notif_tomorrow_text_no_course">明日无课,好好休息!</string>
     <string name="notif_date_title">%1$s · %2$d 次课</string>
     <string name="notif_date_no_course">%1$s 没有课</string>
     <string name="notif_before_class_compact">%1$s 开始 · %2$s</string>
     <string name="notif_room_unknown">未知教室</string>
-    <string name="agenda_first">首课 %1$s</string>
-    <string name="agenda_more">另有 %1$d 次课</string>
     <string name="agenda_time_unknown">时间待定</string>
     <string name="default_course_name">课程</string>
     <string name="default_room">上课地点</string>

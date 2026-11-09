@@ -103,40 +103,47 @@ object ReminderNotify {
             .setContentIntent(openAppIntent(app))
             .setAutoCancel(true)
 
+        // 标题里的「号」是**当月几号**（不是周几），与 Sleepy 1.0.61 一致：
+        //   「今日 8 号，您有 1 节课」/「明日 9 号，您有 2 节课」
+        val dayOfMonth = targetDate.dayOfMonth
+
         if (courses.isEmpty()) {
             val title = when (relativeDay) {
-                0L -> res.getString(R.string.notif_daily_title_no_course)
-                1L -> res.getString(R.string.notif_tomorrow_title_no_course)
+                0L -> res.getString(R.string.notif_daily_title_no_course, dayOfMonth)
+                1L -> res.getString(R.string.notif_tomorrow_title_no_course, dayOfMonth)
                 else -> res.getString(R.string.notif_date_no_course, targetDate.toString())
             }
             val text = res.getString(
                 if (tomorrowPreview) R.string.notif_tomorrow_text_no_course
                 else R.string.notif_daily_text_no_course
             )
-            builder.setContentTitle(title).setContentText(text)
+            builder
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             post(app, notificationId, builder.build())
             return
         }
 
         val title = when (relativeDay) {
-            0L -> res.getString(R.string.notif_daily_title, courses.size)
-            1L -> res.getString(R.string.notif_tomorrow_title, courses.size)
+            0L -> res.getString(R.string.notif_daily_title, dayOfMonth, courses.size)
+            1L -> res.getString(R.string.notif_tomorrow_title, dayOfMonth, courses.size)
             else -> res.getString(R.string.notif_date_title, targetDate.toString(), courses.size)
         }
+        // 正文只报第一节（Sleepy 1.0.61 就没有展开列表，BigText 与正文同文）：
+        //   「第一节课 台球文化与运动 于 14:00 在 台球馆 上课」
         val first = courses.first()
-        val firstLine = courseLine(app, first)
-        val text = res.getString(R.string.agenda_first, firstLine)
-        val visible = courses.take(PREVIEW_MAX_LINES)
-        val remaining = courses.size - visible.size
-        val expanded = buildList {
-            addAll(visible.map { courseLine(app, it) })
-            if (remaining > 0) add(res.getString(R.string.agenda_more, remaining))
-        }.joinToString("\n")
+        val text = res.getString(
+            R.string.notif_daily_text_first,
+            first.name.ifBlank { res.getString(R.string.default_course_name) },
+            first.startText.ifBlank { res.getString(R.string.agenda_time_unknown) },
+            first.room.ifBlank { res.getString(R.string.notif_room_unknown) }
+        )
 
         builder
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(expanded))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
         post(app, notificationId, builder.build())
     }
 
@@ -169,14 +176,6 @@ object ReminderNotify {
         nm.cancel(NOTIFY_BEFORE_CLASS)
     }
 
-    /** 通知行：`08:00 · 高等数学 · 教学楼A101`（时间缺失退「时间待定」） */
-    private fun courseLine(context: Context, course: ReminderCourse): String {
-        val res = LocaleHelper.wrap(context)
-        val time = course.startText.ifBlank { res.getString(R.string.agenda_time_unknown) }
-        val room = course.room.ifBlank { res.getString(R.string.notif_room_unknown) }
-        return "$time · ${course.name} · $room"
-    }
-
     private fun post(context: Context, id: Int, notification: android.app.Notification) {
         // 权限被撤销时静默跳过：调用方（Receiver）已经判断过一次，这里防止设置页手动测试抛异常
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
@@ -187,9 +186,6 @@ object ReminderNotify {
         return ChronoUnit.MILLIS.between(now.atZone(ZoneId.systemDefault()), next)
             .coerceAtLeast(60_000L)
     }
-
-    /** 展开态最多列 6 条，其余折成「另有 N 次课」。 */
-    private const val PREVIEW_MAX_LINES = 6
 
     /** 课程结束时刻（预览/勿扰用），供设置页复用。 */
     fun endTimeText(course: ReminderCourse): String =
