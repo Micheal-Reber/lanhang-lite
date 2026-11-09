@@ -71,6 +71,7 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -83,6 +84,23 @@ import kotlin.math.sign
 private val BarHeight = 64.dp
 private val IndicatorHeight = 56.dp
 private val ContentMargin = 4.dp
+
+/**
+ * 每个 Tab 的宽度。
+ *
+ * 胶囊不铺满屏幕——总宽 = TabWidth × tab 数 + 两侧 ContentMargin，
+ * 即「贴合内容」的紧凑胶囊（2026-11-09 用户要求），常规手机屏（~390dp）
+ * 宽约 312dp，折叠屏 / 平板上保持不变。
+ */
+private val TabWidth = 76.dp
+
+/**
+ * 紧凑胶囊的完整宽度。
+ *
+ * `MainActivity.forwardTouchOutsideBar` 靠它算透传边界：胶囊居中于底栏视图里，
+ * 左右两侧的空白要把触摸透传回内容区，边界按这个值从视图中心往两边量。
+ */
+internal fun compactPillWidthDp(tabCount: Int): Dp = TabWidth * tabCount + ContentMargin * 2
 
 data class LanhangTab(
     val selectedIcon: ImageVector,
@@ -116,15 +134,17 @@ fun LiquidGlassBottomBar(
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(
-        modifier.fillMaxWidth().height(BarHeight),
+        // 紧凑胶囊：整体宽度按 Tab 计，不铺满屏幕；居中由调用方的 align 决定。
+        // 触摸透传边界见 MainActivity.forwardTouchOutsideBar，两处必须同口径。
+        modifier
+            .height(BarHeight)
+            .width(compactPillWidthDp(tabs.size)),
         contentAlignment = Alignment.CenterStart,
     ) {
         val density = LocalDensity.current
         val tabsCount = tabs.size
         // 与内容步长一致：胶囊左右各留 ContentMargin，指示器宽度必须用同一个值
-        val tabWidth = with(density) {
-            (constraints.maxWidth.toFloat() - ContentMargin.toPx() * 2f) / tabsCount
-        }
+        val tabWidth = with(density) { TabWidth.toPx() }
 
         val offsetAnimation = remember { Animatable(0f) }
         val panelOffset by remember(density, constraints.maxWidth) {

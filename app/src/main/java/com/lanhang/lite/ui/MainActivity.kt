@@ -7,7 +7,6 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.badge.BadgeDrawable
@@ -31,6 +29,7 @@ import com.lanhang.lite.ui.navigation.BottomBarPrefs
 import com.lanhang.lite.ui.navigation.BottomBarStyle
 import com.lanhang.lite.ui.navigation.LanhangTab
 import com.lanhang.lite.ui.navigation.LiquidGlassBottomBar
+import com.lanhang.lite.ui.navigation.compactPillWidthDp
 import com.lanhang.lite.ui.navigation.ViewBackdrop
 import com.lanhang.lite.ui.navigation.rememberViewBackdrop
 import android.content.Context
@@ -399,9 +398,7 @@ class MainActivity : AppCompatActivity() {
                         onNavigate = { tab -> switchTab(tabs.indexOf(tab)) },
                         backdrop = glass.backdrop,
                         backdropRevision = glass::revisionTick,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(horizontal = 16.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
             }
@@ -647,9 +644,11 @@ class MainActivity : AppCompatActivity() {
             val navLoc = IntArray(2)
             binding.bottomNav.getLocationOnScreen(navLoc)
             val density = resources.displayMetrics.density
-            val barLeft = navLoc[0] + (16f * density).toInt()
+            // 紧凑胶囊水平居中（宽度见 compactPillWidthDp），透传边界按视图宽度往两边量
+            val pillWidthPx = (compactPillWidthDp(BOTTOM_TAB_COUNT).value * density).toInt()
+            val barLeft = navLoc[0] + (binding.bottomNav.width - pillWidthPx) / 2
             val barTop = navLoc[1] + binding.bottomNav.height - (64f * density).toInt()
-            val barRight = navLoc[0] + binding.bottomNav.width - (16f * density).toInt()
+            val barRight = barLeft + pillWidthPx
             val barBottom = navLoc[1] + binding.bottomNav.height
             val insideBar = event.rawX >= barLeft && event.rawX <= barRight &&
                 event.rawY >= barTop && event.rawY <= barBottom
@@ -751,6 +750,10 @@ class MainActivity : AppCompatActivity() {
         private const val TAG_GRADES = "grades"
         private const val TAG_MOMENTS = "moments"
         private const val TAG_SETTINGS = "settings"
+
+        // 底栏的四个 Tab（与 setupGlassBottomBar 里的 tabs 列表一一对应）。
+        // 紧凑胶囊宽度 = BOTTOM_TAB_COUNT × TabWidth + 两侧 ContentMargin，见 ui/navigation/LiquidGlassBottomBar.kt
+        private const val BOTTOM_TAB_COUNT = 4
 
         private const val TAB_SCHEDULE = 0
         private const val TAB_GRADES = 1
