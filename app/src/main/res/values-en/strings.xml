@@ -855,6 +855,22 @@
     <string name="reminder_rel_action_open">Enable</string>
     <string name="reminder_rel_action_settings">Settings</string>
 
+    <!-- Battery whitelist: the red banner pinned at the top of the reliability card (H0/H1) -->
+    <string name="reminder_rel_battery_alert">Fix this first: without ignoring battery optimizations, the system throttles this app to 1 alarm per hour (1 per day once it is rarely used), so reminders go missing in batches. Allowing battery optimization overrides that limit.</string>
+
+    <!-- Cross-week fetch failures -->
+    <string name="reminder_rel_data_gap">Schedule not synced — reminders across weeks may be missing (%1$d consecutive failures)</string>
+
+    <!-- Switches on but no alarms armed at all -->
+    <string name="reminder_rel_lost">There are classes in the next 7 days but no before-class alarms are armed — tap here to re-arm</string>
+    <string name="reminder_rel_rearming">Re-arming class reminders…</string>
+
+    <!-- App standby bucket (H0 self-evidence) -->
+    <string name="reminder_rel_bucket_title">App standby bucket</string>
+    <string name="reminder_rel_bucket_ok">Normal — alarms are not throttled</string>
+    <string name="reminder_rel_bucket_rare">Dropped to rare — alarms throttled to 1 per hour (battery optimization override applies)</string>
+    <string name="reminder_rel_bucket_restricted">Dropped to restricted — alarms throttled to 1 per day (battery optimization override applies)</string>
+
     <!-- Page title and master switch -->
     <string name="reminder_title">Reminders</string>
     <string name="reminder_master_title">Enable reminders</string>

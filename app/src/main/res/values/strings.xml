@@ -857,6 +857,22 @@
     <string name="reminder_rel_action_open">去开启</string>
     <string name="reminder_rel_action_settings">去设置</string>
 
+    <!-- 电池白名单：可靠性卡置顶的红条（H0/H1 的共同对策） -->
+    <string name="reminder_rel_battery_alert">先处理这一项：没开「忽略电池优化」时，系统会把本应用的闹钟限流到每小时 1 个（长期不用时降到每天 1 个），提醒会成批丢失。手动放开电池优化即可覆盖这个限制。</string>
+
+    <!-- 跨周补拉失败的红条 -->
+    <string name="reminder_rel_data_gap">课表未同步，跨周提醒可能缺失（已连续 %1$d 次补拉失败）</string>
+
+    <!-- 开着开关却一个闹钟都没排上 -->
+    <string name="reminder_rel_lost">未来 7 天有课，却一个课前提醒都没排上 —— 点这里重排</string>
+    <string name="reminder_rel_rearming">正在重新排课表提醒…</string>
+
+    <!-- 应用待机分桶（H0 自证） -->
+    <string name="reminder_rel_bucket_title">应用待机分桶</string>
+    <string name="reminder_rel_bucket_ok">正常，闹钟不会被限流</string>
+    <string name="reminder_rel_bucket_rare">已降为 rare：闹钟被限流到每小时 1 个（放开电池优化可覆盖）</string>
+    <string name="reminder_rel_bucket_restricted">已降为 restricted：闹钟被限流到每天 1 个（放开电池优化可覆盖）</string>
+
     <!-- 页面标题与总开关 -->
     <string name="reminder_title">提醒</string>
     <string name="reminder_master_title">开启提醒</string>

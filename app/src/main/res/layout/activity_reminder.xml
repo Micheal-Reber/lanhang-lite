@@ -761,6 +761,53 @@
                         android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
+                    <!--
+                        🔴 电池白名单红条：整页置顶（P0-5）。
+                        它同时对付两件事 —— Doze 白名单与待机分桶限流，官方写明放开前者可覆盖后者；
+                        以前只作为五行之一平铺在下面，用户根本意识不到这是「不响」的头号原因。
+                    -->
+                    <TextView
+                        android:id="@+id/tvRelBatteryAlert"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_sm"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingTop="@dimen/space_xxs"
+                        android:paddingBottom="@dimen/space_xxs"
+                        android:text="@string/reminder_rel_battery_alert"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                        android:textColor="?attr/colorError"
+                        android:visibility="gone" />
+
+                    <!-- 🔴 跨周补拉连续失败：课表没同步，跨周的课排不进闹钟 -->
+                    <TextView
+                        android:id="@+id/tvRelDataAlert"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_sm"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingTop="@dimen/space_xxs"
+                        android:paddingBottom="@dimen/space_xxs"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                        android:textColor="?attr/colorError"
+                        android:visibility="gone" />
+
+                    <!-- 🔴 开着开关、窗口里有课、账本却空 —— 排钟压根没跑过 -->
+                    <TextView
+                        android:id="@+id/tvRelLost"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_sm"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingTop="@dimen/space_xxs"
+                        android:paddingBottom="@dimen/space_xxs"
+                        android:text="@string/reminder_rel_lost"
+                        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                        android:textColor="?attr/colorError"
+                        android:visibility="gone" />
+
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/divider_thickness"
@@ -939,6 +986,67 @@
 
                         <TextView
                             android:id="@+id/tvRelBatteryAction"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:text="@string/reminder_rel_action_open"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- ============ 应用待机分桶：闹钟被限流的自证（H0） ============ -->
+                    <LinearLayout
+                        android:id="@+id/rowRelBucket"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-16dp"
+                        android:layout_marginEnd="-16dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_two_line"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/icRelBucket"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_check"
+                            app:tint="?attr/colorPrimary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reminder_rel_bucket_title"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvRelBucket"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_xxs"
+                                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvRelBucketAction"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="@dimen/space_sm"

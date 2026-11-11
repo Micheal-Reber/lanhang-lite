@@ -318,8 +318,10 @@
             android:exported="false" />
 
         <!--
-            开机 / 应用更新后重排：AlarmManager 的闹钟不跨重启，不重建就再也不响。
-            MY_PACKAGE_REPLACED 覆盖「升级安装把已排闹钟清掉」的情况。
+            开机 / 应用更新 / 改系统时间后重排：AlarmManager 的闹钟不跨重启，不重建就再也不响。
+            MY_PACKAGE_REPLACED 覆盖「升级安装把已排闹钟清掉」的情况；
+            TIME_SET / TIMEZONE_CHANGED 覆盖「闹钟存的是绝对时刻，改时间后全部指错钟点」——
+            自续期一次性闹钟尤其依赖这条：链子一旦指错，之后每一天都错。
         -->
         <receiver
             android:name=".reminder.BootReceiver"
@@ -327,6 +329,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

@@ -2,6 +2,7 @@ package com.lanhang.lite.reminder
 
 import android.app.AlarmManager
 import android.app.NotificationManager
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
@@ -530,6 +531,20 @@ class ReminderActivity : AppCompatActivity() {
         binding.rowRelBattery.setOnClickListener {
             if (!batteryOptimizationIgnored()) launchBatterySettings(this)
         }
+        // 置顶红条本身就是入口：这一条是「不响」的头号原因，不该还要用户往下滚才找到
+        binding.tvRelBatteryAlert.setOnClickListener {
+            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+        }
+        // 分桶限流的对策仍然是放开电池优化（官方写明可以覆盖），所以跳同一个设置页
+        binding.rowRelBucket.setOnClickListener {
+            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+        }
+        // P0-6：开关开着、窗口里有课、账本却是空的 —— 点一下直接重排
+        binding.tvRelLost.setOnClickListener {
+            toast(R.string.reminder_rel_rearming)
+            ReminderScheduler.restart()
+            handler.postDelayed({ refreshReliability() }, 1500)
+        }
         binding.rowRelDnd.setOnClickListener {
             if (!policyAccessGranted()) {
                 runCatching {
@@ -566,6 +581,7 @@ class ReminderActivity : AppCompatActivity() {
     private fun refreshReliability() {
         lifecycleScope.launch {
             val snapshot = withContext(Dispatchers.IO) { ReminderReliability.snapshot(this@ReminderActivity) }
+            val lost = withContext(Dispatchers.IO) { ReminderScheduler.scheduleLooksLost() }
             if (isFinishing || isDestroyed) return@launch
             val res = resources
 
@@ -603,6 +619,33 @@ class ReminderActivity : AppCompatActivity() {
                     else R.string.reminder_rel_battery_missing
                 ),
             )
+            // P0-5：红条整页置顶 —— 下面那一行只是五行之一平铺，救不了「不点开就不响」
+            binding.tvRelBatteryAlert.visibility =
+                if (snapshot.batteryOptimizationIgnored) View.GONE else View.VISIBLE
+
+            // P1-7：待机分桶，H0（闹钟被系统限流）唯一能在 App 内自证的手段
+            val bucket = snapshot.standbyBucket
+            if (bucket == null) {
+                binding.rowRelBucket.visibility = View.GONE
+            } else {
+                val throttled = ReminderReliability.standbyBucketThrottles(bucket)
+                binding.rowRelBucket.visibility = View.VISIBLE
+                bindPermissionRow(
+                    row = binding.rowRelBucket,
+                    icon = binding.icRelBucket,
+                    body = binding.tvRelBucket,
+                    action = binding.tvRelBucketAction,
+                    ok = !throttled,
+                    bodyText = res.getString(
+                        when {
+                            bucket >= UsageStatsManager.STANDBY_BUCKET_RESTRICTED ->
+                                R.string.reminder_rel_bucket_restricted
+                            throttled -> R.string.reminder_rel_bucket_rare
+                            else -> R.string.reminder_rel_bucket_ok
+                        }
+                    ),
+                )
+            }
             bindPermissionRow(
                 row = binding.rowRelDnd,
                 icon = binding.icRelDnd,
@@ -638,6 +681,7 @@ class ReminderActivity : AppCompatActivity() {
             if (!snapshot.notificationPermissionGranted) todo++
             if (!snapshot.exactAlarmAllowed) todo++
             if (!snapshot.batteryOptimizationIgnored) todo++
+            if (ReminderReliability.standbyBucketThrottles(bucket)) todo++
             if (Build.VERSION.SDK_INT >= 36 && snapshot.promotedOngoingAllowed == false) todo++
             val errorColor = com.google.android.material.color.MaterialColors
                 .getColor(binding.tvRelSummary, com.google.android.material.R.attr.colorError)
@@ -656,6 +700,17 @@ class ReminderActivity : AppCompatActivity() {
                     else R.string.reminder_rel_widget_unbound
                 )
             )
+
+            // P0-4：跨周补拉连续失败 → 红条。一次失败多半只是离线，连续两次才是真的同步不上，
+            // 也是「下周才开始的课整门排不进闹钟」的信号。
+            val fails = ReminderPrefs.coverFailStreak(this@ReminderActivity)
+            binding.tvRelDataAlert.visibility = if (fails >= 2) View.VISIBLE else View.GONE
+            if (fails >= 2) {
+                binding.tvRelDataAlert.text = res.getString(R.string.reminder_rel_data_gap, fails)
+            }
+
+            // P0-6：开关开着、窗口里确实有课、账本却是空的 —— 排钟压根没跑过
+            binding.tvRelLost.visibility = if (lost) View.VISIBLE else View.GONE
         }
     }
 

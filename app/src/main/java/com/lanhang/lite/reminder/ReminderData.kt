@@ -114,11 +114,14 @@ object ReminderData {
      * 补齐提醒窗口覆盖到的按周数据（没有就拉一次）。
      *
      * 只在「该周没有缓存、且不是主缓存本身代表的那一周」时联网，一个 7 天窗口最多两次请求；
-     * 拉不到（离线/会话失效）就静默跳过，调度继续按已有数据走。
+     * 拉不到（离线/会话失效）就跳过，调度继续按已有数据走。
+     *
+     * @return true = 窗口内该有的周数据都齐了；false = **有周没拉到**
+     *         （调用方据此记一次失败，连续两次就在提醒页出红条）
      */
-    suspend fun ensureWeeksCovered(days: Int = 7) {
-        val base = ScheduleRepository.loadCached()?.data ?: return
-        val b = bounds(base) ?: return
+    suspend fun ensureWeeksCovered(days: Int = 7): Boolean {
+        val base = ScheduleRepository.loadCached()?.data ?: return true
+        val b = bounds(base) ?: return true
         val today = LocalDate.now()
         val weeks = LinkedHashSet<Int>()
         for (offset in 0 until days) {
@@ -127,13 +130,52 @@ object ReminderData {
             ) ?: continue
             weeks += week
         }
+        var ok = true
         weeks.filter { it != b.cachedWeek }.forEach { week ->
             if (ScheduleRepository.loadCachedWeek(week) != null) return@forEach
-            runCatching {
+            val pulled = runCatching {
                 ScheduleRepository.refresh(week, updateWidget = false, reschedule = false)
             }
+            if (pulled.isFailure) {
+                ok = false
+                ReminderLog.error("cover-week-$week", pulled.exceptionOrNull() ?: IllegalStateException("no cause"))
+            }
         }
+        return ok
     }
+
+    /**
+     * 窗口里**数据不可判定**的日期。
+     *
+     * 「没有课」和「不知道有没有课」是两回事：前者可以撤销已排的闹钟，后者撤了就等于
+     * 把「下周才开始的课」整门删掉 —— 而且删掉之后只有点开 App 才排得回来
+     * （00:05 的重同步一旦在补拉成功前把闹钟取消，就再也补不回来了）。
+     *
+     * 返回 null = 连学期边界都没有（没有课表缓存），整个窗口都不可判定。
+     */
+    fun unknownDates(days: Int): Set<LocalDate>? {
+        val base = ScheduleRepository.loadCached()?.data ?: return null
+        val b = bounds(base) ?: return null
+        val today = LocalDate.now()
+        val unknown = LinkedHashSet<LocalDate>()
+        for (offset in 0 until days) {
+            val date = today.plusDays(offset.toLong())
+            val week = ScheduleWeek.rawWeekOf(date, b.cachedWeek, b.startWeek, b.endWeek)
+                ?: continue // 学期外：已知无课，不是「不可判定」
+            if (dataForWeek(base, b, week) == null) unknown += date
+        }
+        return unknown
+    }
+
+    /**
+     * requestCode 反查日期（只在 [candidates] 里找）。
+     *
+     * 账本存的是 `armedKey(date, startPeriod)` 派生出来的 Int，模 100000 后不可逆；
+     * 但候选日期只有 7 个、节次只有 11 个，穷举比在账本里另存一份日期映射可靠
+     * （少一个键就少一处「两边对不上」的地方）。
+     */
+    fun dateOfCode(code: Int, candidates: Iterable<LocalDate>): LocalDate? =
+        candidates.firstOrNull { date -> (1..11).any { period -> armedKey(date, period) == code } }
 
     /**
      * 从 [from] 起逐天找第一节还没开始的课，最多找 [days] 天。

@@ -62,12 +62,21 @@ object Diagnostics {
     }
 
     @Synchronized
-    fun record(context: Context, area: String, error: Throwable) {
+    fun record(context: Context, area: String, error: Throwable) =
+        record(context, area, "${error.javaClass.simpleName}: ${error.message.orEmpty()}")
+
+    /**
+     * 追加一条自述事件（不是异常也要能记）：`[area] message`，一行一条。
+     *
+     * 为什么不是 `Log.w`：诊断页采集的是 `logcat -d … *:W`，D/I 级根本采不到，
+     * 而提醒链路的排钟埋点需要长期留痕 —— 只能落在这个文件里。
+     */
+    @Synchronized
+    fun record(context: Context, area: String, message: String) {
         runCatching {
             val file = java.io.File(context.filesDir, "diagnostics.log")
             if (file.length() > 64 * 1024) file.writeText("")
-            val message = redact(context, "${error.javaClass.simpleName}: ${error.message.orEmpty()}")
-            file.appendText("${System.currentTimeMillis()} [$area] $message\n")
+            file.appendText("${System.currentTimeMillis()} [$area] ${redact(context, message)}\n")
         }
     }
 

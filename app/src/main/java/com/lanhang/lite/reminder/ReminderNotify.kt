@@ -177,8 +177,11 @@ object ReminderNotify {
     }
 
     private fun post(context: Context, id: Int, notification: android.app.Notification) {
-        // 权限被撤销时静默跳过：调用方（Receiver）已经判断过一次，这里防止设置页手动测试抛异常
+        // 权限被撤销时跳过：调用方（Receiver）已经判断过一次，这里防止设置页手动测试抛异常。
+        // 成败都要留痕 —— 「通知发了没」是排查「不响」时第一个要确认的事实。
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
+            .onSuccess { ReminderLog.event("notify", "id=$id ok=true") }
+            .onFailure { ReminderLog.error("notify-failed", it) }
     }
 
     private fun millisUntilNextMidnight(now: LocalDateTime): Long {

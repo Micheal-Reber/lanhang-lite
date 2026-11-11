@@ -1,6 +1,7 @@
 package com.lanhang.lite.reminder
 
 import android.app.AlarmManager
+import android.app.usage.UsageStatsManager
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -23,6 +24,14 @@ data class BackgroundReliabilitySnapshot(
     val batteryOptimizationIgnored: Boolean,
     val widgetBound: Boolean,
     val promotedOngoingAllowed: Boolean?,
+    /**
+     * 应用待机分桶（API 28+）；null = 系统没有这个概念。
+     *
+     * 这是 H0「闹钟被系统限流」唯一能在 App 内自证的手段：
+     * `rare` 每小时只放行 1 个闹钟、`restricted` 每天 1 个。
+     * 读**本包**的分桶不需要 `PACKAGE_USAGE_STATS` 权限。
+     */
+    val standbyBucket: Int?,
 )
 
 /**
@@ -43,7 +52,25 @@ object ReminderReliability {
             batteryOptimizationIgnored = batteryOptimizationIgnored(app),
             widgetBound = widgetBound(app),
             promotedOngoingAllowed = promotedOngoingAllowed(app),
+            standbyBucket = standbyBucket(app),
         )
+    }
+
+    /**
+     * 分桶已经紧到会限流闹钟了吗（`rare` 起：每小时 1 个；`restricted` 起：每天 1 个）。
+     *
+     * 官方同时写明：**用户手动把本 App 加进电池优化白名单会覆盖分桶限制**，
+     * 所以这一行缺了指向的仍然是「忽略电池优化」那一行，不新增设置项。
+     */
+    fun standbyBucketThrottles(bucket: Int?): Boolean =
+        bucket != null && bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
+
+    /** 读本包的待机分桶；API 28 以下 / 服务取不到返回 null。不需要任何权限。 */
+    private fun standbyBucket(context: Context): Int? {
+        if (Build.VERSION.SDK_INT < 28) return null
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return null
+        return runCatching { usm.appStandbyBucket }.getOrDefault(null)
     }
 
     /** API 36+ 才能查 promoted ongoing 授权；更低的系统没有这个概念，返回 null。 */

@@ -92,9 +92,12 @@ object ReminderPrefs {
     fun setBeforeClassMode(context: Context, mode: String) =
         prefs(context).edit().putString("before_class_mode", mode).apply()
 
-    fun isBeforeClassBannerEnabled(context: Context): Boolean =
-        beforeClassMode(context) != MODE_FLUID
-
+    /**
+     * 当前形态是不是流体云。
+     *
+     * 只有这一个真值判定（横幅 = 不是流体云）：旧版两个独立布尔会互相静默吞掉，
+     * 一个「横幅开、流体云也开」的状态会让两边都以为该自己发、结果谁都没发。
+     */
     fun isBeforeClassFluidEnabled(context: Context): Boolean =
         beforeClassMode(context) == MODE_FLUID
 
@@ -119,14 +122,14 @@ object ReminderPrefs {
     private const val KEY_ARMED = "before_class_armed_codes"
 
     fun loadArmedCodes(context: Context): Set<Int> =
-        context.applicationContext.getSharedPreferences(LEDGER_FILE, Context.MODE_PRIVATE)
+        ledger(context)
             .getStringSet(KEY_ARMED, null)
             .orEmpty()
             .mapNotNull { it.toIntOrNull() }
             .toSet()
 
     fun saveArmedCodes(context: Context, codes: Set<Int>) {
-        context.applicationContext.getSharedPreferences(LEDGER_FILE, Context.MODE_PRIVATE)
+        ledger(context)
             .edit()
             .putStringSet(KEY_ARMED, codes.map { it.toString() }.toSet())
             .apply()
@@ -134,4 +137,31 @@ object ReminderPrefs {
 
     /** 退出登录 / 关闭提醒时清账本：换人登录后旧账号的 requestCode 必须能被撤销。 */
     fun clearArmedCodes(context: Context) = saveArmedCodes(context, emptySet())
+
+    // ---- 跨周补拉的失败计数（可靠性红条用；同样放账本 SP：本机状态） ----
+
+    private const val KEY_COVER_FAIL_STREAK = "cover_fail_streak"
+    private const val KEY_COVER_FAIL_AT = "cover_fail_at"
+
+    /** 连续几次跨周补拉失败；成功即清零。≥2 才提示，避免离线一次就吓人。 */
+    fun coverFailStreak(context: Context): Int =
+        ledger(context).getInt(KEY_COVER_FAIL_STREAK, 0).coerceIn(0, 999)
+
+    /** 最近一次补拉失败的时间戳；0 = 没失败过。 */
+    fun coverFailAt(context: Context): Long = ledger(context).getLong(KEY_COVER_FAIL_AT, 0L)
+
+    fun recordCoverResult(context: Context, ok: Boolean) {
+        val p = ledger(context)
+        if (ok) {
+            p.edit().putInt(KEY_COVER_FAIL_STREAK, 0).putLong(KEY_COVER_FAIL_AT, 0L).apply()
+        } else {
+            p.edit()
+                .putInt(KEY_COVER_FAIL_STREAK, coverFailStreak(context) + 1)
+                .putLong(KEY_COVER_FAIL_AT, System.currentTimeMillis())
+                .apply()
+        }
+    }
+
+    private fun ledger(context: Context) =
+        context.applicationContext.getSharedPreferences(LEDGER_FILE, Context.MODE_PRIVATE)
 }
