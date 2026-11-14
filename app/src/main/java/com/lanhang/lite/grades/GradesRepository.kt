@@ -30,6 +30,14 @@ object GradesRepository {
 
     private fun scoresFile(term: String) = File(cacheDir, "grades_$term.json")
 
+    /** 退出登录时清掉学期列表与各学期成绩（都是 filesDir 下的按账号缓存）。 */
+    fun clearCache() {
+        runCatching { semestersFile.delete() }
+        runCatching {
+            cacheDir.listFiles { f -> f.name.startsWith("grades_") }?.forEach { it.delete() }
+        }
+    }
+
     // ---- 学期列表 ----
 
     fun loadCachedSemesters(): List<GradeSemester>? {

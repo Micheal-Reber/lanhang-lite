@@ -56,12 +56,6 @@ class MomentMessageAdapter(
 
     fun indexOf(messageId: String): Int = items.indexOfFirst { it.messageId == messageId }
 
-    fun replaceAt(index: Int, item: MomentMessageItem) {
-        if (index < 0 || index >= items.size) return
-        items[index] = item
-        notifyItemChanged(index)
-    }
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_moment_message, parent, false)

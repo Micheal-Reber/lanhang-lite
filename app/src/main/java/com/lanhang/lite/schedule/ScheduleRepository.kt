@@ -70,6 +70,17 @@ object ScheduleRepository {
      * 只删 `schedule_w<数字>.json`：`schedule_wcur.json` 是 [MiniappApi] 留的原始响应转储，
      * 其它 `xnxq_list.json`/`score_*.json` 也不是周缓存，不能连带删掉。
      */
+    /**
+     * 退出登录时清掉全部课表缓存（主缓存 + 按周缓存）。
+     *
+     * 缓存落在 filesDir（不是 cacheDir），换账号后如果留着，新账号第一次打开会先看到
+     * 上一个人的课表 —— 所以退出登录必须显式清。
+     */
+    fun clearCache() {
+        runCatching { cacheFile.delete() }
+        clearWeekCaches()
+    }
+
     private fun clearWeekCaches() {
         val pattern = Regex("""schedule_w\d+\.json""")
         runCatching {

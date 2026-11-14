@@ -16,7 +16,6 @@
 <resources>
 
     <!-- ==================== 间距：M3 4dp 网格 ==================== -->
-    <dimen name="space_none">0dp</dimen>
     <dimen name="space_xxs">2dp</dimen>
     <dimen name="space_xs">4dp</dimen>
     <dimen name="space_sm">8dp</dimen>
@@ -25,21 +24,17 @@
     <dimen name="space_xl">24dp</dimen>
     <dimen name="space_2xl">32dp</dimen>
     <dimen name="space_3xl">48dp</dimen>
-    <dimen name="space_4xl">64dp</dimen>
 
     <!-- ==================== 圆角：M3 shape scale ==================== -->
     <dimen name="corner_xs">4dp</dimen>
     <dimen name="corner_sm">8dp</dimen>
     <dimen name="corner_md">12dp</dimen>
     <dimen name="corner_lg">16dp</dimen>
-    <dimen name="corner_xl">28dp</dimen>
     <dimen name="corner_full">999dp</dimen>
     <!-- 大圆角卡片专用圆角（Hoshi 版式：设置分组卡 / 工作圈动态卡；M3 shape scale 无 24dp 档） -->
     <dimen name="corner_card_large">24dp</dimen>
 
     <!-- ==================== 字号：M3 type scale ==================== -->
-    <!-- Display：仅用于登录页品牌大标题等极端场景 -->
-    <dimen name="text_display_small">36sp</dimen>
     <dimen name="text_headline_medium">28sp</dimen>
     <dimen name="text_headline_small">24sp</dimen>
     <!-- Title：顶栏标题、页面主标题、卡片主标题 -->

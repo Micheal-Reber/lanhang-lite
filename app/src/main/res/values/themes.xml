@@ -197,11 +197,6 @@
         <item name="iconTint">?attr/colorOnSurfaceVariant</item>
     </style>
 
-    <!-- 日历按钮用 tonal 版本：它是"跳转到某周"的入口，比左右翻页更重 -->
-    <style name="Widget.Lanhang.IconButton.Tonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
-        <item name="iconSize">@dimen/icon_lg</item>
-    </style>
-
     <!--
       周次按钮：M3 里"可点击的当前值"用 chip 形态（胶囊 + 短高度）。
       TonalButton 自带 secondaryContainer 底与 onSecondaryContainer 字，

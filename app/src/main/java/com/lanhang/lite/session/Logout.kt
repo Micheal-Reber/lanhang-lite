@@ -1,12 +1,22 @@
 package com.lanhang.lite.session
 
 import android.content.Context
+import com.lanhang.lite.directory.DirectoryRepository
 import com.lanhang.lite.moments.MomentMessageStore
 import com.lanhang.lite.moments.MomentMessageWatcher
 import com.lanhang.lite.moments.MomentNotify
+import com.lanhang.lite.moments.MomentsCache
 import com.lanhang.lite.net.ApiClient
+import com.lanhang.lite.oa.OaCache
 import com.lanhang.lite.net.MomentsApi
+import com.lanhang.lite.schedule.LocalCourseStore
+import com.lanhang.lite.schedule.ScheduleRepository
+import com.lanhang.lite.grades.GradesRepository
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * 退出登录的本地清理（2026-10-27 从 `MainActivity.performLogout` 抽出来）。
@@ -43,7 +53,21 @@ object Logout {
         com.lanhang.lite.reminder.FluidCloudService.requestStop(app)
         com.lanhang.lite.reminder.ReminderNotify.cancelAll(app)
 
-        // 课表、成绩、工作圈全是按账号缓存的，留着就是串号
+        // 课表、成绩、工作圈全是按账号缓存的，留着就是串号。
+        //
+        // 🔴 2026-11-14 修正：这些缓存**全在 filesDir**（schedule_cache.json / schedule_w*.json /
+        // grades_*.json / local_courses.json / oa_apps.json / 工作圈快照 / directory/），
+        // 而这里以前只删 `cacheDir`（那里面只有上传用的临时图）—— 等于什么都没清。
+        // 换个人登录会先看到上一个人的课表、成绩、动态和常用应用顺序。
+        // 这几个 clear 一直写好了却没人调用，就是「函数无引用」的由来。
+        runCatching { ScheduleRepository.clearCache() }
+        runCatching { GradesRepository.clearCache() }
+        runCatching { LocalCourseStore.clear() }
+        runCatching { OaCache.clear() }
+        runCatching { MomentsCache.clear() }
+        // 通讯录缓存是 suspend 的（IO 线程逐个删文件），低频操作，起个后台任务即可
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { DirectoryRepository.clear() }
+        // 上传用的临时图确实在 cacheDir
         app.cacheDir.deleteRecursively()
 
         // 网页里的登录态也算账号数据（2026-11-14 加「赣青二课」后尤其重要）：

@@ -27,6 +27,13 @@ object LocalCourseStore {
         file = File(context.applicationContext.filesDir, FILE)
     }
 
+    /** 退出登录时清掉自定义课程：它挂在课表上，换账号后没有意义。 */
+    @Synchronized
+    fun clear() {
+        if (!::file.isInitialized) return
+        runCatching { file.delete() }
+    }
+
     @Synchronized
     fun all(): List<LocalCourse> {
         if (!::file.isInitialized || !file.exists()) return emptyList()

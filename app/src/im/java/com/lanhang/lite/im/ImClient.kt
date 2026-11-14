@@ -1413,25 +1413,6 @@ object ImClient {
         )
     }
 
-    /** 放弃下载（用户点了取消 / 页面被关掉） */
-    fun cancelDownloadFile(uid: String) {
-        runCatching {
-            RongIMClient.getInstance().getMessageByUid(
-                uid,
-                object : RongIMClient.ResultCallback<Message>() {
-                    override fun onSuccess(message: Message?) {
-                        if (message != null) {
-                            RongIMClient.getInstance()
-                                .cancelDownloadMediaMessage(message, null)
-                        }
-                    }
-
-                    override fun onError(e: RongIMClient.ErrorCode?) = Unit
-                }
-            )
-        }
-    }
-
     /**
      * localPath 存在、且文件**真的在盘上**才算数。
      *

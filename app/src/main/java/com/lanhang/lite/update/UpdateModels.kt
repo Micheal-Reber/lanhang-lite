@@ -99,16 +99,6 @@ data class UpdateRecord(
     val status: UpdateStatus = UpdateStatus.AVAILABLE,
     val failureDetails: String? = null,
 ) {
-    fun toAsset(): UpdateAsset? {
-        val url = downloadUrl ?: return null
-        return UpdateAsset(
-            name = assetName.ifBlank { fileName },
-            downloadUrl = url,
-            fallbackUrls = fallbackUrls,
-            sha256 = sha256,
-        )
-    }
-
     fun matches(other: UpdateCheck.Available): Boolean =
         versionName == other.versionName && assetName == other.asset.name && sha256 == other.asset.sha256
 }

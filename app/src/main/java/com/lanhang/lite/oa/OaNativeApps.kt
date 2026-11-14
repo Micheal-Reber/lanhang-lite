@@ -41,8 +41,6 @@ object OaNativeApps {
     const val CAMPUS_NET_APP_ID = "native:campus_net"
     const val LIBRARY_SEAT_APP_ID = "native:library_seat"
 
-    fun isNative(id: String?): Boolean = id?.startsWith("native:") == true
-
     /**
      * 三个本地入口的宫格条目（顺序即默认展示顺序）。
      *

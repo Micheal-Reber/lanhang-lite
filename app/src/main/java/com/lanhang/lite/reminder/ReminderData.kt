@@ -64,13 +64,6 @@ object ReminderData {
 
     fun hasSchedule(): Boolean = ScheduleRepository.loadCached()?.data != null
 
-    /** 这一天属于第几周；null = 学期外或没有缓存 */
-    fun weekOf(date: LocalDate): Int? {
-        val data = ScheduleRepository.loadCached()?.data ?: return null
-        val b = bounds(data) ?: return null
-        return ScheduleWeek.rawWeekOf(date, b.cachedWeek, b.startWeek, b.endWeek)
-    }
-
     /** 某天的课，按开始节次排序。学期外/无缓存返回空表。 */
     fun coursesOn(date: LocalDate): List<ReminderCourse> {
         val base = ScheduleRepository.loadCached()?.data ?: return emptyList()

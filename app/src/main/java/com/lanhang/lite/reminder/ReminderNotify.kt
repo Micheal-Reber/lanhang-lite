@@ -10,7 +10,6 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.android.material.color.MaterialColors
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
-import com.lanhang.lite.schedule.PeriodClock
 import com.lanhang.lite.ui.MainActivity
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -189,8 +188,4 @@ object ReminderNotify {
         return ChronoUnit.MILLIS.between(now.atZone(ZoneId.systemDefault()), next)
             .coerceAtLeast(60_000L)
     }
-
-    /** 课程结束时刻（预览/勿扰用），供设置页复用。 */
-    fun endTimeText(course: ReminderCourse): String =
-        PeriodClock.endText(course.endPeriod).orEmpty()
 }

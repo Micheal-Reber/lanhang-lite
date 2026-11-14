@@ -3,7 +3,6 @@ package com.lanhang.lite.update
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.util.Log
-import androidx.core.content.pm.PackageInfoCompat
 import com.lanhang.lite.R
 
 /**
@@ -22,12 +21,6 @@ object UpdateChecker {
     fun currentVersionName(context: Context): String = runCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName
     }.getOrNull().orEmpty().ifBlank { "--" }
-
-    fun currentVersionCode(context: Context): Long = runCatching {
-        PackageInfoCompat.getLongVersionCode(
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        )
-    }.getOrDefault(0L)
 
     /**
      * 是否 debug 构建。

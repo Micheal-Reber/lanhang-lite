@@ -147,9 +147,6 @@ object ReminderPrefs {
     fun coverFailStreak(context: Context): Int =
         ledger(context).getInt(KEY_COVER_FAIL_STREAK, 0).coerceIn(0, 999)
 
-    /** 最近一次补拉失败的时间戳；0 = 没失败过。 */
-    fun coverFailAt(context: Context): Long = ledger(context).getLong(KEY_COVER_FAIL_AT, 0L)
-
     fun recordCoverResult(context: Context, ok: Boolean) {
         val p = ledger(context)
         if (ok) {

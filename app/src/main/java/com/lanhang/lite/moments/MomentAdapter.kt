@@ -128,16 +128,16 @@ class MomentAdapter(
         notifyDataSetChanged()
     }
 
-    fun append(list: List<MomentItem>) {
-        val start = items.size
-        items.addAll(list)
-        notifyItemRangeInserted(start, list.size)
-    }
-
     @SuppressLint("NotifyDataSetChanged")
     fun clear() {
         items.clear()
         notifyDataSetChanged()
+    }
+
+    fun append(list: List<MomentItem>) {
+        val start = items.size
+        items.addAll(list)
+        notifyItemRangeInserted(start, list.size)
     }
 
     fun indexOf(feedId: String?): Int = items.indexOfFirst { it.feed.feed_id == feedId }
