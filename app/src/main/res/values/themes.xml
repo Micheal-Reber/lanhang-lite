@@ -56,6 +56,17 @@
         <item name="titleTextColor">?attr/colorOnSurface</item>
         <item name="navigationIconTint">?attr/colorOnSurface</item>
         <item name="titleTextAppearance">@style/TextAppearance.Lanhang.ToolbarTitle</item>
+        <!--
+          返回键 / 右侧菜单的竖向对齐：appcompat 默认 buttonGravity=top，它把子 View 对齐到
+          [paddingTop, paddingTop+minHeight] 这一段的中心。而本项目把状态栏 inset 同时折进了
+          toolbar 的 paddingTop 与 minHeight（见 MainActivity 的 insets 回调），minHeight 里
+          已经含了状态栏那段，返回键中心于是比走 CENTER 的标题低 paddingTop/2 —— 状态栏 126px
+          时是 63px ≈ 24dp，且按钮按 maxButtonHeight 量成 56dp 高后会被 toolbar 底边裁掉一截
+          （真机实测「通用」页：标题中心 y=210、返回键盒子中心 y=273、只露得出上半截）。
+          改成 center_vertical 后两者都按内容区 [paddingTop, height] 居中，天然同一条基线；
+          paddingTop=0 时 top 与 center_vertical 等价，所以不带状态栏内边距的场景不受影响。
+        -->
+        <item name="buttonGravity">center_vertical</item>
     </style>
 
     <!-- M3 TitleLarge：22sp / Regular，中文不额外加粗 -->

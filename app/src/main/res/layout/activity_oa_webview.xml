@@ -8,7 +8,7 @@
         android:id="@+id/toolbar"
         style="@style/Widget.Lanhang.Toolbar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/top_app_bar_height"
+        android:layout_height="wrap_content"
         android:minHeight="@dimen/top_app_bar_height"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

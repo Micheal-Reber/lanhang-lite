@@ -134,12 +134,13 @@ class MainActivity : AppCompatActivity() {
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             v.setPadding(v.paddingLeft, 0, v.paddingRight, bars.bottom)
             val tb = binding.toolbar
-            tb.minimumHeight = 0
+            // 高度自适应内容：minHeight = 状态栏 inset + M3 small top app bar 的 64dp
+            // （token 见 res/values/dimens.xml），paddingTop 让标题与状态栏错开同一基线。
+            // 写死固定 height 在大字号（fontScale≈2）下会把标题裁掉 —— 见 AGENTS §5
+            // 「固定高度的格子必须按内容自适应」。
+            tb.minimumHeight =
+                bars.top + resources.getDimensionPixelSize(R.dimen.top_app_bar_height)
             tb.setPadding(tb.paddingLeft, bars.top, tb.paddingRight, 0)
-            val lp = tb.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-            // 高度 = 状态栏 inset + M3 small top app bar 的 64dp（token 见 res/values/dimens.xml）
-            lp.height = bars.top + resources.getDimensionPixelSize(R.dimen.top_app_bar_height)
-            tb.layoutParams = lp
             // 课表页顶栏内容（标题 + 周次/视图切换）与 toolbar 共用同一块区域：
             // 高度跟着 toolbar 的约束走，这里只把状态栏那一段让出来，保证两者一条基线
             val sh = binding.scheduleHeader
