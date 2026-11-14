@@ -788,6 +788,12 @@
     <string name="oa_hall_club_section">团学活动</string>
     <string name="gqhw_name">赣青二课</string>
     <string name="gqhw_desc">第二课堂成绩单</string>
+    <!-- 「常用功能」分组（搜索框之下）：长按宫格任意应用可移入/移出，选择存在本地（oa/OaCommonStore）。
+         「校园服务」是校园网/图书馆座位被移出常用功能后的兜底分组 -->
+    <string name="oa_common_section">常用功能</string>
+    <string name="oa_service_section">校园服务</string>
+    <string name="oa_common_add">加入常用功能</string>
+    <string name="oa_common_remove">移出常用功能</string>
     <!-- 网页里的非 http(s) 链接（weixin:// / alipays:// / intent://）没有应用能接时的提示 -->
     <string name="oa_web_open_app_failed">没有找到能打开它的应用</string>
 

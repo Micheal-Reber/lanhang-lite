@@ -1,5 +1,6 @@
 package com.lanhang.lite.oa
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,13 +13,16 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
+import com.lanhang.lite.campusnet.CampusNetActivity
 import com.lanhang.lite.core.ApiException
 import com.lanhang.lite.core.TextRef
 import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.core.toast
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentOaHallBinding
+import com.lanhang.lite.library.LibrarySeatActivity
 import com.lanhang.lite.settings.Diagnostics
 import com.lanhang.lite.ui.OaWebViewActivity
 import com.lanhang.lite.ui.navigation.BottomBarDims
@@ -45,6 +49,11 @@ import kotlinx.coroutines.withContext
  * 顶栏、系统栏 inset、语言包装全归宿主 MainActivity 管（Fragment 跟随宿主）；
  * 这里只管自己那块：搜索框、宫格与底部留白。
  *
+ * **常用功能**（2026-11-14 用户要求）：搜索框之下第一个分组，长按任意应用可
+ * 「移入 / 移出常用功能」，选择存在本地 [OaCommonStore]。校园网、图书馆座位、
+ * 赣青二课默认在常用功能里；它们都是本地补的入口（[OaNativeApps]），被移出后
+ * 会回到宫格底部的「校园服务 / 团学活动」分组，不会无处可寻。
+ *
  * **没有下拉刷新**（2026-11-14 用户要求取消）：宫格由 [OaCache] 的时效驱动 ——
  * 新鲜期（1 小时）内重进完全不联网，过期后先渲染缓存再后台静默替换。
  */
@@ -52,10 +61,17 @@ class OaHallFragment : Fragment() {
 
     private var _binding: FragmentOaHallBinding? = null
     private val binding get() = _binding!!
-    private val adapter = OaHallAdapter { app -> openApp(app) }
+    private val adapter = OaHallAdapter(
+        onApp = { app -> openApp(app) },
+        onAppLongClick = { app -> confirmToggleCommon(app) }
+    )
 
     private var rows: List<OaRow> = emptyList()
     private var loadJob: Job? = null
+
+    /** 最近一次构建宫格的原始数据，长按移入/移出常用功能后靠它原地重建，不必重新联网 */
+    private var lastAll: OaAppsAll? = null
+    private var lastFavorites: List<String> = emptyList()
 
     /** 首次加载失败过：空态要显示错误原因 + 重试，而不是「没有应用」 */
     private var loadFailed = false
@@ -133,6 +149,8 @@ class OaHallFragment : Fragment() {
                     fromCache = true
                     fresh = cached.fresh
                     loadFailed = false
+                    lastAll = cached.apps
+                    lastFavorites = cached.favorites
                     rows = buildRows(ctx, cached.apps, cached.favorites)
                     applyFilter(_binding?.etSearch?.text?.toString().orEmpty())
                 }
@@ -155,6 +173,8 @@ class OaHallFragment : Fragment() {
                     OaApi.apps() to OaApi.favorites()
                 }
                 loadFailed = false
+                lastAll = result.first
+                lastFavorites = result.second
                 // 内容没变就不重绑（OaRow 是 data class，结构相等即可判断）：
                 // 静默刷新每次启动都会跑，无脑 notifyDataSetChanged 会让整屏图标闪一次
                 val newRows = buildRows(ctx, result.first, result.second)
@@ -191,13 +211,37 @@ class OaHallFragment : Fragment() {
     /**
      * 摊平成「标题 + 应用」行。
      *
-     * 排序：收藏优先，其次服务端 `order_num`。去重是必要的——同一个应用可能同时出现在
-     * 基础应用和某个分类里，重复渲染会让用户以为有两个入口。
+     * 结构：常用功能（顶部）→ 服务端分组 → 校园服务 / 团学活动（本地入口兜底分组）。
+     * 服务端分组内排序：收藏优先，其次服务端 `order_num`。去重是必要的——同一个应用
+     * 可能同时出现在基础应用和某个分类里，重复渲染会让用户以为有两个入口；
+     * 进了「常用功能」的条目也靠 seen 从原分组摘掉，一个入口只在屏上出现一次。
      */
     private fun buildRows(ctx: android.content.Context, all: OaAppsAll, favorites: List<String>): List<OaRow> {
         val favSet = favorites.toSet()
         val seen = HashSet<String>()
         val out = mutableListOf<OaRow>()
+
+        // 全部条目按 id 索引（服务端 + 本地入口），常用功能分组按用户存的顺序从这里取。
+        // 服务端下架了的 id 自动消失，不会留个打不开的格子。
+        val byId = LinkedHashMap<String, OaApp>()
+        fun index(apps: List<OaApp>?) {
+            apps.orEmpty()
+                .filter { !it.id.isNullOrBlank() && !it.name.isNullOrBlank() }
+                .forEach { byId.putIfAbsent(it.id.orEmpty(), it) }
+        }
+        index(all.type1?.apps)
+        index(all.type2?.apps)
+        all.type2?.types?.forEach { index(it.apps) }
+        index(OaNativeApps.all(ctx))
+
+        // 顶部「常用功能」（搜索框之下第一个分组）：长按移入/移出，本地持久化。
+        val common = OaCommonStore.load(ctx).mapNotNull { byId[it] }
+        if (common.isNotEmpty()) {
+            out += OaRow.Header(ctx.getString(R.string.oa_common_section))
+            common.forEach {
+                if (seen.add(it.id.orEmpty())) out += OaRow.App(it)
+            }
+        }
 
         fun section(title: String, apps: List<OaApp>?) {
             val list = apps.orEmpty()
@@ -224,19 +268,18 @@ class OaHallFragment : Fragment() {
                     group.apps
                 )
             }
-        // 「赣青二课」（2026-11-14 用户要求接入「工作」）：江西省高校第二课堂成绩单平台，
-        // 校外独立站点（`gqhw.jxmediacenter.com`），服务端 `/apps/all` 里没有它，所以本地补一条。
-        // 不做原生页：那套系统是若依 + uni-app 的几十页 H5，且全程要登录态，WebView 承载就是完整接入。
-        // 排在最后而不是顶部：常用应用要一眼可见，二课属于低频入口（搜索也找得到）。
-        out += OaRow.Header(ctx.getString(R.string.oa_hall_club_section))
-        out += OaRow.App(
-            OaApp(
-                id = OaNativeApps.GQHW_APP_ID,
-                name = ctx.getString(R.string.gqhw_name),
-                description = ctx.getString(R.string.gqhw_desc),
-                homePageUrl = OaNativeApps.GQHW_URL,
-                orderNum = 0
-            )
+        // 本地入口的兜底分组（2026-11-14）：默认三项都在「常用功能」里，这里通常为空；
+        // 被用户长按移出后就回到这里，保证随时找得到、也能再移回去。
+        // 「校园服务」= 校园网 + 图书馆座位（原生 Activity）；「团学活动」= 赣青二课
+        // （校外独立站点 `gqhw.jxmediacenter.com`，WebView 承载，不做原生页）。
+        val natives = OaNativeApps.all(ctx)
+        section(
+            ctx.getString(R.string.oa_service_section),
+            natives.filter { it.id != OaNativeApps.GQHW_APP_ID }
+        )
+        section(
+            ctx.getString(R.string.oa_hall_club_section),
+            natives.filter { it.id == OaNativeApps.GQHW_APP_ID }
         )
         return out
     }
@@ -281,11 +324,22 @@ class OaHallFragment : Fragment() {
         val appId = app.id?.takeIf { it.isNotBlank() } ?: return
         if (opening) return
         val ctx = context ?: return
-        // 「赣青二课」是校外独立站点：**不走 OA 网关、不取 appToken**。
-        // 取来的 Token 头对校外站毫无意义，带过去反而可能被当成非法客户端。
-        if (appId == OaNativeApps.GQHW_APP_ID) {
-            OaWebViewActivity.open(ctx, OaNativeApps.GQHW_URL, appToken = null, title = app.name)
-            return
+        // 本地入口不走 OA 网关、不取 appToken（取来对校外站/原生页毫无意义），按 id 分发：
+        when (appId) {
+            // 校园网、图书馆座位是原生 Activity（2026-11-14 从设置「工具」页挪进工作 Tab）
+            OaNativeApps.CAMPUS_NET_APP_ID -> {
+                startActivity(Intent(ctx, CampusNetActivity::class.java))
+                return
+            }
+            OaNativeApps.LIBRARY_SEAT_APP_ID -> {
+                LibrarySeatActivity.start(ctx)
+                return
+            }
+            // 「赣青二课」是校外独立站点，直接开 WebView
+            OaNativeApps.GQHW_APP_ID -> {
+                OaWebViewActivity.open(ctx, OaNativeApps.GQHW_URL, appToken = null, title = app.name)
+                return
+            }
         }
         val cached = app.homePageUrl?.takeIf { it.isNotBlank() }
         if (cached != null && cached.startsWith("rce://")) {
@@ -312,6 +366,30 @@ class OaHallFragment : Fragment() {
                 opening = false
             }
         }
+    }
+    /** 长按应用：移入 / 移出「常用功能」。确认后用缓存的原始数据原地重建，不重新联网。 */
+    private fun confirmToggleCommon(app: OaApp) {
+        val ctx = context ?: return
+        val id = app.id?.takeIf { it.isNotBlank() } ?: return
+        val removing = OaCommonStore.isCommon(ctx, id)
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(app.name.orEmpty())
+            .setPositiveButton(
+                if (removing) R.string.oa_common_remove else R.string.oa_common_add
+            ) { _, _ ->
+                if (removing) OaCommonStore.remove(ctx, id) else OaCommonStore.add(ctx, id)
+                rebuildRows()
+            }
+            .setNegativeButton(R.string.common_cancel, null)
+            .show()
+    }
+
+    /** 常用功能变动后重建宫格；还没有任何数据（首次加载就失败）时无可重建，直接忽略。 */
+    private fun rebuildRows() {
+        val ctx = context ?: return
+        val all = lastAll ?: return
+        rows = buildRows(ctx, all, lastFavorites)
+        applyFilter(_binding?.etSearch?.text?.toString().orEmpty())
     }
 
 

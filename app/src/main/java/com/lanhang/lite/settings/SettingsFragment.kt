@@ -25,10 +25,8 @@ import com.lanhang.lite.R
 import com.lanhang.lite.core.StorageJanitor
 import com.lanhang.lite.core.toast
 import com.lanhang.lite.core.userMessage
-import com.lanhang.lite.campusnet.CampusNetActivity
 import com.lanhang.lite.databinding.FragmentSettingsBinding
 import com.lanhang.lite.idcard.IdCardActivity
-import com.lanhang.lite.library.LibrarySeatActivity
 import com.lanhang.lite.moments.MomentsFilterActivity
 import com.lanhang.lite.moments.MomentsFilterStore
 import com.lanhang.lite.moments.UserInfoCache
@@ -71,7 +69,8 @@ import kotlinx.coroutines.withContext
  *   ② 诊断与日志 / 关于
  * 点进二级页后 Toolbar 切换为返回箭头 + 子页标题；系统返回键回到目录。
  * 视图切换在本 Fragment 内完成，避免与四 Tab hide/show 的 back stack 冲突。
- * 「工具」二级页收纳导出课表、身份码、图书馆座位、校园网、接口调试。
+ * 「工具」二级页收纳导出课表、身份码、工作圈过滤、接口调试
+ * （图书馆座位、校园网 2026-11-14 挪去「工作」Tab 的常用功能分组）。
  *
  * 二级页有两种承载方式，**转场完全相同**（都是 [Motion.fadeThrough]，顶栏原地换标题）：
  * - 布局型（外观 / 工具 / 通用 / 清除缓存 / 关于）：inflate 一个 `view_settings_*.xml` 进 detailContainer；
@@ -617,12 +616,7 @@ class SettingsFragment : Fragment() {
                 root.findViewById<View>(R.id.rowIdCard).setOnClickListener {
                     startActivity(Intent(requireContext(), IdCardActivity::class.java))
                 }
-                // 图书馆座位、校园网 2026-10-26 从设置目录挪进工具页
-                root.findViewById<View>(R.id.rowLibrarySeat)
-                    .setOnClickListener { LibrarySeatActivity.start(requireContext()) }
-                root.findViewById<View>(R.id.rowCampusNet).setOnClickListener {
-                    startActivity(Intent(requireContext(), CampusNetActivity::class.java))
-                }
+                // 图书馆座位、校园网 2026-11-14 挪去「工作」Tab 的常用功能分组（见 oa/OaNativeApps）
                 // 工作圈过滤 2026-10-28 从设置目录挪进工具页
                 root.findViewById<TextView>(R.id.tvMomentsFilterSummary)?.text =
                     MomentsFilterStore.summary(requireContext())

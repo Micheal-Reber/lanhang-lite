@@ -784,6 +784,10 @@
     <string name="oa_hall_club_section">Student activities</string>
     <string name="gqhw_name">Ganqing Second Classroom</string>
     <string name="gqhw_desc">Extracurricular transcript</string>
+    <string name="oa_common_section">Frequently used</string>
+    <string name="oa_service_section">Campus services</string>
+    <string name="oa_common_add">Add to frequently used</string>
+    <string name="oa_common_remove">Remove from frequently used</string>
     <string name="oa_web_open_app_failed">No app can open this link</string>
 
     <!-- ==================== Campus network (Srun sign-in) ==================== -->

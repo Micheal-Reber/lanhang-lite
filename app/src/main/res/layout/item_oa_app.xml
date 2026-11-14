@@ -21,12 +21,36 @@
         android:paddingEnd="@dimen/space_xs"
         android:paddingBottom="@dimen/space_md">
 
-        <ImageView
-            android:id="@+id/ivLogo"
+        <!-- 图标位：本地入口（校园网 / 图书馆座位 / 赣青二课）有品牌色圆角底，服务端条目透明 -->
+        <FrameLayout
+            android:id="@+id/iconBox"
             android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter" />
+            android:layout_height="40dp">
+
+            <!--
+              本地入口的图标单独一个 ImageView（2026-11-14 第三次修）：
+              之前和服务端 logo 共用一个 ImageView，`load(null)` 取消 Coil 请求是**下一帧**才
+              清空 drawable 的，正好把刚 setImageResource 设上的矢量图标抹掉 —— 现象就是
+              「三个常用入口变成一块纯色底板」（日志能证明 setImageResource 确实执行过）。
+              分两个视图之后，Coil 只碰 ivLogo，永远动不到 ivLocal。
+            -->
+            <ImageView
+                android:id="@+id/ivLocal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:tint="?attr/colorOnPrimary"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/ivLogo"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/tvName"
