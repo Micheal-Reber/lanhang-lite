@@ -48,6 +48,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     private var scheduleFragment: Fragment? = null
+
+    /** 「工作」Tab（2026-11-14 导航互换：原设置里的「网上办事大厅」独立页改名进底栏） */
+    private var workFragment: Fragment? = null
+
+    /** 成绩页：2026-11-14 起**不是 Tab**，是设置的二级页（openGradesFromSettings 盖在设置上） */
     private var gradesFragment: Fragment? = null
     private var momentsFragment: Fragment? = null
     private var settingsFragment: Fragment? = null
@@ -60,6 +65,28 @@ class MainActivity : AppCompatActivity() {
 
     /** 二级页态时只留「返回」，隐藏工作圈那组动作 */
     private var toolbarSubMode = false
+
+    /**
+     * 二级页自己的顶栏菜单（null = 该二级页没有动作）。
+     *
+     * 只有设置内部的二级页会用到（诊断页的「保存 / 分享」）。放这里而不是让二级页
+     * 自己塞 Toolbar：设置二级页共用宿主的这一根 toolbar，菜单必须跟着
+     * [toolbarSubMode] 一起进退，否则退出二级页后诊断页的两个图标会留在设置目录上。
+     */
+    private var subMenuRes: Int? = null
+
+    /** 二级页菜单项点击的转发目标；返回 true = 已处理 */
+    private var subMenuAction: ((Int) -> Boolean)? = null
+
+    /**
+     * 成绩二级页的系统返回键（2026-11-14 导航互换：成绩从底栏 Tab 挪进设置）。
+     *
+     * 设置自己的二级页在 SettingsFragment 里挂回调，成绩挂在宿主上；两者天然互斥 ——
+     * 成绩开着时设置必是隐藏的（它的回调 isEnabled=false），成绩关了这个回调先被摘掉。
+     */
+    private val gradesBackCallback = object : androidx.activity.OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = closeGradesFromSettings()
+    }
 
     /**
      * 顶栏「消息」铃铛的红点。
@@ -129,6 +156,8 @@ class MainActivity : AppCompatActivity() {
         // 再抬一层：绘制与触摸都排在 toolbar 之前，避免两者叠在同一位置时互相遮住。
         binding.scheduleHeader.translationZ = 2f
         binding.toolbar.setNavigationOnClickListener { toolbarBackAction?.invoke() }
+        // 成绩二级页的系统返回（顶栏返回箭头走上面那行，两个入口同一个动作）
+        onBackPressedDispatcher.addCallback(this, gradesBackCallback)
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -163,6 +192,7 @@ class MainActivity : AppCompatActivity() {
 
 
         scheduleFragment = supportFragmentManager.findFragmentByTag(TAG_SCHEDULE)
+        workFragment = supportFragmentManager.findFragmentByTag(TAG_WORK)
         gradesFragment = supportFragmentManager.findFragmentByTag(TAG_GRADES)
         momentsFragment = supportFragmentManager.findFragmentByTag(TAG_MOMENTS)
         settingsFragment = supportFragmentManager.findFragmentByTag(TAG_SETTINGS)
@@ -171,23 +201,33 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             switchTab(TAB_SCHEDULE)
         } else {
+            // 成绩是设置的二级页：它可见时设置必被 hide，必须先判，否则会落到 else 的课表上
+            val gradesOpen = gradesFragment?.isHidden == false
             val restored = when {
+                gradesOpen -> TAB_SETTINGS
                 momentsFragment?.isHidden == false -> TAB_MOMENTS
                 settingsFragment?.isHidden == false -> TAB_SETTINGS
-                gradesFragment?.isHidden == false -> TAB_GRADES
+                workFragment?.isHidden == false -> TAB_WORK
                 else -> TAB_SCHEDULE
             }
             tabState.intValue = restored
             // 恢复分支不走 switchTab，原生底栏的选中态要在这里补一次
             syncBottomBarSelection(restored)
-            showToolbarMain(when (restored) {
-                TAB_MOMENTS -> getString(R.string.tab_moments)
-                TAB_SETTINGS -> getString(R.string.tab_settings)
-                TAB_GRADES -> getString(R.string.tab_grades)
-                else -> getString(R.string.tab_schedule)
-            })
+            if (gradesOpen) {
+                // 现场是「设置目录隐藏 + 成绩显示」：恢复成二级页态（返回箭头 + 收底栏）
+                gradesBackCallback.isEnabled = true
+                showToolbarSub(getString(R.string.tab_grades), onBack = { closeGradesFromSettings() })
+            } else {
+                showToolbarMain(when (restored) {
+                    TAB_MOMENTS -> getString(R.string.tab_moments)
+                    TAB_WORK -> getString(R.string.tab_work)
+                    TAB_SETTINGS -> getString(R.string.tab_settings)
+                    else -> getString(R.string.tab_schedule)
+                })
+            }
             // 设置页可能正停在某个二级页上（亮暗主题/语言切换会 recreate）：那种状态底栏必须收起。
             // onViewCreated 里的 syncToolbar 早于 tabState 定稿，会被上面这行 showToolbarMain 覆盖，补一次。
+            // 成绩开着时设置是隐藏的，syncToolbar 内部 isHidden 直接 return，不会抢顶栏。
             if (restored == TAB_SETTINGS) {
                 (settingsFragment as? com.lanhang.lite.settings.SettingsFragment)?.syncToolbar()
             }
@@ -218,10 +258,17 @@ class MainActivity : AppCompatActivity() {
         // 原生底栏要显式回写选中态（玻璃读 tabState 自动跟随）。
         // 这里 tabState 已经更新过，所以回写触发的 OnItemSelectedListener 会判定「相等」直接返回，不会递归。
         syncBottomBarSelection(tab)
+        // 从成绩二级页直接跳走（桌面小组件等非底栏路径）：返回键回调先撤，
+        // 否则成绩已被下面的分支藏掉，按下返回却会把设置页错误地喊出来
+        gradesBackCallback.isEnabled = false
         val tx = supportFragmentManager.beginTransaction()
         val s = scheduleFragment ?: com.lanhang.lite.schedule.ScheduleFragment().also {
             scheduleFragment = it
             tx.add(R.id.fragmentContainer, it, TAG_SCHEDULE)
+        }
+        val w = workFragment ?: com.lanhang.lite.oa.OaHallFragment().also {
+            workFragment = it
+            tx.add(R.id.fragmentContainer, it, TAG_WORK)
         }
         val g = gradesFragment ?: com.lanhang.lite.grades.GradesFragment().also {
             gradesFragment = it
@@ -238,12 +285,12 @@ class MainActivity : AppCompatActivity() {
             tx.add(R.id.fragmentContainer, it, TAG_SETTINGS)
         }
         when (tab) {
-            TAB_GRADES -> {
-                tx.hide(s).hide(m).hide(st).show(g)
-                showToolbarMain(getString(R.string.tab_grades))
+            TAB_WORK -> {
+                tx.hide(s).hide(g).hide(m).hide(st).show(w)
+                showToolbarMain(getString(R.string.tab_work))
             }
             TAB_MOMENTS -> {
-                tx.hide(s).hide(g).hide(st).show(m)
+                tx.hide(s).hide(g).hide(w).hide(st).show(m)
                 showToolbarMain(getString(R.string.tab_moments))
                 // 已经在这个 Tab 上再点一次 → 回顶；从别的 Tab 切过来不动滚动位置
                 if (previousTab == TAB_MOMENTS) {
@@ -255,11 +302,11 @@ class MainActivity : AppCompatActivity() {
                 refreshUnreadBadge()
             }
             TAB_SETTINGS -> {
-                tx.hide(s).hide(g).hide(m).show(st)
+                tx.hide(s).hide(g).hide(w).hide(m).show(st)
                 showToolbarMain(getString(R.string.tab_settings))
             }
             else -> {
-                tx.hide(g).hide(m).hide(st).show(s)
+                tx.hide(g).hide(w).hide(m).hide(st).show(s)
                 showToolbarMain(getString(R.string.tab_schedule))
             }
         }
@@ -272,7 +319,7 @@ class MainActivity : AppCompatActivity() {
         // 目标取 tabFadeTarget（课表只淡内容层），不是一律 Fragment 根视图。
         val entering = tabFadeTarget(tab)
         // 复位上一次可能被打断的淡入：四个目标统一取消动画、alpha 归 1，避免停在半透明
-        for (t in intArrayOf(TAB_SCHEDULE, TAB_GRADES, TAB_MOMENTS, TAB_SETTINGS)) {
+        for (t in intArrayOf(TAB_SCHEDULE, TAB_WORK, TAB_MOMENTS, TAB_SETTINGS)) {
             tabFadeTarget(t)?.apply {
                 animate().cancel()
                 alpha = 1f
@@ -298,7 +345,7 @@ class MainActivity : AppCompatActivity() {
      * 所以课表只淡内容层，背景层保持 alpha 1；其余 Tab 没有溢出层，仍淡根视图。
      */
     private fun tabFadeTarget(tab: Int): View? = when (tab) {
-        TAB_GRADES -> gradesFragment?.view
+        TAB_WORK -> workFragment?.view
         TAB_MOMENTS -> momentsFragment?.view
         TAB_SETTINGS -> settingsFragment?.view
         else -> (scheduleFragment as? com.lanhang.lite.schedule.ScheduleFragment)?.tabFadeTarget
@@ -309,6 +356,9 @@ class MainActivity : AppCompatActivity() {
     fun showToolbarMain(title: String) {
         toolbarSubMode = false
         toolbarBackAction = null
+        // 二级页菜单随二级页一起退场（否则诊断页的保存/分享会残留在设置目录顶栏）
+        subMenuRes = null
+        subMenuAction = null
         binding.toolbar.navigationIcon = null
         // 课表 Tab 的标题画在 scheduleHeader 里（与右侧的周次/视图切换同一行），
         // 这时 toolbar 自带标题必须留空，否则两处都画「课表」会叠在一起。
@@ -334,10 +384,24 @@ class MainActivity : AppCompatActivity() {
         invalidateOptionsMenu()
     }
 
-    /** 设置二级页态：返回箭头 + 子页标题（对应 PocketDiary 的 DetailScaffold）。 */
-    fun showToolbarSub(title: String, onBack: () -> Unit) {
+    /**
+     * 设置二级页态：返回箭头 + 子页标题（对应 PocketDiary 的 DetailScaffold）。
+     *
+     * [menuRes] / [onMenuAction] 给二级页自己的顶栏动作（目前只有诊断页用到）。传 null 表示
+     * 这一页没有动作，顶栏右侧留空 —— 与「外观 / 工具 / 通用」等页一致。
+     */
+    fun showToolbarSub(
+        title: String,
+        onBack: () -> Unit,
+        menuRes: Int? = null,
+        onMenuAction: ((Int) -> Boolean)? = null,
+    ) {
         toolbarSubMode = true
         toolbarBackAction = onBack
+        // 菜单状态先落定，重建交给方法末尾的 invalidateOptionsMenu（一次就够，
+        // 这里再清一次会让菜单重建两遍，二级页的图标会闪一下）
+        subMenuRes = menuRes
+        subMenuAction = onMenuAction
         binding.toolbar.navigationIcon =
             androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_back)
         binding.toolbar.title = title
@@ -347,6 +411,52 @@ class MainActivity : AppCompatActivity() {
         setBottomNavVisible(false)
         applyOpaqueToolbar()
         invalidateOptionsMenu()
+    }
+
+    /**
+     * 设置目录点「成绩」（2026-11-14 导航互换）：成绩从底栏 Tab 挪进设置，当**二级页**打开 ——
+     * 返回箭头 + 底栏收起，返回（顶栏或系统键）回设置目录，与「工具 / 通用」同一种版式。
+     * 设置页自己的二级页在 Fragment 内部换视图，这个跨 Fragment 的盖层挂在宿主上。
+     */
+    fun openGradesFromSettings() {
+        val fm = supportFragmentManager
+        val g = gradesFragment ?: com.lanhang.lite.grades.GradesFragment().also {
+            gradesFragment = it
+            fm.beginTransaction().add(R.id.fragmentContainer, it, TAG_GRADES).commitNow()
+        }
+        val st = settingsFragment ?: return
+        gradesBackCallback.isEnabled = true
+        val rebuild = {
+            fm.beginTransaction().hide(st).show(g).commitNow()
+            showToolbarSub(getString(R.string.tab_grades), onBack = { closeGradesFromSettings() })
+            glassBackdrop?.invalidate()
+            // 被藏起来的那个视图把 alpha 补回实底（fadeThrough 会给 host 归位，
+            // 但中途被打断时可能停在半透明，下次 show 出来就是「隐身」）
+            st.view?.alpha = 1f
+            g.view?.let { Motion.fadeIn(this, it) }
+            Unit
+        }
+        // M3 fade through：设置目录淡出 → 换页 → 成绩淡入（同级目的地切换，与设置内部二级页同一套）
+        val host = st.view
+        if (host != null) Motion.fadeThrough(this, host, rebuild) else rebuild()
+    }
+
+    /** 成绩二级页返回（顶栏箭头与系统返回键共用）：藏成绩、亮回设置目录、底栏放回来 */
+    private fun closeGradesFromSettings() {
+        val fm = supportFragmentManager
+        val g = gradesFragment ?: return
+        val st = settingsFragment ?: return
+        gradesBackCallback.isEnabled = false
+        val rebuild = {
+            fm.beginTransaction().hide(g).show(st).commitNow()
+            showToolbarMain(getString(R.string.tab_settings))
+            glassBackdrop?.invalidate()
+            g.view?.alpha = 1f
+            st.view?.let { Motion.fadeIn(this, it) }
+            Unit
+        }
+        val host = g.view
+        if (host != null) Motion.fadeThrough(this, host, rebuild) else rebuild()
     }
 
     /**
@@ -368,9 +478,9 @@ class MainActivity : AppCompatActivity() {
                         stringResource(R.string.tab_schedule),
                     ),
                     LanhangTab(
-                        ImageVector.vectorResource(R.drawable.ic_school),
-                        ImageVector.vectorResource(R.drawable.ic_school),
-                        stringResource(R.string.tab_grades),
+                        ImageVector.vectorResource(R.drawable.ic_view_grid),
+                        ImageVector.vectorResource(R.drawable.ic_view_grid),
+                        stringResource(R.string.tab_work),
                     ),
                     LanhangTab(
                         ImageVector.vectorResource(R.drawable.ic_dynamic_feed),
@@ -714,7 +824,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
+        // 二级页有自己的动作时用它的菜单替换主菜单（诊断页的保存/分享）；
+        // 其它二级页没有动作，右侧必须留空 —— 挂着工作圈的搜索/铃铛会指向已经不存在的页面
+        val sub = if (toolbarSubMode) subMenuRes else null
+        if (sub != null) menuInflater.inflate(sub, menu) else menuInflater.inflate(R.menu.menu_main, menu)
         // M3 顶栏默认是 surface 底，菜单图标跟随 onSurface（深色模式自动反转）；
         // 课表页顶栏透明，颜色由课表按背景明暗上报，见 onScheduleChromeChanged
         val iconTint = toolbarIconTint ?: materialColor(MaterialR.attr.colorOnSurface)
@@ -727,37 +840,43 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        R.id.action_moments_search -> {
-            com.lanhang.lite.moments.MomentSearchActivity.start(this)
-            true
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // 二级页自己的菜单项先交给页面处理（诊断页的保存 / 分享）；未处理再走主菜单
+        if (toolbarSubMode && subMenuAction?.invoke(item.itemId) == true) return true
+        return when (item.itemId) {
+            R.id.action_moments_search -> {
+                com.lanhang.lite.moments.MomentSearchActivity.start(this)
+                true
+            }
+            R.id.action_my_moments -> {
+                com.lanhang.lite.moments.MyMomentsActivity.start(this)
+                true
+            }
+            R.id.action_moments_messages -> {
+                // 清掉节流时间戳：从消息中心回来时 onResume 会强制重算一次未读，
+                // 否则刚读完的红点还要挂到下个节流周期才消失
+                unreadCheckedAt = 0L
+                com.lanhang.lite.moments.MomentMessagesActivity.start(this)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
-        R.id.action_my_moments -> {
-            com.lanhang.lite.moments.MyMomentsActivity.start(this)
-            true
-        }
-        R.id.action_moments_messages -> {
-            // 清掉节流时间戳：从消息中心回来时 onResume 会强制重算一次未读，
-            // 否则刚读完的红点还要挂到下个节流周期才消失
-            unreadCheckedAt = 0L
-            com.lanhang.lite.moments.MomentMessagesActivity.start(this)
-            true
-        }
-        else -> super.onOptionsItemSelected(item)
     }
 
     companion object {
         private const val TAG_SCHEDULE = "schedule"
+        private const val TAG_WORK = "work"
         private const val TAG_GRADES = "grades"
         private const val TAG_MOMENTS = "moments"
         private const val TAG_SETTINGS = "settings"
 
         // 底栏的四个 Tab（与 setupGlassBottomBar 里的 tabs 列表一一对应）。
         // 紧凑胶囊宽度 = BOTTOM_TAB_COUNT × TabWidth + 两侧 ContentMargin，见 ui/navigation/LiquidGlassBottomBar.kt
+        // 2026-11-14 导航互换：TAB_GRADES → TAB_WORK（成绩改从设置二级页打开，TAG_GRADES 仍留给盖层用）
         private const val BOTTOM_TAB_COUNT = 4
 
         private const val TAB_SCHEDULE = 0
-        private const val TAB_GRADES = 1
+        private const val TAB_WORK = 1
         private const val TAB_MOMENTS = 2
         private const val TAB_SETTINGS = 3
 
@@ -769,13 +888,13 @@ class MainActivity : AppCompatActivity() {
          */
         private val TAB_OF_MENU = mapOf(
             R.id.nav_schedule to TAB_SCHEDULE,
-            R.id.nav_grades to TAB_GRADES,
+            R.id.nav_work to TAB_WORK,
             R.id.nav_moments to TAB_MOMENTS,
             R.id.nav_settings to TAB_SETTINGS,
         )
 
         private fun menuIdOf(tab: Int): Int = when (tab) {
-            TAB_GRADES -> R.id.nav_grades
+            TAB_WORK -> R.id.nav_work
             TAB_MOMENTS -> R.id.nav_moments
             TAB_SETTINGS -> R.id.nav_settings
             else -> R.id.nav_schedule

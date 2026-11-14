@@ -172,7 +172,7 @@ class IdCardActivity : AppCompatActivity() {
     private fun refreshCode() {
         codeJob?.cancel()
         codeJob = lifecycleScope.launch {
-            binding.qrProgress.isVisible = true
+            binding.qrProgress.show()
             binding.tvError.isVisible = false
 
             // profile 决定条码内容，等它结束再画，避免先画一次再重画；
@@ -224,7 +224,7 @@ class IdCardActivity : AppCompatActivity() {
             binding.imgBarcode.setImageBitmap(barcode)
             binding.tvBarcodeText.isVisible = barcode != null
             binding.tvBarcodeText.text = barText
-            binding.qrProgress.isVisible = false
+            binding.qrProgress.hide()
             binding.tvRefreshedAt.text = getString(
                 R.string.id_card_refreshed_at,
                 timeFormat.format(Date())
@@ -233,7 +233,7 @@ class IdCardActivity : AppCompatActivity() {
     }
 
     private fun showError(message: String) {
-        binding.qrProgress.isVisible = false
+        binding.qrProgress.hide()
         binding.tvError.text = message
         binding.tvError.isVisible = true
     }

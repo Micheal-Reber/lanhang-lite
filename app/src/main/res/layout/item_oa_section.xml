@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 办事大厅的分组标题行（跨满整行，见 OaHallActivity 的 SpanSizeLookup） -->
+<!-- 办事大厅的分组标题行（跨满整行，见 OaHallFragment 的 SpanSizeLookup） -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tvSection"
     android:layout_width="match_parent"

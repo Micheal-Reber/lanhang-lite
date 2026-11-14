@@ -223,7 +223,7 @@ class MomentSearchActivity : AppCompatActivity() {
         adapter.highlightWords = emptyList()
         adapter.submit(emptyList())
         binding.btnMore.isVisible = false
-        binding.progress.isVisible = false
+        binding.progress.hide()
         binding.tvStatus.text = getString(R.string.moments_search_scope, DEFAULT_DEPTH)
         val hasHistory = MomentSearchStore.history().isNotEmpty()
         binding.historyBox.isVisible = hasHistory
@@ -268,7 +268,7 @@ class MomentSearchActivity : AppCompatActivity() {
         binding.historyBox.isVisible = false
         binding.tvEmpty.isVisible = false
         binding.btnMore.isVisible = false
-        binding.progress.isVisible = true
+        binding.progress.show()
         binding.tvStatus.text = getString(R.string.moments_search_progress, 0, target)
         launchScan()
     }
@@ -280,7 +280,7 @@ class MomentSearchActivity : AppCompatActivity() {
         target = minOf(MAX_DEPTH, target + STEP)
         binding.btnMore.isVisible = false
         // 已经有结果时不要再盖一层转圈：进度写在状态行里，结果继续往上加
-        binding.progress.isVisible = adapter.itemCount == 0
+        if (adapter.itemCount == 0) binding.progress.show() else binding.progress.hide()
         launchScan()
     }
 
@@ -316,7 +316,7 @@ class MomentSearchActivity : AppCompatActivity() {
             } finally {
                 // 被取消（改了关键词 / 退出页面）时不要再动界面：新的一轮搜索已经在写状态了
                 if (isActive) {
-                    binding.progress.isVisible = false
+                    binding.progress.hide()
                     finishScan()
                 }
             }

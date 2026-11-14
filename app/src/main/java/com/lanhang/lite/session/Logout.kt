@@ -45,6 +45,16 @@ object Logout {
 
         // 课表、成绩、工作圈全是按账号缓存的，留着就是串号
         app.cacheDir.deleteRecursively()
+
+        // 网页里的登录态也算账号数据（2026-11-14 加「赣青二课」后尤其重要）：
+        // 校外站点的会话 Cookie 被 WebLoginStore 抄进了 SP，WebView 自己也留着一份。
+        // 不清的话，换个人登录后点开二课还是上一个人的账号。
+        com.lanhang.lite.ui.WebLoginStore.clear(app)
+        runCatching {
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            android.webkit.CookieManager.getInstance().flush()
+        }
+
         // 桌面小组件还不知道账号换了，立刻按空会话重画一次
         ScheduleWidgetUpdater.updateAll(app)
     }

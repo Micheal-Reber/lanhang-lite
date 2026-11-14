@@ -13,4 +13,11 @@
     <files-path
         name="updates_internal"
         path="downloads/" />
+    <!--
+        私信里收到的文件（打开时交给系统应用）。只开这一个子目录，不碰 filesDir 其他东西。
+        文件由 ImChatActivity.copyToRecvDir 复制进来，文件名已清洗并带消息 key 前缀。
+    -->
+    <files-path
+        name="im_recv"
+        path="im/recv/" />
 </paths>

@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  权限控制页（2026-11-13，对齐原版 PermissionControlActivity）：
+
+    ← 权限控制
+    说明文字
+    ┌ 手机号      ┐  每张卡一个字段，卡内是**单选**（原版用 CheckBox 手工互斥，
+    │ ○ 所有人    │  这里用 RadioGroup：单选本来就该用 radio，互斥由控件自己保证）
+    │ ○ 仅教职工  ┘
+    ┌ 头像        ┐  三档字段多一个「不允许」
+    │ ○ 所有人    │
+    │ ○ 仅教职工  │
+    │ ○ 不允许    │
+    …
+    [ 保存 ]
+
+  读 `GET /user/getUserStatus`、写 `POST /user/setUserStatus`；加载期间内容隐藏、中间转圈，
+  拿不到就显示错误 + 重试（没拿到原始值时保存会把隐私位覆盖成默认值，所以失败不给点保存）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Lanhang.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/top_app_bar_height"
+        app:navigationContentDescription="@string/common_back"
+        app:navigationIcon="@drawable/ic_back"
+        app:title="@string/settings_permission_control" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/screen_padding_h"
+            android:paddingTop="@dimen/space_lg"
+            android:paddingEnd="@dimen/screen_padding_h"
+            android:paddingBottom="@dimen/space_xl"
+            android:scrollbars="none"
+            android:visibility="invisible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvIntro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_xs"
+                    android:layout_marginEnd="@dimen/space_xs"
+                    android:layout_marginBottom="@dimen/space_lg"
+                    android:text="@string/permission_intro"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <!-- ========== 手机号（两档） ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_phone"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgPhone"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbPhone0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbPhone1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 邮箱（两档） ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_email"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgEmail"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbEmail0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbEmail1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 头像（三档：原版 headFlag 还有 2 = 不允许查看） ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_avatar"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgAvatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbAvatar0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbAvatar1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbAvatar2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_nobody" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 私信（非好友能不能给我发消息） ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_message"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgMessage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbMessage0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbMessage1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbMessage2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_nobody" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 群聊邀请 ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_group"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgGroup"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbGroup0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbGroup1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbGroup2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_nobody" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 发布动态（原版 pinFlag：别人能不能在你的主页发布动态） ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_pin"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgPin"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbPin0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbPin1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbPin2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_nobody" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/space_lg" />
+
+                <!-- ========== 加好友 ========== -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="@dimen/space_xxs"
+                            android:text="@string/permission_field_friend"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <RadioGroup
+                            android:id="@+id/rgFriend"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbFriend0"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_everyone" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbFriend1"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_staff" />
+
+                            <com.google.android.material.radiobutton.MaterialRadioButton
+                                android:id="@+id/rbFriend2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="@dimen/list_item_height_single"
+                                android:text="@string/permission_opt_nobody" />
+                        </RadioGroup>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSave"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xl"
+                    android:enabled="false"
+                    android:text="@string/permission_save" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- 加载失败态：内容拿不到时不能保存（会把隐私位覆盖成默认值），所以给错误 + 重试 -->
+        <LinearLayout
+            android:id="@+id/stateCenter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_padding_h"
+            android:paddingEnd="@dimen/screen_padding_h"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvError"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                android:textColor="?attr/colorError" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRetry"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:text="@string/common_retry" />
+        </LinearLayout>
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+</LinearLayout>

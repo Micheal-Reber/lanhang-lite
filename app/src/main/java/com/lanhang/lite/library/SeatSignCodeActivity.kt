@@ -8,7 +8,6 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
@@ -85,7 +84,7 @@ class SeatSignCodeActivity : AppCompatActivity() {
     private fun loadCode() {
         if (loading) return
         loading = true
-        binding.progress.isVisible = true
+        binding.progress.show()
         binding.btnRefresh.isEnabled = false
         lifecycleScope.launch {
             try {
@@ -110,7 +109,7 @@ class SeatSignCodeActivity : AppCompatActivity() {
             } finally {
                 loading = false
                 if (!isFinishing && !isDestroyed) {
-                    binding.progress.isVisible = false
+                    binding.progress.hide()
                     binding.btnRefresh.isEnabled = true
                 }
             }

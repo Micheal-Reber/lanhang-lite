@@ -165,7 +165,7 @@ class MomentsFragment : Fragment() {
 
         // 视图重建（进程恢复/主题切换）后 adapter 必为空，不能因 savedInstanceState 跳过加载
         if (savedInstanceState == null || adapter.itemCount == 0) {
-            binding.progress.isVisible = true
+            binding.progress.show()
             load(reset = true)
         }
     }
@@ -175,7 +175,7 @@ class MomentsFragment : Fragment() {
         if (_binding == null) return
         glassFab?.invalidate()
         if (loading || adapter.itemCount > 0) return
-        binding.progress.isVisible = true
+        binding.progress.show()
         load(reset = true)
     }
 
@@ -322,7 +322,7 @@ class MomentsFragment : Fragment() {
             } finally {
                 loading = false
                 // 协程取消后 view 可能已经销毁，收尾一律走可空引用
-                _binding?.progress?.isVisible = false
+                _binding?.progress?.hide()
                 _binding?.swipe?.isRefreshing = false
             }
             if (needMore && autoLoads < MAX_AUTO_LOADS) {

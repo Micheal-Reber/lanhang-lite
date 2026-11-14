@@ -1,58 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  诊断页（2026-10-30 从设置页的 AlertDialog 改成独立页面，版式对齐 Hoshi Reader）：
+  诊断与日志（设置二级页，2026-11-14 由独立 Activity 迁入）：
 
-    ┌ ← 诊断 ⬇ ↑ ┐   顶栏标题居中（CenterAlignedTopAppBar 的观感），右侧两个动作
     分组卡片：标签左 / 值右（包名、版本、Android、设备、时间）
     分区小标题「应用错误记录」 + 等宽卡片
     分区小标题「运行日志」 + 说明 + 等宽卡片
+    顶栏的「保存 / 分享」两个动作由宿主 Toolbar 提供（菜单挂载见 SettingsFragment.syncToolbar）
 
   等宽只用在两个正文块上：时间戳、异常类名、PID 在比例字体里根本对不齐列，
   看得出「同一秒刷了十几条同样的错」才叫日志。
-  顶栏仍走 `Widget.Lanhang.Toolbar` + wrap_content + minHeight：insets 回调给它补
-  `paddingTop = 状态栏高度`，高度写死 actionBarSize 的话这份 padding 会在固定高度内部占位。
--->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        style="@style/Widget.Lanhang.Toolbar"
+  不自己套 NestedScrollView：二级页的滚动交给宿主的 scrollDetail（内层再套一层会把滑动吃掉）。
+  进度圈盖在内容上：采集期间内容 `invisible`（仍占位），圈居中显示，不会跳高度。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="@dimen/top_app_bar_height"
-        app:menu="@menu/menu_diagnostics"
-        app:navigationContentDescription="@string/common_back"
-        app:navigationIcon="@drawable/ic_back"
-        app:title="@string/diagnostics_page_title"
-        app:titleCentered="true" />
-
-    <!-- 采集时 logcat 可能要几百毫秒：先把内容藏起来、中间转圈，避免进来看到一片空白 -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scroll"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
+        android:orientation="vertical"
         android:paddingStart="@dimen/screen_padding_h"
-        android:paddingTop="@dimen/space_lg"
+        android:paddingTop="@dimen/screen_padding_h"
         android:paddingEnd="@dimen/screen_padding_h"
-        android:paddingBottom="@dimen/space_xl"
-        android:scrollbars="none"
+        android:paddingBottom="@dimen/content_padding_bottom_bare"
         android:visibility="invisible">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
 
             <!-- ========== 卡片一：包与运行环境（一卡多行，行间内缩分隔线） ========== -->
             <com.google.android.material.card.MaterialCardView
@@ -321,14 +295,11 @@
                     android:textColor="?attr/colorOnSurface"
                     android:textIsSelectable="true" />
             </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/progress"
-            style="?android:attr/progressBarStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center" />
-    </FrameLayout>
-</LinearLayout>
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center" />
+</FrameLayout>

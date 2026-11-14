@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通用页（2026-11-13 用户指定的二级页，与「工具」同一套结构）：
+
+    ← 通用
+    ┌ 账号密码修改  › ┐  官方 go 网关 id=79 的 H5
+    │ 手机号修改    › │  官方 go 网关 id=83 的 H5
+    │ 权限控制      › ┘  原生页 PermissionControlActivity
+
+  收纳「账号本身」的设置：与外观、工具这类页面级配置分开。
+  退出登录**不放这里**（2026-11-13 用户指出与「我的资料」页那颗按钮重复），
+  隐私政策按用户同日要求不做。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/screen_padding_h"
+    android:paddingTop="@dimen/screen_padding_h"
+    android:paddingEnd="@dimen/screen_padding_h"
+    android:paddingBottom="@dimen/content_padding_bottom_bare">
+
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Lanhang.Card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- 账号密码修改：官方 go 网关 id=79 的 H5（原版 SettingActivity:130），Token 用 ldapToken -->
+            <LinearLayout
+                android:id="@+id/rowPassword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/list_item_height_single"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/card_padding"
+                android:paddingTop="@dimen/space_md"
+                android:paddingEnd="@dimen/card_padding"
+                android:paddingBottom="@dimen/space_md">
+
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_password"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/list_icon_gap"
+                    android:layout_weight="1"
+                    android:text="@string/settings_password_modify"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="@dimen/icon_md"
+                    android:layout_height="@dimen/icon_md"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/divider_thickness"
+                android:layout_marginStart="@dimen/card_padding"
+                android:layout_marginEnd="@dimen/card_padding"
+                android:background="?attr/colorOutlineVariant" />
+
+            <!-- 手机号修改：官方 go 网关 id=83 的 H5（原版 SettingActivity:136） -->
+            <LinearLayout
+                android:id="@+id/rowPhone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/list_item_height_single"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/card_padding"
+                android:paddingTop="@dimen/space_md"
+                android:paddingEnd="@dimen/card_padding"
+                android:paddingBottom="@dimen/space_md">
+
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_phone"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/list_icon_gap"
+                    android:layout_weight="1"
+                    android:text="@string/settings_phone_modify"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="@dimen/icon_md"
+                    android:layout_height="@dimen/icon_md"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/divider_thickness"
+                android:layout_marginStart="@dimen/card_padding"
+                android:layout_marginEnd="@dimen/card_padding"
+                android:background="?attr/colorOutlineVariant" />
+
+            <!-- 权限控制：原生隐私开关页（原版 PermissionControlActivity），决定别人看你主页能看到什么 -->
+            <LinearLayout
+                android:id="@+id/rowPermission"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/list_item_height_single"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/card_padding"
+                android:paddingTop="@dimen/space_md"
+                android:paddingEnd="@dimen/card_padding"
+                android:paddingBottom="@dimen/space_md">
+
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_shield"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/list_icon_gap"
+                    android:layout_weight="1"
+                    android:text="@string/settings_permission_control"
+                    android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="@dimen/icon_md"
+                    android:layout_height="@dimen/icon_md"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+</LinearLayout>

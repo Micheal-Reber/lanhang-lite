@@ -4,6 +4,8 @@
   id 与 MainActivity 的 TAB_* 顺序一致：switchTab 靠 menu item 的 order 定位下标，
   顺序改了要同步 MainActivity.tabOfMenuItem。
   图标复用液态玻璃底栏那四张矢量图，两个底栏长得一样、只是容器不同。
+  2026-11-14 导航互换：成绩移出底栏（改从设置二级页打开），第二项换成「工作」
+  （原设置里的「网上办事大厅」，OaHallFragment）。
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
@@ -11,9 +13,9 @@
         android:icon="@drawable/ic_calendar"
         android:title="@string/tab_schedule" />
     <item
-        android:id="@+id/nav_grades"
-        android:icon="@drawable/ic_school"
-        android:title="@string/tab_grades" />
+        android:id="@+id/nav_work"
+        android:icon="@drawable/ic_view_grid"
+        android:title="@string/tab_work" />
     <item
         android:id="@+id/nav_moments"
         android:icon="@drawable/ic_dynamic_feed"

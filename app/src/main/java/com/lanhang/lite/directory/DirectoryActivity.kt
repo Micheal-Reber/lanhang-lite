@@ -85,6 +85,7 @@ class DirectoryActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }?.let { supportActionBar?.title = it }
 
         // insets 会多次回调，基准值必须先取：直接读当前 padding 会一次次累加
         val baseRecyclerBottom = binding.recycler.paddingBottom
@@ -143,6 +144,7 @@ class DirectoryActivity : AppCompatActivity() {
         }
 
         loadTree()
+        focusSearchIfAsked()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -476,7 +478,7 @@ class DirectoryActivity : AppCompatActivity() {
 
         adapter.submit(rows)
         val hasData = rows.any { it is DirectoryRow.Dept || it is DirectoryRow.Member }
-        binding.progress.visibility = if (showProgress) View.VISIBLE else View.GONE
+        if (showProgress) binding.progress.show() else binding.progress.hide()
         binding.tvEmpty.visibility = if (emptyText != null && !hasData) View.VISIBLE else View.GONE
         binding.tvEmpty.text = emptyText.orEmpty()
         binding.btnRetry.visibility = if (showRetry) View.VISIBLE else View.GONE
@@ -485,6 +487,16 @@ class DirectoryActivity : AppCompatActivity() {
     private fun openProfile(userId: String) {
         if (userId.isBlank()) return
         UserProfileActivity.start(this, userId)
+    }
+
+    /** 进入即聚焦搜索框（私信顶栏「+ → 添加好友」用：这页就是找人） */
+    private fun focusSearchIfAsked() {
+        if (!intent.getBooleanExtra(EXTRA_FOCUS_SEARCH, false)) return
+        binding.etQuery.requestFocus()
+        binding.etQuery.post {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(binding.etQuery, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     /** 从根到该节点的完整路径（含自身），与参考实现同构 */
@@ -504,11 +516,21 @@ class DirectoryActivity : AppCompatActivity() {
         private const val STATE_PATH = "directory_path"
         private const val STATE_QUERY = "directory_query"
 
+        /** 「添加好友」入口：进来就把焦点给搜索框 */
+        private const val EXTRA_FOCUS_SEARCH = "focus_search"
+
+        /** 顶栏标题覆盖（默认「成员录」；私信里进来显示「添加好友」） */
+        private const val EXTRA_TITLE = "title"
+
         /** 搜索防抖：连着敲字只打最后一次 */
         private const val DEBOUNCE_MS = 260L
 
-        fun start(context: Context) {
-            context.startActivity(Intent(context, DirectoryActivity::class.java))
+        fun start(context: Context, focusSearch: Boolean = false, title: String? = null) {
+            context.startActivity(
+                Intent(context, DirectoryActivity::class.java)
+                    .putExtra(EXTRA_FOCUS_SEARCH, focusSearch)
+                    .putExtra(EXTRA_TITLE, title)
+            )
         }
     }
 }

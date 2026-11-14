@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  私信顶栏「+」的下拉菜单底（PopupWindow 的 background）。
+  用主题属性取色：亮/暗主题各一档，禁止写死 hex。
+  圆角取 corner_md(12dp) 而不是更大的档：菜单行自己有 4dp 内缩，
+  圆角过大会让行的涟漪方角从圆角里露出来。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorSurfaceContainerHigh" />
+    <corners android:radius="@dimen/corner_md" />
+</shape>

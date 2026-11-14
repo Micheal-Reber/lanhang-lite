@@ -25,7 +25,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import coil.load
@@ -209,7 +208,7 @@ class PublishMomentActivity : AppCompatActivity() {
     }
 
     private fun setBusy(busy: Boolean) {
-        binding.progress.isVisible = busy
+        if (busy) binding.progress.show() else binding.progress.hide()
         binding.etContent.isEnabled = !busy
         refreshState()
     }

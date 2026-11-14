@@ -22,6 +22,30 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!--
+      Android 11+ 的包可见性（targetSdk 30 起默认「看不见」别的应用）。
+      不声明这些包名，`getPackageInfo("com.autonavi.minimap")` 会抛 NameNotFoundException ——
+      明明装了高德，代码却当成没装，直接退到网页版。2026-11-12 用户实测「点位置打开浏览器」
+      就是这条引起的。scheme 也要一并声明：走隐式 Intent 的 startActivity 同样受可见性约束。
+    -->
+    <queries>
+        <package android:name="com.autonavi.minimap" />
+        <package android:name="com.baidu.BaiduMap" />
+        <package android:name="com.tencent.map" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="androidamap" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="qqmap" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="baidumap" />
+        </intent>
+    </queries>
+
     <application>
 
         <!-- 私信列表：入口在「设置 → 私信」和「设置 → 成员录」顶部那一行 -->
@@ -34,6 +58,19 @@
         <activity
             android:name=".im.ImChatActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 新朋友（好友申请列表）：入口在私信列表顶栏「+」；进页面即拉取并置已读 -->
+        <activity
+            android:name=".im.ImNewFriendsActivity"
+            android:exported="false"
+            android:label="@string/im_new_friends" />
+
+        <!-- 发起群聊（成员多选 → 填群名建群）：入口在私信列表顶栏「+」；要弹输入法填群名 -->
+        <activity
+            android:name=".im.ImCreateGroupActivity"
+            android:exported="false"
+            android:label="@string/im_create_group"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- 进程启动即把私信入口注入 ImBridge（ContentProvider.onCreate 早于 Application.onCreate） -->

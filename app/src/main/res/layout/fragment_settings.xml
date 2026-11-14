@@ -28,7 +28,7 @@
             android:paddingTop="@dimen/screen_padding_h"
             android:paddingEnd="@dimen/screen_padding_h">
 
-            <!-- ========== 分组一：我的资料 / 外观 / 工具 / 网上办事大厅 ========== -->
+            <!-- ========== 分组一：我的资料 / 外观 / 上课提醒 / 工具 / 成绩 / 成员录 / 私信 ========== -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.Lanhang.Card.Large"
                 android:layout_width="match_parent"
@@ -39,7 +39,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- 我的资料（双行：姓名 + 学号；设置最顶端，2026-10-26 用户要求） -->
+                    <!-- 我的资料（双行：姓名 + 学号；设置最顶端第一行，2026-10-26 用户要求） -->
                     <LinearLayout
                         android:id="@+id/rowAccount"
                         android:layout_width="match_parent"
@@ -249,9 +249,12 @@
                         android:layout_marginEnd="@dimen/card_padding"
                         android:background="?attr/colorOutlineVariant" />
 
-                    <!-- 网上办事大厅：单行，不带副标题（2026-10-26 用户要求） -->
+                    <!--
+                      成绩（2026-11-14 导航互换）：从底栏 Tab 挪进来当二级页，位置仍是
+                      原「网上办事大厅」那一行（它改名「工作」进了底栏）。单行，不带副标题。
+                    -->
                     <LinearLayout
-                        android:id="@+id/rowOaHall"
+                        android:id="@+id/rowGrades"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
@@ -269,7 +272,7 @@
                             android:layout_width="@dimen/icon_lg"
                             android:layout_height="@dimen/icon_lg"
                             android:contentDescription="@null"
-                            android:src="@drawable/ic_view_grid"
+                            android:src="@drawable/ic_school"
                             app:tint="?attr/colorOnSurfaceVariant" />
 
                         <TextView
@@ -277,7 +280,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="@dimen/list_icon_gap"
                             android:layout_weight="1"
-                            android:text="@string/settings_oa_hall"
+                            android:text="@string/tab_grades"
                             android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
                             android:textColor="?attr/colorOnSurface" />
 
@@ -417,7 +420,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/space_xl" />
 
-            <!-- ========== 分组二：诊断 / 关于 ========== -->
+            <!-- ========== 分组二：通用 / 诊断与日志 / 清除缓存 / 关于 ========== -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.Lanhang.Card.Large"
                 android:layout_width="match_parent"
@@ -427,6 +430,58 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
+
+                    <!--
+                      通用（2026-11-13 用户指定为二级页；2026-11-14 用户指定排到本卡第一行）：
+                      二级页，与「工具」同一套版式，收纳账号密码修改 / 手机号修改 / 权限控制 ——
+                      都是「账号本身」的设置。退出登录只留在「我的资料」页底部，
+                      隐私政策按用户要求不做。
+                    -->
+                    <LinearLayout
+                        android:id="@+id/rowGeneral"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_single"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_sm"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_sm">
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_lg"
+                            android:layout_height="@dimen/icon_lg"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_manage_accounts"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/list_icon_gap"
+                            android:layout_weight="1"
+                            android:text="@string/settings_general"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_md"
+                            android:layout_height="@dimen/icon_md"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/divider_thickness"
+                        android:layout_marginStart="@dimen/card_padding"
+                        android:layout_marginEnd="@dimen/card_padding"
+                        android:background="?attr/colorOutlineVariant" />
 
                     <!-- 诊断与日志：2026-10-26 从「关于」二级页提到目录页（参考版式第二组就装了诊断） -->
                     <LinearLayout

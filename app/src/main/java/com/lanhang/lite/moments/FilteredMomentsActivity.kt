@@ -153,7 +153,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
         adapter.submit(emptyList())
         binding.tvEmpty.isVisible = false
         binding.btnMore.isVisible = false
-        binding.progress.isVisible = true
+        binding.progress.show()
         binding.tvStatus.text = getString(R.string.moments_filtered_view_scanning, 0)
         launchScan()
     }
@@ -164,7 +164,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
         if (target >= MAX_DEPTH) return
         target = minOf(MAX_DEPTH, target + STEP)
         binding.btnMore.isVisible = false
-        binding.progress.isVisible = adapter.itemCount == 0
+        if (adapter.itemCount == 0) binding.progress.show() else binding.progress.hide()
         launchScan()
     }
 
@@ -206,7 +206,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
             } finally {
                 // 被取消时（退出页面）不要再动界面
                 if (isActive) {
-                    binding.progress.isVisible = false
+                    binding.progress.hide()
                     finishScan()
                 }
             }
@@ -271,7 +271,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
 
     private fun showDisabled() {
         adapter.submit(emptyList())
-        binding.progress.isVisible = false
+        binding.progress.hide()
         binding.btnMore.isVisible = false
         binding.tvStatus.text = getString(R.string.moments_filtered_view_off)
         binding.tvEmpty.text = getString(R.string.moments_filtered_view_off)

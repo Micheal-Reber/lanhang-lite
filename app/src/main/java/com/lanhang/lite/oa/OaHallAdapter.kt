@@ -3,8 +3,6 @@ package com.lanhang.lite.oa
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import coil.load
-import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ItemOaAppBinding
 import com.lanhang.lite.databinding.ItemOaSectionBinding
 
@@ -62,15 +60,9 @@ class OaHallAdapter(
 
         fun bind(app: OaApp, onApp: (OaApp) -> Unit) {
             binding.tvName.text = app.name.orEmpty()
-            // logo 是远程图：失败/为空都退回统一占位图标，避免格子空一块。
-            // 各家上传的 logo 一半是白底图，深色卡片上会变成一块白方块，先抠掉白底再显示。
-            binding.ivLogo.load(app.logoUrl?.takeIf { it.isNotBlank() }) {
-                crossfade(true)
-                transformations(StripWhiteBackdropTransformation())
-                placeholder(R.drawable.ic_view_grid)
-                error(R.drawable.ic_view_grid)
-                fallback(R.drawable.ic_view_grid)
-            }
+            // 图标是**自绘**的（首字 + 圆角底，见 OaAppIconView）：服务端下发的 logo 图一半是
+            // 白底、校外网络下不下来、尺寸也不一致，抠白底那套算法已经删掉了。
+            binding.ivLogo.bind(app.name.orEmpty())
             binding.root.setOnClickListener { onApp(app) }
             binding.root.contentDescription = app.name.orEmpty()
         }

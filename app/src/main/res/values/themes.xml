@@ -111,6 +111,18 @@
     </style>
 
     <!--
+      弹层内的卡片（sheet_local_course_edit 的四张表单卡）：12dp 圆角 + 0 海拔，
+      底色取 High 而不是 Filled 默认的 Highest —— BottomSheet 背景本身已是 Low/High 一档，
+      用 Highest 会把层次拉得过开。**新弹层里的卡片一律用这个，不要再散写三件套。**
+    -->
+    <style name="Widget.Lanhang.Card.Sheet" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerHigh</item>
+        <item name="cardCornerRadius">@dimen/corner_md</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!--
       ==================== 字阶（M3 type scale 的落地别名） ====================
       只覆写 textSize（中文不设 letterSpacing），字重/行高沿用官方值。
       卡片与列表项一律用 android:textAppearance 引用，不要再散写 textSize + textStyle="bold"

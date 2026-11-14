@@ -134,6 +134,62 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!--
+                  好友关系（2026-11-12，2026-11-13 精简为三态）：加好友 / 同意申请 / 等待对方同意。
+                  「已是好友 → 删除好友」已挪到页面最下面那个红描边大按钮（btnDeleteFriend，
+                  与「退出登录」同版式），所以这一卡在好友态时整卡隐藏。
+                  与「发私信」同属私信能力，所以看自己、或 lite 版（ImBridge 没注入）时整卡隐藏；
+                  lite 版加了好友也无处说话，不给半截功能。
+                -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardFriend"
+                    style="@style/Widget.Lanhang.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/card_gap"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/rowFriend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/list_item_height_single"
+                        android:orientation="horizontal"
+                        android:paddingStart="@dimen/card_padding"
+                        android:paddingTop="@dimen/space_md"
+                        android:paddingEnd="@dimen/card_padding"
+                        android:paddingBottom="@dimen/space_md">
+
+                        <ImageView
+                            android:layout_width="@dimen/icon_lg"
+                            android:layout_height="@dimen/icon_lg"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_person"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/tvFriendLabel"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/list_icon_gap"
+                            android:layout_weight="1"
+                            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <ImageView
+                            android:id="@+id/ivFriendChevron"
+                            android:layout_width="@dimen/icon_md"
+                            android:layout_height="@dimen/icon_md"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- 快捷入口：个人动态（第二级页）。自己看自己时整卡隐藏（设置→当前账号只要资料） -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardPosts"
@@ -332,6 +388,22 @@
                     android:text="@string/moments_block_user"
                     android:visibility="gone" />
 
+                <!-- 删除好友（2026-11-13 用户要求：从上面那张好友卡的行里挪出来，放到页面最下面，
+                     和「退出登录」同一个版式）：删好友是破坏性动作，用整行红描边大按钮比挤在
+                     卡片行里更醒目；只有「已是好友」时出现，所以与下面的退出登录不会同屏。 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeleteFriend"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xl"
+                    android:text="@string/friend_delete"
+                    android:textColor="?attr/colorError"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_person_remove"
+                    app:iconTint="?attr/colorError"
+                    app:strokeColor="?attr/colorError" />
+
                 <!-- 退出登录（2026-11-01 从设置目录页搬到这里）：账号卡在设置页能点进这个页面，
                      退出作用的对象是同一份会话，放在「我的资料」最下面更贴合语义，
                      也让设置目录页只留「进去看看」的条目。只有自己看自己时出现。 -->
@@ -351,10 +423,10 @@
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
-        <ProgressBar
+        <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/progress"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:visibility="gone" />
 

@@ -93,7 +93,7 @@ class MomentDetailActivity : AppCompatActivity() {
             binding.tvEmpty.isVisible = true
             return
         }
-        binding.progress.isVisible = true
+        binding.progress.show()
         load()
     }
 
@@ -124,7 +124,7 @@ class MomentDetailActivity : AppCompatActivity() {
                 Diagnostics.record(this@MomentDetailActivity, getString(R.string.moments_detail_title), e)
                 showMissing(getString(R.string.moments_network_error))
             } finally {
-                binding.progress.isVisible = false
+                binding.progress.hide()
                 binding.swipe.isRefreshing = false
             }
         }

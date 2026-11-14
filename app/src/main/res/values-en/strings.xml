@@ -88,6 +88,27 @@
     <string name="settings_account">Signed in as</string>
     <string name="settings_account_meta_hint">View student ID, school and contacts</string>
     <string name="settings_proto">Client ID</string>
+    <!-- Account settings (aligned with the official app, 2026-11-13), under the "General" page -->
+    <string name="settings_password_modify">Change password</string>
+    <string name="settings_phone_modify">Change phone number</string>
+    <string name="settings_permission_control">Privacy controls</string>
+    <string name="settings_general">General</string>
+    <!-- Privacy controls page (native, reads and writes /user/getUserStatus) -->
+    <string name="permission_intro">These settings decide what others can see on your profile and how they can reach you. They take effect for everyone as soon as you save.</string>
+    <string name="permission_field_phone">Phone number</string>
+    <string name="permission_field_email">Email</string>
+    <string name="permission_field_avatar">Profile photo</string>
+    <string name="permission_field_message">Direct messages</string>
+    <string name="permission_field_group">Group invitations</string>
+    <string name="permission_field_pin">Posting to profile</string>
+    <string name="permission_field_friend">Adding as friend</string>
+    <string name="permission_opt_everyone">Everyone</string>
+    <string name="permission_opt_staff">Staff only</string>
+    <string name="permission_opt_nobody">No one</string>
+    <string name="permission_save">Save</string>
+    <string name="permission_saved">Settings saved</string>
+    <string name="permission_load_failed">Couldn\'t load: %1$s</string>
+    <string name="permission_save_failed">Couldn\'t save: %1$s</string>
     <string name="settings_about_version_label">Version</string>
     <string name="settings_about_version_value">%1$s (%2$d)</string>
     <string name="settings_about_section_help">Help &amp; feedback</string>
@@ -133,6 +154,13 @@
     <string name="im_notify_title">New message</string>
     <string name="im_notify_group_body">%1$s: %2$s</string>
     <string name="im_notify_body_placeholder">[Message]</string>
+    <string name="im_notify_friend_channel">Friend requests</string>
+    <string name="im_notify_friend_channel_desc">Alerts for friend requests and responses (while this device is online)</string>
+    <string name="im_notify_friend_title">Friend request</string>
+    <string name="im_notify_friend_requested">%1$s sent you a friend request</string>
+    <string name="im_notify_friend_accepted">%1$s accepted your friend request</string>
+    <string name="im_notify_friend_generic">You have a new friend request</string>
+    <string name="im_notify_friend_accepted_generic">Someone accepted your friend request</string>
     <string name="im_image">Photo</string>
     <string name="im_preview_image">[Photo]</string>
     <string name="im_preview_other">[Message]</string>
@@ -157,6 +185,19 @@
     <string name="im_video_open_failed">No app can play this video</string>
     <string name="im_attach_file">File</string>
     <string name="im_attach_location">Location</string>
+    <string name="im_file_open_with">Open with</string>
+    <string name="im_file_open">Open</string>
+    <string name="im_file_save">Save to device</string>
+    <string name="im_file_saved">Saved</string>
+    <string name="im_file_save_failed">Could not save</string>
+    <string name="im_file_open_failed">Could not open the file</string>
+    <string name="im_file_no_app">No app can open this file type. Long-press to save it instead.</string>
+    <string name="im_file_downloading">Downloading %1$d%%</string>
+    <string name="im_file_downloading_unknown">Downloading…</string>
+    <string name="im_location_no_coords">This location message has no coordinates</string>
+    <string name="im_location_open_failed">No map app available. Coordinates copied.</string>
+    <string name="im_location_coords_label">Coordinates</string>
+    <string name="im_file_download_failed">Download failed. Check your network and try again.</string>
     <string name="im_attach_failed">Could not read the selected file</string>
     <string name="im_location_denied">No location permission</string>
     <string name="im_location_unavailable">Location unavailable right now</string>
@@ -168,6 +209,25 @@
     <string name="im_join_group_id_required">Enter a group ID</string>
     <string name="im_join_group_offline">Not connected, cannot join right now</string>
     <string name="im_join_group_failed">Could not join the group (%1$s)</string>
+    <!-- The “+” dropdown menu: matches the official top bar (new group / add friends / campus card / new friends / join group) -->
+    <string name="im_menu_add">Add</string>
+    <string name="im_create_group">New group</string>
+    <string name="im_add_friend">Add friends</string>
+    <string name="im_campus_card_pay">Campus card payment</string>
+    <string name="im_open_page_failed">Could not open the page (%1$s)</string>
+    <!-- New group: pick members first, then create (a single pick becomes a 1:1 chat) -->
+    <string name="im_create_group_confirm">Create</string>
+    <string name="im_create_group_confirm_n">Create(%1$d)</string>
+    <string name="im_create_group_search_hint">Search by name / student ID</string>
+    <string name="im_create_group_friends">My friends</string>
+    <string name="im_create_group_results">Results</string>
+    <string name="im_create_group_empty_friends">No friends yet — add some with “Add friends”</string>
+    <string name="im_create_group_no_match">No one matches</string>
+    <string name="im_create_group_need_member">Select at least one member</string>
+    <string name="im_create_group_name">Group name</string>
+    <string name="im_create_group_do">Create group</string>
+    <string name="im_create_group_failed">Could not create the group (%1$s)</string>
+    <string name="im_create_group_not_friend">You can only create a group with friends — add them first</string>
     <string name="im_refresh">Refresh</string>
     <string name="im_retry">Retry</string>
     <string name="im_connecting">Connecting to messaging…</string>
@@ -177,8 +237,35 @@
     <string name="im_send">Send</string>
     <string name="im_send_failed">Failed to send</string>
     <string name="im_sending">Sending…</string>
+    <string name="im_msg_read">Read</string>
+    <string name="im_msg_state_read">%1$s · Read</string>
+    <string name="im_msg_state_unread">%1$s · Unread</string>
     <string name="im_group_suffix">Group</string>
     <string name="im_unknown_peer">Unknown</string>
+    <!-- Friend / new friends (IM build only; entry points are the messages top bar and the profile page) -->
+    <string name="im_new_friends">New friends</string>
+    <string name="im_new_friends_count">%1$d friend requests</string>
+    <string name="im_new_friends_empty">No friend requests yet</string>
+    <string name="im_new_friends_failed">Could not load friend requests (%1$s)</string>
+    <string name="im_friend_accept">Accept</string>
+    <string name="im_friend_accepted">Accepted</string>
+    <string name="im_friend_timeout">Expired</string>
+    <string name="im_friend_waiting">Waiting for them</string>
+    <string name="im_friend_accept_failed">Could not accept the request (%1$s)</string>
+    <string name="im_friend_request_delete">Delete record</string>
+    <string name="im_friend_request_delete_message">This record will be removed. Existing friendships are unaffected.</string>
+    <string name="im_friend_request_deleted">Deleted</string>
+    <string name="im_friend_request_delete_failed">Could not delete the record (%1$s)</string>
+    <string name="friend_add">Add friend</string>
+    <string name="friend_accept">Accept request</string>
+    <string name="friend_waiting">Waiting for approval</string>
+    <string name="friend_delete">Remove friend</string>
+    <string name="friend_delete_message">%1$s will be removed from your friend list. You can add them again later.</string>
+    <string name="friend_invite_hint">Verification message</string>
+    <string name="friend_invite_default">I\'m %1$s</string>
+    <string name="friend_invite_sent">Friend request sent</string>
+    <string name="friend_add_failed">Could not send the friend request (%1$s)</string>
+    <string name="friend_delete_failed">Could not remove this friend (%1$s)</string>
     <string name="settings_footer">Lanhang Lite · A third-party lightweight client for NCHU</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_light">Light</string>
@@ -267,6 +354,8 @@
 
     <!-- Bottom bar / titles -->
     <string name="tab_grades">Grades</string>
+    <!-- Second bottom tab (navigation swap, 2026-11-14: was "Service portal" in Settings) -->
+    <string name="tab_work">Work</string>
     <string name="tab_moments">Feed</string>
     <string name="tab_settings">Settings</string>
 
@@ -573,6 +662,7 @@
     <string name="user_profile_label_major">Major</string>
     <string name="user_profile_label_class">Class</string>
     <string name="user_profile_label_post">Title</string>
+    <string name="user_profile_copied">Copied</string>
     <string name="user_profile_masked_hint">Some details are hidden according to the owner\'s privacy settings</string>
     <string name="user_profile_error">Failed to load profile</string>
     <string name="user_profile_not_found">Account deleted or not viewable</string>
@@ -679,9 +769,7 @@
     <string name="directory_no_match">No matching members found</string>
     <string name="directory_dept_empty">No members in this department</string>
 
-    <!-- ==================== Campus services hall (native grid) ==================== -->
-    <string name="settings_oa_hall">Service portal</string>
-    <string name="oa_hall_title">Campus services</string>
+    <!-- ==================== Campus services hall (native grid, now the "Work" tab) ==================== -->
     <string name="oa_hall_tag">Services load</string>
     <string name="oa_hall_basic">Common apps</string>
     <string name="oa_hall_other">Other apps</string>
@@ -693,6 +781,10 @@
     <string name="oa_hall_no_page">This app has no mobile page to open</string>
     <string name="oa_hall_no_login">Your session has expired, please sign in again</string>
     <string name="oa_hall_need_official">This app can only be opened in the official app</string>
+    <string name="oa_hall_club_section">Student activities</string>
+    <string name="gqhw_name">Ganqing Second Classroom</string>
+    <string name="gqhw_desc">Extracurricular transcript</string>
+    <string name="oa_web_open_app_failed">No app can open this link</string>
 
     <!-- ==================== Campus network (Srun sign-in) ==================== -->
     <string name="settings_campus_net">Campus network</string>

@@ -37,6 +37,57 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
+        包可见性（Android 11 / API 30 起强制）。
+
+        OaWebViewActivity 里网页点的 `weixin://` / `alipays://` / `intent://` 要交给系统拉起，
+        但**不声明 <queries> 时系统根本不告诉我们设备上装了哪些应用** ——
+        `startActivity(ACTION_VIEW, weixin://…)` 必然抛 ActivityNotFoundException，
+        表现就是「缴电费点充值没反应」（2026-11-14 从分叉第 74 轮搬入）。
+        这里只声明「要查询谁能处理这些 scheme / 包名」，不申请任何权限。
+    -->
+    <queries>
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.eg.android.AlipayGphone" />
+        <package android:name="com.unionpay.uppay" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="weixin" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="weixinpay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="alipays" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="alipay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tencent" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="mqq" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="uppay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+
+    <!--
         课前流体云：前台服务让进度条每 15s 真实推进。
         specialUse 是唯一能描述「课程实时卡片」的官方类型（不是 media / location 那些）。
     -->
@@ -151,9 +202,12 @@
             </intent-filter>
         </activity>
 
+        <!-- adjustResize：「工作」Tab（OaHallFragment）里的搜索框要靠 IME inset 把结果列表让开，
+             不声明时 adjustUnspecified 不保证分发键盘 inset（原 OaHallActivity 就带这条） -->
         <activity
             android:name=".ui.MainActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.OaWebViewActivity"
@@ -205,11 +259,11 @@
             android:exported="false"
             android:label="@string/moments_blocked_title" />
 
-        <!-- 诊断与日志（入口：设置目录第二张卡的「诊断与日志」）：整页展示 + 顶栏保存/分享 -->
+        <!-- 权限控制（入口：设置目录第一张卡的「权限控制」）：原生隐私开关页，读写 /user/getUserStatus -->
         <activity
-            android:name=".settings.DiagnosticsActivity"
+            android:name=".settings.PermissionControlActivity"
             android:exported="false"
-            android:label="@string/diagnostics_page_title" />
+            android:label="@string/settings_permission_control" />
 
         <!-- 关键词搜索（入口在工作圈顶栏放大镜）：需要弹输入法，adjustResize 让结果区跟着缩 -->
         <activity
@@ -268,22 +322,9 @@
             android:label="@string/seat_sign_code_title" />
 
         <activity
-            android:name=".oa.OaHallActivity"
-            android:exported="false"
-            android:label="@string/oa_hall_title"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
             android:name=".campusnet.CampusNetActivity"
             android:exported="false"
             android:label="@string/campus_net_title"
-            android:windowSoftInputMode="adjustResize" />
-
-        <!-- 课程提醒设置页（入口：设置目录一级行）：无底栏，与身份码/校园网等二级页一致 -->
-        <activity
-            android:name=".reminder.ReminderActivity"
-            android:exported="false"
-            android:label="@string/reminder_title"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- 课前流体云：前台服务载体，存活期即投放期（进度条每 15s 推进） -->

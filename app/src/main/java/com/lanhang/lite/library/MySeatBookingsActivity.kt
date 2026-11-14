@@ -194,14 +194,14 @@ class MySeatBookingsActivity : AppCompatActivity() {
 
     private fun beginLoading() {
         pendingOps++
-        if (pendingOps == 1) binding.progress.isVisible = true
+        if (pendingOps == 1) binding.progress.show()
     }
 
     private fun endLoading() {
         pendingOps--
         if (pendingOps <= 0) {
             pendingOps = 0
-            binding.progress.isVisible = false
+            binding.progress.hide()
         }
     }
 

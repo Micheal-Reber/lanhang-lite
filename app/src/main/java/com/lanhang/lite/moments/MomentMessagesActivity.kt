@@ -4,8 +4,6 @@ import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -84,6 +82,7 @@ class MomentMessagesActivity : AppCompatActivity() {
         binding = ActivityMomentMessagesBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.toolbar.setNavigationOnClickListener { finish() }
+        setupToolbarMenu()
 
         // insets 会多次回调，基准值必须先取：直接读当前 padding 会一次次累加
         val baseBottomPadding = binding.recycler.paddingBottom
@@ -122,7 +121,7 @@ class MomentMessagesActivity : AppCompatActivity() {
         binding.notifyBanner.setOnClickListener { onNotifyBannerClick() }
 
         setupFilters()
-        binding.progress.isVisible = true
+        binding.progress.show()
         load(reset = true)
         maybeAskNotifyPermission()
     }
@@ -212,7 +211,7 @@ class MomentMessagesActivity : AppCompatActivity() {
             } finally {
                 // 取消也要复位，否则重进页面会一直转圈
                 loading = false
-                binding.progress.isVisible = false
+                binding.progress.hide()
                 binding.swipe.isRefreshing = false
             }
         }
@@ -295,7 +294,8 @@ class MomentMessagesActivity : AppCompatActivity() {
         } else {
             null
         }
-        invalidateOptionsMenu()
+        // 菜单现在挂在布局的 app:menu 上（见 setupToolbarMenu），可见性只能自己刷
+        refreshMenu()
     }
 
     /** 首屏失败落在空态上，翻页失败只吐 toast，避免把已有内容清掉 */
@@ -339,6 +339,7 @@ class MomentMessagesActivity : AppCompatActivity() {
         } else {
             null
         }
+        refreshMenu()
         if (notify) {
             toast(
                 getString(
@@ -390,29 +391,38 @@ class MomentMessagesActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ 菜单
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_moment_messages, menu)
+    /**
+     * 顶栏菜单（「全部已读」）。
+     *
+     * ⚠️ 必须走「布局挂 `app:menu` + 这里的 `setOnMenuItemClickListener`」：NoActionBar 主题下
+     * 没有 ActionBar 宿主，`onCreateOptionsMenu` **根本不会被调用** —— 写了不报错、不崩，
+     * 只是按钮永远不出现（AGENTS §5 记过的坑，本页此前就是这么坏的）。
+     */
+    private fun setupToolbarMenu() {
         // 顶栏是 M3 surface 底，图标统一跟 onSurface；逐项染色是因为这里没有溢出菜单
         val tint = com.google.android.material.color.MaterialColors.getColor(
             binding.toolbar,
             com.google.android.material.R.attr.colorOnSurface
         )
+        val menu = binding.toolbar.menu
         for (i in 0 until menu.size()) {
             menu.getItem(i).icon?.mutate()?.setTint(tint)
-            // 没有未读时「全部已读」没有意义，直接藏掉
-            if (menu.getItem(i).itemId == R.id.action_mark_all_read) {
-                menu.getItem(i).isVisible = all.any { it.unread }
+        }
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_mark_all_read) {
+                markAllRead()
+                true
+            } else {
+                false
             }
         }
-        return true
+        refreshMenu()
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        R.id.action_mark_all_read -> {
-            markAllRead()
-            true
-        }
-        else -> super.onOptionsItemSelected(item)
+    /** 没有未读时「全部已读」没有意义，直接藏掉（渲染与已读切换后各调一次） */
+    private fun refreshMenu() {
+        val item = binding.toolbar.menu.findItem(R.id.action_mark_all_read) ?: return
+        item.isVisible = all.any { it.unread }
     }
 
 

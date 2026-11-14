@@ -48,8 +48,8 @@ object BottomBarPrefs {
  * 底栏相关尺寸的唯一出口。
  *
  * 主 Tab 页的内容底部留白要跟着底栏形态变：液态玻璃是浮起 64dp 的胶囊（留 112dp），
- * 原生底栏贴底 80dp（留 96dp）。**布局里不要再直接写 `@dimen/content_padding_bottom`**
- * —— 那是玻璃那一档，选了原生之后底部会多出 32dp 空档，而且切换形态时不会跟着变。
+ * 原生底栏贴底 72dp（留 88dp）。**布局里不要再直接写 `@dimen/content_padding_bottom`**
+ * —— 那是玻璃那一档，选了原生之后底部会多出 24dp 空档，而且切换形态时不会跟着变。
  */
 object BottomBarDims {
 

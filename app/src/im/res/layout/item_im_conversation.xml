@@ -43,31 +43,17 @@
                 android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
                 android:textColor="?attr/colorOnSurface" />
 
+            <!-- 已读 / 未读徽标排在时间**前面**，时间是这一行最后一个子 View（2026-11-13 用户要求：
+                 徽标一出现就抢行尾的话，时间看着被挤到前面去了。标题是 weight=1，
+                 徽标出现只压缩标题，时间右缘始终钉在行尾） -->
             <TextView
-                android:id="@+id/tvTime"
+                android:id="@+id/tvRead"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_sm"
                 android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_xxs"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/tvPreview"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tvUnread"
@@ -84,6 +70,24 @@
                 android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
                 android:textColor="?attr/colorOnPrimary"
                 android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_sm"
+                android:textAppearance="@style/TextAppearance.Lanhang.LabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPreview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xxs"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 </LinearLayout>

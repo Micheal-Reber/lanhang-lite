@@ -22,7 +22,6 @@ import com.lanhang.lite.core.SwipeRefreshStyle
 import com.lanhang.lite.core.userMessage
 import com.lanhang.lite.databinding.FragmentGradesBinding
 import com.lanhang.lite.session.Session
-import com.lanhang.lite.ui.navigation.BottomBarDims
 import com.lanhang.lite.ui.showFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,20 +53,22 @@ class GradesFragment : Fragment() {
         adapter = GradeAdapter()
         binding.recycler.layoutManager = LinearLayoutManager(requireContext())
         binding.recycler.adapter = adapter
-        // 底部留白按底栏形态给（玻璃 112dp / 原生 96dp），见 BottomBarDims
+        // 底部留白：2026-11-14 起成绩是设置二级页（返回箭头、底栏收起，见
+        // MainActivity.openGradesFromSettings），用二级页统一的 bare 留白；
+        // 原来按底栏形态给的 BottomBarDims 是常驻底栏主 Tab 页的口径，这里不再适用
         binding.contentGrades.updatePadding(
-            bottom = BottomBarDims.contentBottomPadding(requireContext())
+            bottom = resources.getDimensionPixelSize(R.dimen.content_padding_bottom_bare)
         )
         SwipeRefreshStyle.apply(binding.swipe)
         binding.swipe.setOnRefreshListener {
             if (selectedTerm.isNotEmpty()) loadScores(selectedTerm, network = true)
         }
 
-        binding.progress.isVisible = true
+        binding.progress.show()
         viewLifecycleOwner.lifecycleScope.launch {
             loadSemesters()
             // 协程取消后不能再碰 binding：view 可能已销毁，_binding 已置空
-            _binding?.progress?.isVisible = false
+            _binding?.progress?.hide()
         }
     }
 
@@ -145,7 +146,7 @@ class GradesFragment : Fragment() {
         if (loading || term.isEmpty()) return
         val screen = _binding ?: return
         loading = true
-        if (network) screen.swipe.isRefreshing = true else screen.progress.isVisible = true
+        if (network) screen.swipe.isRefreshing = true else screen.progress.show()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 var data = withContext(Dispatchers.IO) { GradesRepository.loadCachedScores(term) }
@@ -165,7 +166,7 @@ class GradesFragment : Fragment() {
                 // 必须放 finally：取消途中也要复位，否则 loading 卡在 true，
                 // 重新进页面会静默不加载
                 loading = false
-                _binding?.progress?.isVisible = false
+                _binding?.progress?.hide()
                 _binding?.swipe?.isRefreshing = false
             }
         }

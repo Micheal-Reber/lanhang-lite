@@ -1,44 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  课程提醒设置（移植 Sleepy 的 ReminderScreen，卡片顺序一致：总开关 → 课前提醒 → 每日提醒 → 勿扰 → 后台可靠性）。
-  结构：总开关（含「提醒权限需要处理」呼点行）→ 每节课前提醒（分钟 / 形态 / 流体云 / 预览）
-        → 每日提醒（今日摘要 / 明日预告 + 时间 + 预览）→ 上课自动勿扰 → 后台可靠性。
-  版式与其他设置二级页一致：Widget.Lanhang.Card + card_padding，不显示底栏。
+  课程提醒（设置二级页，2026-11-14 由独立 Activity 迁入）。
+
+  内容与顺序照 Sleepy 的 ReminderScreen：总开关（含「提醒权限需要处理」呼点行）→ 每节课前提醒
+  （分钟 / 形态 / 流体云 / 预览）→ 每日提醒（今日摘要 / 明日预告 + 时间 + 预览）→ 上课自动勿扰 → 后台可靠性。
+
+  **不自己套 NestedScrollView**：二级页的滚动由宿主的 scrollDetail 负责，内层再套一层同方向的
+  滚动容器会把手指的滑动全吃掉（页面看起来「划不动」）。同理不写 title/返回箭头 —— 顶栏是宿主的。
+
   省略项（无多课表 / 节假日数据，见 AGENTS.md）：「按日期设置提醒」「需要提醒的课表」。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/content"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:orientation="vertical">
-
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        style="@style/Widget.Lanhang.Toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="@dimen/top_app_bar_height"
-        app:navigationContentDescription="@string/common_back"
-        app:navigationIcon="@drawable/ic_back"
-        app:title="@string/reminder_title" />
-
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false">
-
-        <LinearLayout
-            android:id="@+id/content"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="@dimen/screen_padding_h"
-            android:paddingTop="@dimen/space_lg"
-            android:paddingEnd="@dimen/screen_padding_h"
-            android:paddingBottom="@dimen/content_padding_bottom_bare">
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/screen_padding_h"
+    android:paddingTop="@dimen/screen_padding_h"
+    android:paddingEnd="@dimen/screen_padding_h"
+    android:paddingBottom="@dimen/content_padding_bottom_bare">
 
             <!-- ==================== 总开关 ==================== -->
             <com.google.android.material.card.MaterialCardView
@@ -1213,6 +1194,4 @@
                         android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

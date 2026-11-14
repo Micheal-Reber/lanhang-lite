@@ -125,7 +125,7 @@ class MyMomentsActivity : AppCompatActivity() {
             binding.tvEmpty.isVisible = true
             return
         }
-        binding.progress.isVisible = true
+        binding.progress.show()
         load(reset = true)
     }
 
@@ -217,7 +217,7 @@ class MyMomentsActivity : AppCompatActivity() {
                 showError(reset, getString(R.string.moments_network_error))
             }
             loading = false
-            binding.progress.isVisible = false
+            binding.progress.hide()
             binding.swipe.isRefreshing = false
         }
     }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  网上办事大厅（原生宫格）。
-  结构：顶栏 → 搜索框 → 宫格（分组标题 + 应用卡片）。
-  列表来自 POST /api/apps/all，点卡片用一次性 Token 打开应用内 WebView。
+  「工作」Tab（原网上办事大厅，2026-11-14 由独立 Activity 改成 MainActivity 里的常驻页）。
+  结构：搜索框 → 宫格（分组标题 + 应用卡片）。顶栏与系统栏 inset 都归 MainActivity 管，
+  这里不再有自己的 toolbar。列表来自 POST /api/apps/all，点卡片用一次性 Token 打开应用内 WebView。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -10,16 +10,6 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:orientation="vertical">
-
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        style="@style/Widget.Lanhang.Toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="@dimen/top_app_bar_height"
-        app:navigationContentDescription="@string/common_back"
-        app:navigationIcon="@drawable/ic_back"
-        app:title="@string/oa_hall_title" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/searchBox"
@@ -46,22 +36,18 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipe"
+        <!-- 2026-11-14 用户要求取消下拉刷新：宫格由 OaCache 时效驱动（新鲜期内不联网），
+             手动刷新需求已不存在，SwipeRefreshLayout 整层移除 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingStart="@dimen/space_md"
-                android:paddingTop="@dimen/space_xs"
-                android:paddingEnd="@dimen/space_md"
-                android:paddingBottom="@dimen/space_2xl"
-                android:scrollbars="vertical" />
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/space_md"
+            android:paddingTop="@dimen/space_xs"
+            android:paddingEnd="@dimen/space_md"
+            android:paddingBottom="@dimen/space_2xl"
+            android:scrollbars="vertical" />
 
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/progress"

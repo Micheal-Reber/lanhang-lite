@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 私信列表顶栏：手动刷新会话（连不上时也能点） -->
+<!--
+  私信列表顶栏：手动刷新（连不上时也能点）+ 「+」。
+  「+」点开的是下拉菜单（见 ImConversationsActivity.showAddMenu），新朋友 / 加入群聊
+  都收进去了 —— 顶栏只留两个图标，360dp 宽下不会被挤进溢出菜单。
+  图标在 360dp 宽下放得下；title 仍可读（不要靠图标表达含义）。
+-->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
-    <item
-        android:id="@+id/action_im_join_group"
-        android:icon="@drawable/ic_group"
-        android:title="@string/im_join_group"
-        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_im_refresh"
         android:icon="@drawable/ic_im_refresh"
         android:title="@string/im_refresh"
         app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_im_add"
+        android:icon="@drawable/ic_add"
+        android:title="@string/im_menu_add"
+        app:showAsAction="always" />
 </menu>

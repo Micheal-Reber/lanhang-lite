@@ -111,12 +111,12 @@
                             android:contentDescription="@string/id_card_qr_desc"
                             android:scaleType="fitCenter" />
 
-                        <ProgressBar
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
                             android:id="@+id/qrProgress"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
                             android:layout_gravity="center"
-                            android:indeterminateTint="#FF084168" />
+                            app:indicatorColor="#FF084168" />
                     </FrameLayout>
 
                     <TextView

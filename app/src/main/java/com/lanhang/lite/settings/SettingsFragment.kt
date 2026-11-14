@@ -35,8 +35,7 @@ import com.lanhang.lite.moments.UserInfoCache
 import com.lanhang.lite.moments.UserProfileActivity
 import com.lanhang.lite.net.MiniappApi
 import com.lanhang.lite.net.StaffBrief
-import com.lanhang.lite.oa.OaHallActivity
-import com.lanhang.lite.reminder.ReminderActivity
+import com.lanhang.lite.oa.OaApi
 import com.lanhang.lite.schedule.ScheduleBackdrop
 import com.lanhang.lite.schedule.ScheduleBackgroundActivity
 import com.lanhang.lite.schedule.ScheduleData
@@ -45,6 +44,8 @@ import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.session.AppLanguage
 import com.lanhang.lite.session.Session
 import com.lanhang.lite.ui.MainActivity
+import com.lanhang.lite.ui.Motion
+import com.lanhang.lite.ui.OaWebViewActivity
 import com.lanhang.lite.ui.navigation.BottomBarDims
 import com.lanhang.lite.ui.navigation.BottomBarPrefs
 import com.lanhang.lite.ui.navigation.BottomBarStyle
@@ -71,6 +72,12 @@ import kotlinx.coroutines.withContext
  * 点进二级页后 Toolbar 切换为返回箭头 + 子页标题；系统返回键回到目录。
  * 视图切换在本 Fragment 内完成，避免与四 Tab hide/show 的 back stack 冲突。
  * 「工具」二级页收纳导出课表、身份码、图书馆座位、校园网、接口调试。
+ *
+ * 二级页有两种承载方式，**转场完全相同**（都是 [Motion.fadeThrough]，顶栏原地换标题）：
+ * - 布局型（外观 / 工具 / 通用 / 清除缓存 / 关于）：inflate 一个 `view_settings_*.xml` 进 detailContainer；
+ * - 页面型（课程提醒 / 诊断与日志）：逻辑量远超「几行字」，用子 Fragment 承载 —— 它们原本是独立
+ *   Activity，启动时要走系统窗口转场（整窗横滑 450ms），与这里的 90+210ms 淡入淡出对不上，
+ *   2026-11-14 应用户要求统一到二级页。
  */
 class SettingsFragment : Fragment() {
 
@@ -85,6 +92,13 @@ class SettingsFragment : Fragment() {
 
     /** null = 目录页；PAGE_* = 当前二级页 */
     private var detailPage: Int? = null
+
+    /**
+     * 页面型二级页（课程提醒 / 诊断与日志）的子 Fragment；布局型二级页恒为 null。
+     *
+     * 生命周期归 childFragmentManager 管，这里只留引用用于转发顶栏菜单动作。
+     */
+    private var detailFragment: Fragment? = null
 
     private var pendingExport: ScheduleExporter.ExportPayload? = null
     private var exportJob: Job? = null
@@ -134,12 +148,12 @@ class SettingsFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
         binding.rowAppearance.setOnClickListener { openDetail(PAGE_APPEARANCE) }
-        binding.rowReminder.setOnClickListener {
-            startActivity(Intent(requireContext(), ReminderActivity::class.java))
-        }
+        binding.rowReminder.setOnClickListener { openDetail(PAGE_REMINDER) }
         binding.rowTools.setOnClickListener { openDetail(PAGE_TOOLS) }
-        binding.rowOaHall.setOnClickListener {
-            startActivity(Intent(requireContext(), OaHallActivity::class.java))
+        // 成绩（2026-11-14 起是设置二级页，不再是底栏 Tab）：跨 Fragment 盖层由宿主处理，
+        // 这里只负责喊一声 —— 返回箭头/系统返回键与底栏收起都在 MainActivity.openGradesFromSettings
+        binding.rowGrades.setOnClickListener {
+            (activity as? MainActivity)?.openGradesFromSettings()
         }
         binding.rowDirectory.setOnClickListener {
             com.lanhang.lite.directory.DirectoryActivity.start(requireContext())
@@ -158,17 +172,24 @@ class SettingsFragment : Fragment() {
         }
         bindImSummary()
         binding.rowAccount.setOnClickListener { openMyProfile() }
+        // 通用二级页（2026-11-13 用户指定）：账号密码修改 / 手机号修改 / 权限控制 / 退出登录
+        binding.rowGeneral.setOnClickListener { openDetail(PAGE_GENERAL) }
         binding.rowDiagnostics.setOnClickListener {
-            // 2026-10-30 改成独立页面（原来是 AlertDialog，报错一多就挤成一坨灰墙，
-            // 也没法只挑一行复制），见 DiagnosticsActivity
-            DiagnosticsActivity.start(requireContext())
+            // 2026-10-30 从 AlertDialog 改成整页（报错一多会挤成一坨灰墙，也没法只挑一行复制）；
+            // 2026-11-14 又从独立 Activity 改成设置二级页，与「提醒 / 外观 / 通用」同一套转场
+            openDetail(PAGE_DIAGNOSTICS)
         }
         binding.rowClearCache.setOnClickListener { openDetail(PAGE_CACHE) }
         bindAccountCard()
 
         val restored = savedInstanceState?.getInt(KEY_DETAIL, -1) ?: -1
-        if (restored in intArrayOf(PAGE_APPEARANCE, PAGE_TOOLS, PAGE_ABOUT, PAGE_CACHE)) {
-            openDetail(restored, syncToolbar = false)
+        if (restored in intArrayOf(
+                PAGE_APPEARANCE, PAGE_TOOLS, PAGE_ABOUT, PAGE_CACHE, PAGE_GENERAL,
+                PAGE_REMINDER, PAGE_DIAGNOSTICS
+            )
+        ) {
+            // 恢复现场直接落位，不播切换动画（这是进程重建，不是用户在两个页面间导航）
+            openDetail(restored, syncToolbar = false, animate = false)
         }
         // 目录页的底部留白按底栏形态给（玻璃 112dp / 原生 96dp）。
         // 写在 xml 里的话切换形态后不会跟着变 —— 见 BottomBarDims 的说明。
@@ -269,6 +290,24 @@ class SettingsFragment : Fragment() {
             Toast.makeText(requireContext(), R.string.error_relogin, Toast.LENGTH_SHORT).show()
         } else {
             UserProfileActivity.start(requireContext(), id)
+        }
+    }
+
+    /**
+     * go 网关的 H5（账号密码修改 / 手机号修改），与「校园卡支付」同一条链路。
+     *
+     * Token 必须是**新鲜的** ldapToken：过期的网关只回 `Error.aspx?code=4000`，
+     * 界面上就是一张「身份信息已过期」。取令牌是同步 OkHttp，放 IO 线程。
+     * 取不到时 [OaWebViewActivity] 自己还会拿本地那份新鲜的兜底，所以这里失败不拦着不给开。
+     */
+    private fun openGatewayPage(titleRes: Int, url: String) {
+        val ctx = context ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            val token = withContext(Dispatchers.IO) {
+                runCatching { OaApi.freshLdapToken() }.getOrNull()
+            }
+            if (_binding == null) return@launch
+            OaWebViewActivity.open(ctx, url, token, getString(titleRes))
         }
     }
 
@@ -424,7 +463,12 @@ class SettingsFragment : Fragment() {
         if (page == null) {
             act.showToolbarMain(getString(R.string.tab_settings))
         } else {
-            act.showToolbarSub(detailTitle(page)) { closeDetail() }
+            // 诊断页的「保存 / 分享」是这一页自己的动作：菜单资源挂到宿主顶栏，
+            // 点击再转发回子 Fragment（二级页共用宿主的 toolbar，自己塞图标会在退出时残留）
+            val menuRes = if (page == PAGE_DIAGNOSTICS) R.menu.menu_diagnostics else null
+            act.showToolbarSub(detailTitle(page), { closeDetail() }, menuRes) { id ->
+                (detailFragment as? DiagnosticsFragment)?.onMenuAction(id) ?: false
+            }
         }
     }
 
@@ -433,21 +477,75 @@ class SettingsFragment : Fragment() {
         // 工具页现在也装「身份码」，不只课表相关，标题与入口统一叫「工具」
         PAGE_TOOLS -> getString(R.string.settings_tools)
         PAGE_CACHE -> getString(R.string.settings_clear_cache)
+        PAGE_GENERAL -> getString(R.string.settings_general)
+        PAGE_REMINDER -> getString(R.string.reminder_title)
+        PAGE_DIAGNOSTICS -> getString(R.string.diagnostics_page_title)
         else -> getString(R.string.settings_about_app)
     }
 
-    private fun openDetail(page: Int, syncToolbar: Boolean = true) {
-        val b = _binding ?: return
-        val layout = when (page) {
-            PAGE_APPEARANCE -> R.layout.view_settings_appearance
-            PAGE_TOOLS -> R.layout.view_settings_tools
-            PAGE_CACHE -> R.layout.view_settings_cache
-            else -> R.layout.view_settings_about
+    /** 布局型二级页的内容布局；页面型（[detailPageFragment]）没有布局，返回 null。 */
+    private fun detailLayout(page: Int): Int? = when (page) {
+        PAGE_APPEARANCE -> R.layout.view_settings_appearance
+        PAGE_TOOLS -> R.layout.view_settings_tools
+        PAGE_CACHE -> R.layout.view_settings_cache
+        PAGE_GENERAL -> R.layout.view_settings_general
+        PAGE_REMINDER -> null
+        PAGE_DIAGNOSTICS -> null
+        else -> R.layout.view_settings_about
+    }
+
+    /**
+     * 页面型二级页的载体。逻辑量大、要 registerForActivityResult（提醒页要权限与时间选择器），
+     * 塞进「一张布局 + 几行 findViewById」的模型里会失控，所以用子 Fragment。
+     */
+    private fun newDetailFragment(page: Int): Fragment? = when (page) {
+        PAGE_REMINDER -> ReminderFragment()
+        PAGE_DIAGNOSTICS -> DiagnosticsFragment()
+        else -> null
+    }
+
+    private fun openDetail(page: Int, syncToolbar: Boolean = true, animate: Boolean = true) {
+        // 目录页 ↔ 二级页是同级目的地切换，走 M3 fade-through（与 Tab 切换同一套）。
+        // 宿主取 fragment 根：两个 NestedScrollView 都是它的子视图，整体淡出→换页→整体淡入；
+        // 根与 activity_main 背景同为 ?attr/colorSurface，淡透时露出的是同一个色，不会闪。
+        if (animate) {
+            val root = _binding?.root ?: return
+            Motion.fadeThrough(requireContext(), root) { applyDetail(page, syncToolbar) }
+        } else {
+            applyDetail(page, syncToolbar)
         }
-        b.detailContainer.removeAllViews()
-        val child = LayoutInflater.from(requireContext()).inflate(layout, b.detailContainer, false)
-        b.detailContainer.addView(child)
-        setupDetail(page, child)
+    }
+
+    /**
+     * 换页本体（fade-through 的 rebuild）。
+     * 动画的淡出阶段有 90ms，视图可能在这期间被销毁，所以先判 `_binding`。
+     */
+    private fun applyDetail(page: Int, syncToolbar: Boolean) {
+        val b = _binding ?: return
+        val pageFragment = newDetailFragment(page)
+        // 进程/配置变化后 childFragmentManager 已经把上一份子 Fragment 连同视图恢复好了：
+        // 同类就直接复用 —— 既不重建（诊断页会白跑一遍 logcat），也**不能动容器**
+        // （removeAllViews 会把它的视图硬拔走，Fragment 自己还以为视图还在）
+        val existing = childFragmentManager.findFragmentByTag(TAG_DETAIL_PAGE)
+        val restored = pageFragment != null &&
+            existing != null && existing.javaClass == pageFragment.javaClass
+        if (!restored) {
+            clearDetailContent(b)
+            if (pageFragment != null) {
+                childFragmentManager.beginTransaction()
+                    .replace(R.id.detailContainer, pageFragment, TAG_DETAIL_PAGE)
+                    .commitNow()
+                detailFragment = pageFragment
+            } else {
+                val layout = detailLayout(page) ?: return
+                val child = LayoutInflater.from(requireContext())
+                    .inflate(layout, b.detailContainer, false)
+                b.detailContainer.addView(child)
+                setupDetail(page, child)
+            }
+        } else {
+            detailFragment = existing
+        }
         detailPage = page
         b.scrollDirectory.visibility = View.GONE
         b.scrollDetail.visibility = View.VISIBLE
@@ -456,14 +554,41 @@ class SettingsFragment : Fragment() {
         if (syncToolbar) syncToolbar()
     }
 
-    private fun closeDetail() {
+    private fun closeDetail(animate: Boolean = true) {
+        if (animate) {
+            val root = _binding?.root ?: return
+            Motion.fadeThrough(requireContext(), root) { applyCloseDetail() }
+        } else {
+            applyCloseDetail()
+        }
+    }
+
+    /** 收起二级页本体。可重复调用（连按返回时 fadeThrough 会取消上一次并重跑）。 */
+    private fun applyCloseDetail() {
         val b = _binding ?: return
         detailPage = null
-        b.detailContainer.removeAllViews()
+        clearDetailContent(b)
         b.scrollDetail.visibility = View.GONE
         b.scrollDirectory.visibility = View.VISIBLE
         backCallback.isEnabled = false
         syncToolbar()
+    }
+
+    /**
+     * 清空 detailContainer。
+     *
+     * 顺序不能反：子 Fragment 必须先 `remove`（它才肯把自己的视图摘掉），
+     * 再 `removeAllViews()` 扫尾 —— 直接 removeAllViews 会把子 Fragment 的视图
+     * 从容器里硬拔走，它自己仍以为视图还在，下次复用时就会「already has a parent」。
+     */
+    private fun clearDetailContent(b: FragmentSettingsBinding) {
+        detailFragment?.let { f ->
+            if (!childFragmentManager.isStateSaved) {
+                childFragmentManager.beginTransaction().remove(f).commitNow()
+            }
+        }
+        detailFragment = null
+        b.detailContainer.removeAllViews()
     }
 
     private fun setupDetail(page: Int, root: View) {
@@ -506,6 +631,20 @@ class SettingsFragment : Fragment() {
                 }
                 root.findViewById<View>(R.id.rowDebugSchedule)
                     .setOnClickListener { debugSchedule() }
+            }
+            PAGE_GENERAL -> {
+                // 账号密码 / 手机号仍是官方 go 网关的 H5（原生化要先逆向那两个页面的接口，
+                // 2026-11-13 用户决定先保持 WebView）；权限控制是原生页
+                root.findViewById<View>(R.id.rowPassword).setOnClickListener {
+                    openGatewayPage(R.string.settings_password_modify, GATEWAY_PASSWORD_URL)
+                }
+                root.findViewById<View>(R.id.rowPhone).setOnClickListener {
+                    openGatewayPage(R.string.settings_phone_modify, GATEWAY_PHONE_URL)
+                }
+                root.findViewById<View>(R.id.rowPermission).setOnClickListener {
+                    PermissionControlActivity.start(requireContext())
+                }
+                // 退出登录**不在这里**：与「我的资料」页底部那颗按钮重复（2026-11-13 用户要求删）
             }
             PAGE_CACHE -> {
                 val ttlSummary = root.findViewById<TextView>(R.id.tvCacheTtlSummary)
@@ -1108,7 +1247,22 @@ class SettingsFragment : Fragment() {
         private const val PAGE_TOOLS = 1
         private const val PAGE_ABOUT = 2
         private const val PAGE_CACHE = 3
+        private const val PAGE_GENERAL = 4
+
+        // 页面型二级页（子 Fragment 承载，见类注释）：原来的独立 Activity
+        private const val PAGE_REMINDER = 5
+        private const val PAGE_DIAGNOSTICS = 6
+
+        /** 页面型二级页在 childFragmentManager 里的 tag（进程重建后靠它找回同一个实例） */
+        private const val TAG_DETAIL_PAGE = "settings_detail_page"
         private const val KEY_DETAIL = "settings_detail_page"
+
+        /**
+         * 账号密码修改 / 手机号修改：官方 go 网关入口
+         * （原版 `SettingActivity.java:130-141` 直接 `Intent` 这两个地址给 `RceWebViewActivity`）。
+         */
+        private const val GATEWAY_PASSWORD_URL = "https://go.nchu.edu.cn/?id=79"
+        private const val GATEWAY_PHONE_URL = "https://go.nchu.edu.cn/?id=83"
 
         /** 公开仓库：关于页的「源码仓库」「开源许可」都指向这里 */
         private const val REPO_URL = "https://github.com/Micheal-Reber/lanhang-lite"

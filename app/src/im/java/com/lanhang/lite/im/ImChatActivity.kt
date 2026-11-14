@@ -2,6 +2,8 @@ package com.lanhang.lite.im
 
 import com.lanhang.lite.core.toast
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +19,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.MimeTypeMap
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -24,6 +27,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -38,10 +42,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.databinding.ActivityImChatBinding
 import com.lanhang.lite.databinding.ItemImMessageBinding
+import com.lanhang.lite.update.UpdateInstaller
 
 /**
  * 聊天页（IM 版专属，MVP 只收发文本）。
@@ -72,6 +78,37 @@ class ImChatActivity : AppCompatActivity() {
     private val filePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) sendPickedFile(uri) }
+
+    /** 待保存的文件：另存为对话框返回后才知道往哪写，中间先放在这里 */
+    private var pendingSaveFile: File? = null
+
+    /** key → 下载进度（-1 = 已发起、还没有进度回调）；有值就在气泡上显示「下载中」 */
+    private val downloading = mutableMapOf<String, Int>()
+
+    /**
+     * 「保存到本地」：交给系统的另存为对话框，用户自己挑目录。
+     *
+     * 不往 `Downloads` 里硬写：Android 10+ 写公共目录要走 MediaStore，10 以下又要
+     * `WRITE_EXTERNAL_STORAGE` —— 三条分支还容易被系统拦。另存为不需要任何权限，
+     * 全版本一条路，并且目录由用户决定。
+     */
+    private val fileSavePicker = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { uri ->
+        val src = pendingSaveFile
+        pendingSaveFile = null
+        if (uri == null || src == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        src.inputStream().use { it.copyTo(out) }
+                    } != null
+                }.getOrDefault(false)
+            }
+            toast(if (ok) R.string.im_file_saved else R.string.im_file_save_failed)
+        }
+    }
 
     /** 视频选择：系统相册只列出视频 */
     private val videoPicker = registerForActivityResult(
@@ -171,7 +208,6 @@ class ImChatActivity : AppCompatActivity() {
         }
 
         ImClient.loadRecent(peerId, isGroup)
-        ImClient.markRead(peerId, isGroup)
         render()
     }
 
@@ -181,6 +217,9 @@ class ImChatActivity : AppCompatActivity() {
         // 这个会话正被看着：同会话再来消息不弹通知，顺手撤掉之前挂着的那条
         ImClient.visibleThreadKey = ImClient.threadKey(peerId, isGroup)
         ImNotify.cancel(this, peerId)
+        // 清未读 + 回执「已读」放在这里而不是 onCreate：从别的页面（看图、个人主页）
+        // 回来也要补一次，中间到达的消息才算被读过
+        ImClient.markRead(peerId, isGroup)
         render()
     }
 
@@ -504,6 +543,244 @@ class ImChatActivity : AppCompatActivity() {
             .onFailure { toast(getString(R.string.im_video_open_failed)) }
     }
 
+    // ==================== 文件消息：打开 / 保存 ====================
+
+    /**
+     * 点位置气泡 → 交给手机上的地图 App。
+     *
+     * 坐标在 [GeoShare] 里转成 GCJ02 再发出去：系统定位给的是 WGS84，
+     * 高德 / 腾讯要 GCJ02、百度要 BD09，不转的话打点会偏 300~500 米。
+     * 一个地图都没装就退回高德网页版；连网页都打不开时把坐标复制走，至少还能自己粘。
+     */
+    private fun openLocation(message: ImMessage) {
+        if (message.lat == 0.0 && message.lng == 0.0) {
+            toast(R.string.im_location_no_coords)
+            return
+        }
+        val poi = message.poi.orEmpty().ifBlank { message.text }
+        if (GeoShare.open(this, message.lat, message.lng, poi)) return
+
+        val coords = String.format(Locale.US, "%.6f, %.6f", message.lat, message.lng)
+        getSystemService(ClipboardManager::class.java)
+            ?.setPrimaryClip(
+                ClipData.newPlainText(getString(R.string.im_location_coords_label), coords)
+            )
+        toast(R.string.im_location_open_failed)
+    }
+
+    /**
+     * 点文件气泡：本地有就直接开，没有就先下载再开。
+     *
+     * SDK **不会自动下载文件消息**（图片才会顺手下一张缩略图），所以第一次点必然要过一遍
+     * 网络；下载完成后 SDK 会把路径写回 `localPath`，第二次点就直开了。
+     */
+    private fun openFile(message: ImMessage) {
+        if (downloading.containsKey(message.key)) return
+        ensureLocalFile(message) { file ->
+            if (file == null) {
+                toast(R.string.im_file_download_failed)
+                return@ensureLocalFile
+            }
+            launchFileViewer(file, message)
+        }
+    }
+
+    /** 长按文件气泡：打开 / 保存到本地 */
+    private fun showFileMenu(message: ImMessage) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(safeFileName(message.fileName.orEmpty()))
+            .setItems(
+                arrayOf(
+                    getString(R.string.im_file_open),
+                    getString(R.string.im_file_save),
+                    getString(R.string.im_file_open_with),
+                )
+            ) { _, which ->
+                when (which) {
+                    0 -> openFile(message)
+                    1 -> saveFile(message)
+                    2 -> openFileWith(message)
+                }
+            }
+            .show()
+    }
+
+    /** 保存到本地：先确保文件在盘上，再交给系统的另存为对话框 */
+    private fun saveFile(message: ImMessage) {
+        if (downloading.containsKey(message.key)) return
+        ensureLocalFile(message) { file ->
+            if (file == null) {
+                toast(R.string.im_file_download_failed)
+                return@ensureLocalFile
+            }
+            val src = copyToRecvDir(file, message)
+            if (src == null) {
+                toast(R.string.im_file_save_failed)
+                return@ensureLocalFile
+            }
+            pendingSaveFile = src
+            runCatching { fileSavePicker.launch(src.name) }
+                .onFailure {
+                    pendingSaveFile = null
+                    toast(R.string.im_file_save_failed)
+                }
+        }
+    }
+
+    /**
+     * 保证文件已在本地：命中直接给，没命中就下载（进度显示在气泡第三行）。
+     *
+     * 回调不直接碰 View，只改 [downloading] —— 页面切走时回调用不着 View，也就不会崩。
+     */
+    private fun ensureLocalFile(message: ImMessage, onReady: (File?) -> Unit) {
+        localPathOf(message.mediaUrl)?.let { return onReady(it) }
+
+        downloading[message.key] = -1
+        refreshFileBubble(message.key)
+        ImClient.downloadFile(
+            uid = message.key,
+            onProgress = { percent ->
+                downloading[message.key] = percent
+                refreshFileBubble(message.key)
+            },
+            onResult = { path ->
+                downloading.remove(message.key)
+                refreshFileBubble(message.key)
+                onReady(path?.let(::File))
+            },
+        )
+    }
+
+    /** 「下载中 xx%」那行要跟着变，重绑这一条就够 */
+    private fun refreshFileBubble(key: String) {
+        val index = adapter.indexOf(key)
+        if (index >= 0) adapter.notifyItemChanged(index)
+    }
+
+    /**
+     * [ImMessage.mediaUrl] 只有在是**本地路径**时才拿来直接打开。
+     *
+     * 三种形态：`file:///…`（自己发的、或已下载）、`/data/…`（裸路径）、`https://…`
+     * （对方的 CDN 地址）—— 最后一种必须下载，这里返回 null 让上层去下。
+     */
+    private fun localPathOf(url: String?): File? {
+        if (url.isNullOrBlank()) return null
+        val path = when {
+            url.startsWith("file://") -> Uri.parse(url).path
+            url.startsWith("/") -> url
+            else -> null
+        } ?: return null
+        return File(path).takeIf { it.isFile }
+    }
+
+    /** 「用其他应用打开」：跳过精确 MIME，直接把通配交给选择器，让用户自己挑 */
+    private fun openFileWith(message: ImMessage) {
+        if (downloading.containsKey(message.key)) return
+        ensureLocalFile(message) { file ->
+            if (file == null) {
+                toast(R.string.im_file_download_failed)
+                return@ensureLocalFile
+            }
+            launchFileViewer(file, message, anyApp = true)
+        }
+    }
+
+    /**
+     * 交给系统应用打开。
+     *
+     * 先复制到 `filesDir/im/recv/`：SDK 下载落点可能在 cache（随时被清），也不在
+     * FileProvider 的白名单里，直接塞进去会抛 IllegalArgumentException。
+     */
+    private fun launchFileViewer(file: File, message: ImMessage, anyApp: Boolean = false) {
+        val safe = copyToRecvDir(file, message)
+        if (safe == null) {
+            toast(R.string.im_file_open_failed)
+            return
+        }
+        if (anyApp) {
+            if (!viewWith(safe, "*/*", chooser = true)) toast(R.string.im_file_no_app)
+            return
+        }
+        val mime = resolveMime(message, safe)
+
+        // apk 交给系统安装器：和「检查更新」复用同一套（含「未知来源」授权引导）。
+        // 用 ACTION_VIEW 自己拼一份的话，没开未知来源时只会静默失败。
+        if (mime == MIME_APK) {
+            UpdateInstaller.install(this, safe)?.let { toast(it) }
+            return
+        }
+
+        if (viewWith(safe, mime, chooser = false)) return
+        // 精确 MIME 没有任何应用认领（压缩包、冷门格式）→ 退到通配，让用户自己挑。
+        // 不这样做的话，能处理 `*/*` 的浏览器/文件管理器永远不会出现在列表里。
+        if (mime != "*/*" && viewWith(safe, "*/*", chooser = true)) return
+        toast(R.string.im_file_no_app)
+    }
+
+    /**
+     * 推断要交给系统的 MIME。
+     *
+     * 🔴 SDK 的 `FileMessage.getType()` **不保证是 MIME**（自己发的文件我们根本没设过 type，
+     * 收到别人发的可能是个扩展名）。直接拿去 `setDataAndType` 会匹配不到任何应用 ——
+     * 用户实测 apk 只弹出「网易云音乐」一个选项，就是 MIME 不对。
+     * 所以：只认带斜杠的声明值，否则按扩展名查系统表，再不行才用通配。
+     */
+    private fun resolveMime(message: ImMessage, file: File): String {
+        val declared = message.fileMime?.trim().orEmpty()
+        if (declared.contains('/')) return declared
+        val name = message.fileName ?: file.name
+        val ext = name.substringAfterLast('.', "").lowercase(Locale.US)
+        if (ext.isEmpty()) return "*/*"
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
+    }
+
+    /** 起一个 ACTION_VIEW；返回是否真的拉起了（ActivityNotFound 也算 false） */
+    private fun viewWith(file: File, mime: String, chooser: Boolean): Boolean {
+        val uri = runCatching {
+            FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        }.getOrNull() ?: return false
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, mime)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // 部分 ROM 只认 ClipData 里的授权，不看 flag
+        intent.clipData = ClipData.newRawUri(file.name, uri)
+        val target = if (chooser) {
+            Intent.createChooser(intent, getString(R.string.im_file_open_with))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } else {
+            intent
+        }
+        return runCatching { startActivity(target) }.isSuccess
+    }
+
+    /**
+     * 复制到 `filesDir/im/recv/`，文件名带消息 key 前缀，避免重名互相覆盖。
+     *
+     * 已经复制过（长度相同）就复用，否则每点一次都把大文件抄一遍。
+     */
+    private fun copyToRecvDir(src: File, message: ImMessage): File? = runCatching {
+        val dir = File(filesDir, "im/recv").apply { mkdirs() }
+        val name = safeFileName(message.fileName ?: src.name)
+        val dst = File(dir, "${message.key.take(32)}_$name")
+        if (dst.isFile && dst.length() == src.length()) return dst
+        src.inputStream().use { input -> dst.outputStream().use { input.copyTo(it) } }
+        dst
+    }.getOrNull()
+
+    /**
+     * 文件名清洗：对方发来的名字**不可信**。
+     *
+     * `../` 会被拼进路径（路径穿越），`:` `*` 之类在某些分区上直接建不出文件。
+     * 统一换下划线，再掐个长度上限。
+     */
+    private fun safeFileName(raw: String): String {
+        val cleaned = raw.replace(Regex("""[/\\:*?"<>|\u0000-\u001f]"""), "_")
+            .trim()
+            .trim('.')
+            .take(80)
+        return cleaned.ifBlank { "file" }
+    }
+
     /** 气泡下方的时间：`HH:mm`（口径见 [com.lanhang.lite.core.TimeText.clock]） */
     private fun clockTime(millis: Long): String = com.lanhang.lite.core.TimeText.clock(millis)
 
@@ -522,8 +799,16 @@ class ImChatActivity : AppCompatActivity() {
         binding.editText.setText("")
     }
 
+    /**
+     * 渲染一次。
+     *
+     * 🔴 必须传**快照**（`.toList()`）：`ImClient.thread()` 回的是内部那份可变列表，
+     * 直接交给 DiffUtil 会让 old 与 new 是同一个对象 —— 收到新消息、收到已读回执时
+     * 元素在原地被改掉，DiffUtil 逐项对比「自己 == 自己」永远判无变化，
+     * 界面就停在上一帧（列表页没有这个问题，它每次都是 `conversations = merged` 换新列表）。
+     */
     private fun render() {
-        val messages = ImClient.thread(peerId, isGroup)
+        val messages = ImClient.thread(peerId, isGroup).toList()
         val grew = adapter.submit(messages)
         if (grew) binding.recycler.scrollToPosition(messages.lastIndex)
     }
@@ -576,6 +861,9 @@ class ImChatActivity : AppCompatActivity() {
                 .mapNotNull { it.fullImageUrl ?: it.imageUrl }
                 .filter { it.isNotBlank() }
 
+        /** 按消息 key 找下标；找不到返回 -1（刷新下载进度用） */
+        fun indexOf(key: String): Int = items.indexOfFirst { it.key == key }
+
         inner class VH(private val b: ItemImMessageBinding) :
             RecyclerView.ViewHolder(b.root) {
 
@@ -601,15 +889,27 @@ class ImChatActivity : AppCompatActivity() {
                 (b.mediaBox.layoutParams as LinearLayout.LayoutParams).gravity = gravity
                 (b.tvState.layoutParams as LinearLayout.LayoutParams).gravity = gravity
 
-                // 气泡下面那行小字：发送中 / 发送失败 / **发送时间**
+                // 气泡下面那行小字：发送中 / 发送失败 / **发送时间 + 已读状态**
                 //
                 // 和参考项目一致（miuix `BubbleBody` 下方那行 Text）：成功发送后显示 `HH:mm`，
                 // 而不是整行收起来 —— 聊天里没有时间戳的话，隔几小时再回来看不出哪句是几点说的。
                 // 失败时优先显示「发送失败」并转成 error 色，时间暂时让位（比时间更重要）。
+                // 单聊里我发的消息再接一截「已读 / 未读」（群聊不回执已读，不显示）。
                 val stateText = when (message.state) {
                     ImMessage.STATE_SENDING -> ctx.getString(R.string.im_sending)
                     ImMessage.STATE_FAILED -> ctx.getString(R.string.im_send_failed)
-                    else -> clockTime(message.time)
+                    else -> {
+                        val at = clockTime(message.time)
+                        if (message.mine && !isGroup) {
+                            ctx.getString(
+                                if (message.read) R.string.im_msg_state_read
+                                else R.string.im_msg_state_unread,
+                                at,
+                            )
+                        } else {
+                            at
+                        }
+                    }
                 }
                 b.tvState.isVisible = stateText.isNotEmpty()
                 b.tvState.text = stateText
@@ -628,6 +928,11 @@ class ImChatActivity : AppCompatActivity() {
             private fun bindText(message: ImMessage) {
                 val ctx = b.root.context
                 // 文件和位置也用气泡承载，但正文是拼出来的：文件带大小，位置带地名
+                // 复用来的 holder 可能还挂着上一条的监听（图片那边踩过同样的坑）：
+                // 只有文件气泡可点，别让普通文字也能点开上一个文件的菜单
+                b.tvBubble.setOnClickListener(null)
+                b.tvBubble.setOnLongClickListener(null)
+
                 b.tvBubble.text = when (message.kind) {
                     ImMessage.KIND_FILE -> buildString {
                         append("📄 ")
@@ -635,6 +940,13 @@ class ImChatActivity : AppCompatActivity() {
                         if (message.fileSize > 0) {
                             append('\n')
                             append(humanSize(message.fileSize))
+                        }
+                        // 正在下载时把状态写在第三行：这里没有进度条可用，文字最省事
+                        when (val progress = downloading[message.key]) {
+                            null -> Unit
+                            -1 -> append('\n').append(ctx.getString(R.string.im_file_downloading_unknown))
+                            else -> append('\n')
+                                .append(ctx.getString(R.string.im_file_downloading, progress))
                         }
                     }
                     ImMessage.KIND_LOCATION -> locationText(message)
@@ -653,6 +965,18 @@ class ImChatActivity : AppCompatActivity() {
                     if (message.mine) R.drawable.bg_im_bubble_mine
                     else R.drawable.bg_im_bubble_other
                 )
+
+                // 文件：点一下打开（本地没有就先下载），长按出「打开 / 保存到本地」
+                if (message.kind == ImMessage.KIND_FILE) {
+                    b.tvBubble.setOnClickListener { openFile(message) }
+                    b.tvBubble.setOnLongClickListener {
+                        showFileMenu(message)
+                        true
+                    }
+                } else if (message.kind == ImMessage.KIND_LOCATION) {
+                    // 位置：点一下交给地图 App（坐标在里面转 GCJ02，否则会偏几百米）
+                    b.tvBubble.setOnClickListener { openLocation(message) }
+                }
             }
 
             /**
@@ -720,6 +1044,9 @@ class ImChatActivity : AppCompatActivity() {
             "🤝", "🙏", "💪", "👏", "🙌", "👋", "🤙", "❤️",
             "💔", "💯", "🔥", "🎉", "🎂", "☕", "🌙", "⭐",
         )
+
+        /** apk 的 MIME：走安装器而不是普通 ACTION_VIEW */
+        private const val MIME_APK = "application/vnd.android.package-archive"
 
         internal const val EXTRA_PEER = "peer_id"
         internal const val EXTRA_GROUP = "is_group"

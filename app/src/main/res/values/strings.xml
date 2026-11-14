@@ -84,6 +84,27 @@
     <string name="settings_account">当前账号</string>
     <string name="settings_account_meta_hint">查看学号、院系与联系方式</string>
     <string name="settings_proto">接口标识</string>
+    <!-- 账号设置（2026-11-13 对齐原版设置页，收在「通用」二级页）：账号密码/手机号走 go 网关 WebView -->
+    <string name="settings_password_modify">账号密码修改</string>
+    <string name="settings_phone_modify">手机号修改</string>
+    <string name="settings_permission_control">权限控制</string>
+    <string name="settings_general">通用</string>
+    <!-- 权限控制页（原生，读写 /user/getUserStatus）：每一项决定别人在你的个人主页能看到什么、能怎么联系你 -->
+    <string name="permission_intro">这些设置决定别人在你的个人主页能看到什么、能怎么联系你，保存后立即对其他人生效。</string>
+    <string name="permission_field_phone">手机号</string>
+    <string name="permission_field_email">邮箱</string>
+    <string name="permission_field_avatar">头像</string>
+    <string name="permission_field_message">私信</string>
+    <string name="permission_field_group">群聊邀请</string>
+    <string name="permission_field_pin">发布动态</string>
+    <string name="permission_field_friend">加好友</string>
+    <string name="permission_opt_everyone">所有人</string>
+    <string name="permission_opt_staff">仅教职工</string>
+    <string name="permission_opt_nobody">不允许</string>
+    <string name="permission_save">保存</string>
+    <string name="permission_saved">设置已保存</string>
+    <string name="permission_load_failed">加载失败：%1$s</string>
+    <string name="permission_save_failed">保存失败：%1$s</string>
     <!-- 关于页（版式参考 Hoshi Reader）：第一分区无标题，只放版本名（构建号）与接口标识 -->
     <string name="settings_about_version_label">版本</string>
     <string name="settings_about_version_value">%1$s (%2$d)</string>
@@ -130,6 +151,13 @@
     <string name="im_notify_title">新私信</string>
     <string name="im_notify_group_body">%1$s：%2$s</string>
     <string name="im_notify_body_placeholder">[消息]</string>
+    <string name="im_notify_friend_channel">好友申请</string>
+    <string name="im_notify_friend_channel_desc">收到好友申请与好友回应时提醒（仅本机在线时）</string>
+    <string name="im_notify_friend_title">好友申请</string>
+    <string name="im_notify_friend_requested">%1$s 请求加你为好友</string>
+    <string name="im_notify_friend_accepted">%1$s 同意了你的好友申请</string>
+    <string name="im_notify_friend_generic">你有新的好友申请</string>
+    <string name="im_notify_friend_accepted_generic">有人同意了你的好友申请</string>
     <string name="im_image">图片</string>
     <string name="im_preview_image">[图片]</string>
     <string name="im_preview_other">[消息]</string>
@@ -154,6 +182,19 @@
     <string name="im_video_open_failed">没有能播放视频的应用</string>
     <string name="im_attach_file">文件</string>
     <string name="im_attach_location">位置</string>
+    <string name="im_file_open_with">用其他应用打开</string>
+    <string name="im_file_open">打开</string>
+    <string name="im_file_save">保存到本地</string>
+    <string name="im_file_saved">已保存</string>
+    <string name="im_file_save_failed">保存失败</string>
+    <string name="im_file_open_failed">打开文件失败</string>
+    <string name="im_file_no_app">没有能打开这种文件的应用，可以长按保存到本地</string>
+    <string name="im_file_downloading">下载中 %1$d%%</string>
+    <string name="im_file_downloading_unknown">下载中…</string>
+    <string name="im_location_no_coords">这条位置消息没有坐标</string>
+    <string name="im_location_open_failed">没找到可用的地图应用，坐标已复制</string>
+    <string name="im_location_coords_label">位置坐标</string>
+    <string name="im_file_download_failed">文件下载失败，检查网络后重试</string>
     <string name="im_attach_failed">读取所选文件失败</string>
     <string name="im_location_denied">没有定位权限，无法分享位置</string>
     <string name="im_location_unavailable">暂时拿不到位置，请到室外或开启定位后再试</string>
@@ -165,6 +206,25 @@
     <string name="im_join_group_id_required">请填写群号</string>
     <string name="im_join_group_offline">私信未连接，暂时不能加入群聊</string>
     <string name="im_join_group_failed">加入群聊失败（%1$s）</string>
+    <!-- 「+」下拉菜单：对齐官方顶栏加号（发起群聊 / 添加好友 / 校园卡支付 / 新朋友 / 加入群聊） -->
+    <string name="im_menu_add">添加</string>
+    <string name="im_create_group">发起群聊</string>
+    <string name="im_add_friend">添加好友</string>
+    <string name="im_campus_card_pay">校园卡支付</string>
+    <string name="im_open_page_failed">打开页面失败（%1$s）</string>
+    <!-- 发起群聊：成员多选 → 建群（或只选一人时退化成单聊） -->
+    <string name="im_create_group_confirm">创建</string>
+    <string name="im_create_group_confirm_n">创建(%1$d)</string>
+    <string name="im_create_group_search_hint">搜索姓名 / 学号</string>
+    <string name="im_create_group_friends">我的好友</string>
+    <string name="im_create_group_results">搜索结果</string>
+    <string name="im_create_group_empty_friends">还没有好友，先用「添加好友」加几个</string>
+    <string name="im_create_group_no_match">没有找到这个人</string>
+    <string name="im_create_group_need_member">请先选择成员</string>
+    <string name="im_create_group_name">群聊名称</string>
+    <string name="im_create_group_do">创建群聊</string>
+    <string name="im_create_group_failed">创建群聊失败（%1$s）</string>
+    <string name="im_create_group_not_friend">只能和好友建群，请先添加好友</string>
     <string name="im_refresh">刷新</string>
     <string name="im_retry">重试</string>
     <string name="im_connecting">正在连接私信服务…</string>
@@ -174,8 +234,35 @@
     <string name="im_send">发送</string>
     <string name="im_send_failed">发送失败</string>
     <string name="im_sending">发送中…</string>
+    <string name="im_msg_read">已读</string>
+    <string name="im_msg_state_read">%1$s · 已读</string>
+    <string name="im_msg_state_unread">%1$s · 未读</string>
     <string name="im_group_suffix">群聊</string>
     <string name="im_unknown_peer">对方</string>
+    <!-- 好友 / 新朋友（im 版专属；入口在私信顶栏与个人主页） -->
+    <string name="im_new_friends">新朋友</string>
+    <string name="im_new_friends_count">%1$d 条好友申请</string>
+    <string name="im_new_friends_empty">还没有好友申请</string>
+    <string name="im_new_friends_failed">加载好友申请失败（%1$s）</string>
+    <string name="im_friend_accept">同意</string>
+    <string name="im_friend_accepted">已同意</string>
+    <string name="im_friend_timeout">已超时</string>
+    <string name="im_friend_waiting">等待对方同意</string>
+    <string name="im_friend_accept_failed">同意好友申请失败（%1$s）</string>
+    <string name="im_friend_request_delete">删除申请记录</string>
+    <string name="im_friend_request_delete_message">删除后这条记录不再显示，已成立的好友关系不受影响。</string>
+    <string name="im_friend_request_deleted">已删除</string>
+    <string name="im_friend_request_delete_failed">删除申请记录失败（%1$s）</string>
+    <string name="friend_add">加好友</string>
+    <string name="friend_accept">同意好友申请</string>
+    <string name="friend_waiting">等待对方同意</string>
+    <string name="friend_delete">删除好友</string>
+    <string name="friend_delete_message">删除后「%1$s」会从好友列表移除，之后可以再加回来。</string>
+    <string name="friend_invite_hint">验证信息</string>
+    <string name="friend_invite_default">我是 %1$s</string>
+    <string name="friend_invite_sent">已发送好友申请</string>
+    <string name="friend_add_failed">加好友失败（%1$s）</string>
+    <string name="friend_delete_failed">删除好友失败（%1$s）</string>
     <string name="settings_footer">蓝航 Lite · 南昌航空大学第三方轻量客户端</string>
     <string name="settings_theme_title">主题模式</string>
     <string name="settings_theme_light">亮色</string>
@@ -252,6 +339,8 @@
 
     <!-- ==================== 底栏 / 页面标题 ==================== -->
     <string name="tab_grades">成绩</string>
+    <!-- 底栏第二项（2026-11-14 导航互换：原设置里的「网上办事大厅」改名「工作」进底栏） -->
+    <string name="tab_work">工作</string>
     <string name="tab_moments">工作圈</string>
     <string name="tab_settings">设置</string>
 
@@ -497,6 +586,7 @@
     <string name="user_profile_label_major">专业</string>
     <string name="user_profile_label_class">班级</string>
     <string name="user_profile_label_post">职务</string>
+    <string name="user_profile_copied">已复制</string>
     <string name="user_profile_masked_hint">部分信息未公开，已按对方的隐私设置隐藏</string>
     <string name="user_profile_error">资料加载失败</string>
     <string name="user_profile_not_found">账号已注销或无法查看</string>
@@ -682,9 +772,7 @@
     <string name="directory_no_match">没有找到匹配的成员</string>
     <string name="directory_dept_empty">该部门暂无成员</string>
 
-    <!-- ==================== 网上办事大厅（原生宫格） ==================== -->
-    <string name="settings_oa_hall">网上办事大厅</string>
-    <string name="oa_hall_title">网上办事大厅</string>
+    <!-- ==================== 网上办事大厅（原生宫格，现为底栏「工作」Tab） ==================== -->
     <string name="oa_hall_tag">办事大厅加载</string>
     <string name="oa_hall_basic">常用应用</string>
     <string name="oa_hall_other">其他应用</string>
@@ -696,6 +784,12 @@
     <string name="oa_hall_no_page">该应用没有可打开的移动端页面</string>
     <string name="oa_hall_no_login">登录状态已失效，请重新登录后再试</string>
     <string name="oa_hall_need_official">该应用只能在官方 App 内打开</string>
+    <!-- 团学活动分组 + 「赣青二课」（校外独立站点，WebView 承载；见 oa/OaHallFragment） -->
+    <string name="oa_hall_club_section">团学活动</string>
+    <string name="gqhw_name">赣青二课</string>
+    <string name="gqhw_desc">第二课堂成绩单</string>
+    <!-- 网页里的非 http(s) 链接（weixin:// / alipays:// / intent://）没有应用能接时的提示 -->
+    <string name="oa_web_open_app_failed">没有找到能打开它的应用</string>
 
     <!-- ==================== 校园网（深澜一键认证） ==================== -->
     <string name="settings_campus_net">校园网</string>

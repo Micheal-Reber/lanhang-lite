@@ -21,12 +21,11 @@
         android:paddingEnd="@dimen/space_xs"
         android:paddingBottom="@dimen/space_md">
 
-        <ImageView
+        <com.lanhang.lite.oa.OaAppIconView
             android:id="@+id/ivLogo"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter" />
+            android:contentDescription="@null" />
 
         <TextView
             android:id="@+id/tvName"

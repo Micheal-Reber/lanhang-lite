@@ -1,4 +1,4 @@
-package com.lanhang.lite.reminder
+package com.lanhang.lite.settings
 
 import android.app.AlarmManager
 import android.app.NotificationManager
@@ -13,23 +13,37 @@ import android.os.Looper
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import com.lanhang.lite.R
-import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.core.NotifPermission
 import com.lanhang.lite.core.toast
-import com.lanhang.lite.databinding.ActivityReminderBinding
+import com.lanhang.lite.databinding.ViewSettingsReminderBinding
+import com.lanhang.lite.reminder.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
+import com.lanhang.lite.reminder.ClassDndScheduler
+import com.lanhang.lite.reminder.FluidCastState
+import com.lanhang.lite.reminder.FluidCloudService
+import com.lanhang.lite.reminder.ReminderData
+import com.lanhang.lite.reminder.ReminderNotify
+import com.lanhang.lite.reminder.ReminderPrefs
+import com.lanhang.lite.reminder.ReminderReliability
+import com.lanhang.lite.reminder.ReminderRescheduler
+import com.lanhang.lite.reminder.ReminderScheduler
+import com.lanhang.lite.reminder.VendorCapabilityState
+import com.lanhang.lite.reminder.detectLiveCardVendor
+import com.lanhang.lite.reminder.inspectVendorCapability
+import com.lanhang.lite.reminder.launchBatterySettings
+import com.lanhang.lite.reminder.vendorSettingsIntents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,24 +57,37 @@ import java.util.Locale
 /**
  * 课程提醒设置页（照 Sleepy 的 `ReminderScreen` 逐项对齐）。
  *
+ * 2026-11-14 由独立 Activity 改成设置二级页（用户要求：设置里点开二级菜单的动画要统一）。
+ * 原来走 `startActivity`，吃的是系统窗口转场（整窗横移 96dp / 450ms），与设置内部
+ * `Motion.fadeThrough`（90ms 出 + 210ms 入）完全不是一回事；改成子 Fragment 后，
+ * 目录页 ↔ 提醒页就是同一套淡入淡出，顶栏原地换标题、底栏收起也不用重开窗口。
+ *
  * 六块内容与 Sleepy 一致：总开关、每日提醒（今日摘要 / 明日预告）、每节课前提醒
  * （提前分钟 / 形态 / 流体云）、上课自动勿扰、后台可靠性。
  * 「按日期设置提醒」「需要提醒的课表」依赖节假日与多课表数据，本应用是单课表，按
  * AGENTS.md 的既定取舍省略。
  *
- * 关键约定：
+ * 关键约定（迁移时一条都没动）：
  * - 开关打开前先要通知权限；没权限时**开关不得停在打开状态**，授权回来再由 onResume 自动补开；
  * - 任何偏好改动都走 [ReminderRescheduler.request]（300ms 防抖），不直接全量重排；
  * - 勿扰开关需要「通知策略访问」权限，没授权时跳系统页，回来按系统真实状态落定。
+ *
+ * Fragment 与原来 Activity 的差异只有「取 context / 生命周期」这一层：
+ * ```
+ * this / this@ReminderActivity  → ctx（= _binding.root.context，与视图同生共死）
+ * lifecycleScope                → viewLifecycleOwner.lifecycleScope（视图销毁即取消）
+ * isFinishing || isDestroyed    → _binding == null
+ * supportFragmentManager        → parentFragmentManager（时间选择器是 DialogFragment）
+ * ```
+ * `ctx` 一律从根视图取而不是 `requireContext()`：detach 之后 `requireContext()` 抛异常，
+ * 而根视图的 context 一直有效（见 AGENTS.md 的 Fragment 协程约定）。
  */
-class ReminderActivity : AppCompatActivity() {
+class ReminderFragment : Fragment() {
 
-    override fun attachBaseContext(newBase: Context) {
-        // 语言切换见 LocaleHelper：每个 Activity 自己包，漏了这页会一直跟系统语言
-        super.attachBaseContext(LocaleHelper.wrap(newBase))
-    }
+    private var _binding: ViewSettingsReminderBinding? = null
+    private val binding get() = _binding!!
+    private val ctx: Context get() = _binding!!.root.context
 
-    private lateinit var binding: ActivityReminderBinding
     private val handler = Handler(Looper.getMainLooper())
 
     /** 用户点了总开关但还在等权限：授权回来要自动补开 */
@@ -103,32 +130,17 @@ class ReminderActivity : AppCompatActivity() {
         refreshDndStatus()
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityReminderBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        binding.toolbar.setNavigationOnClickListener { finish() }
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = ViewSettingsReminderBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-        // targetSdk 35 在 Android 15+ 强制 edge-to-edge：不补 inset 标题会压在状态栏下面
-        val baseBottom = binding.scroll.paddingBottom
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            binding.toolbar.setPadding(
-                binding.toolbar.paddingLeft,
-                bars.top,
-                binding.toolbar.paddingRight,
-                0
-            )
-            binding.scroll.setPadding(
-                binding.scroll.paddingLeft,
-                binding.scroll.paddingTop,
-                binding.scroll.paddingRight,
-                baseBottom + bars.bottom
-            )
-            insets
-        }
-
-        ReminderNotify.ensureChannels(this)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        ReminderNotify.ensureChannels(ctx)
         setupMaster()
         setupDaily()
         setupBeforeClass()
@@ -139,8 +151,11 @@ class ReminderActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 视图还没建（或已销毁）时不要动 binding：这个回调由宿主的生命周期驱动，
+        // 而二级页可能正好在这一刻被关掉
+        if (_binding == null) return
         // 从系统设置页返回：授权状态可能已经变了，开关按真实状态落定
-        if (pendingMasterEnable && NotifPermission.isGranted(this)) {
+        if (pendingMasterEnable && NotifPermission.isGranted(ctx)) {
             pendingMasterEnable = false
             setMaster(true)
         }
@@ -152,22 +167,25 @@ class ReminderActivity : AppCompatActivity() {
         refreshAll()
         // 预览可能跨周（今天是周日、明天是周一）：先把窗口内缺的按周缓存补上再重画，
         // 否则「明天有 4 次课」会被写成「明天没有课程」。补不到就维持当前渲染。
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 runCatching { ReminderData.ensureWeeksCovered(2) }
             }
+            if (_binding == null) return@launch
             refreshDailyTexts()
             refreshBeforePreview()
         }
         // 状态驱动兜底：从 App 外回来（或改完开关）后再对一眼流体云投放状态
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching { ReminderScheduler.reconcileFluidCloud() }
         }
     }
 
-    override fun onDestroy() {
+    override fun onDestroyView() {
         handler.removeCallbacksAndMessages(null)
-        super.onDestroy()
+        minutesJob?.cancel()
+        super.onDestroyView()
+        _binding = null
     }
 
     // ==================== 总开关 ====================
@@ -175,11 +193,11 @@ class ReminderActivity : AppCompatActivity() {
     private fun setupMaster() {
         binding.swMaster.setOnCheckedChangeListener { _, checked ->
             if (suppressCallbacks) return@setOnCheckedChangeListener
-            if (checked && !NotifPermission.isGranted(this)) {
+            if (checked && !NotifPermission.isGranted(ctx)) {
                 // 先弹回关态，再引导授权：留一个「开着但永远不会响」的开关比不响应更糟
                 setMaster(false)
                 pendingMasterEnable = true
-                NotifPermission.request(this, permissionLauncher)
+                NotifPermission.request(requireActivity(), permissionLauncher)
                 return@setOnCheckedChangeListener
             }
             persistMaster(checked)
@@ -187,6 +205,7 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun setMaster(enabled: Boolean) {
+        if (_binding == null) return
         suppressCallbacks = true
         binding.swMaster.isChecked = enabled
         suppressCallbacks = false
@@ -194,7 +213,7 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun persistMaster(enabled: Boolean) {
-        ReminderPrefs.setEnabled(this, enabled)
+        ReminderPrefs.setEnabled(ctx, enabled)
         if (enabled) ReminderRescheduler.request() else ReminderScheduler.restart()
         refreshMasterDependents()
         refreshPermissionHint()
@@ -206,8 +225,9 @@ class ReminderActivity : AppCompatActivity() {
      *  电池白名单 = 后台被冻结，闹钟照样排了没人理。）
      */
     private fun refreshPermissionHint() {
+        if (_binding == null) return
         binding.btnReliabilityAttention.visibility =
-            if (NotifPermission.isGranted(this) && exactAlarmGranted() && batteryOptimizationIgnored()) {
+            if (NotifPermission.isGranted(ctx) && exactAlarmGranted() && batteryOptimizationIgnored()) {
                 View.GONE
             } else {
                 View.VISIBLE
@@ -219,30 +239,32 @@ class ReminderActivity : AppCompatActivity() {
     private fun setupDaily() {
         binding.swDaily.setOnCheckedChangeListener { _, checked ->
             if (suppressCallbacks) return@setOnCheckedChangeListener
-            ReminderPrefs.setDailyEnabled(this, checked)
+            ReminderPrefs.setDailyEnabled(ctx, checked)
             ReminderRescheduler.request()
             refreshMasterDependents()
         }
         binding.swToday.setOnCheckedChangeListener { _, checked ->
             if (suppressCallbacks) return@setOnCheckedChangeListener
-            ReminderPrefs.setTodayEnabled(this, checked)
+            ReminderPrefs.setTodayEnabled(ctx, checked)
             ReminderRescheduler.request()
         }
         binding.swTomorrow.setOnCheckedChangeListener { _, checked ->
             if (suppressCallbacks) return@setOnCheckedChangeListener
-            ReminderPrefs.setTomorrowEnabled(this, checked)
+            ReminderPrefs.setTomorrowEnabled(ctx, checked)
             ReminderRescheduler.request()
         }
         binding.rowTodayTime.setOnClickListener {
-            pickTime(ReminderPrefs.dailyTime(this), 7, 0) { hour, minute ->
-                ReminderPrefs.setDailyTime(this, clock(hour, minute))
+            pickTime(ReminderPrefs.dailyTime(ctx), 7, 0) { hour, minute ->
+                if (_binding == null) return@pickTime
+                ReminderPrefs.setDailyTime(ctx, clock(hour, minute))
                 ReminderRescheduler.request()
                 refreshDailyTexts()
             }
         }
         binding.rowTomorrowTime.setOnClickListener {
-            pickTime(ReminderPrefs.tomorrowTime(this), 22, 0) { hour, minute ->
-                ReminderPrefs.setTomorrowTime(this, clock(hour, minute))
+            pickTime(ReminderPrefs.tomorrowTime(ctx), 22, 0) { hour, minute ->
+                if (_binding == null) return@pickTime
+                ReminderPrefs.setTomorrowTime(ctx, clock(hour, minute))
                 ReminderRescheduler.request()
                 refreshDailyTexts()
             }
@@ -250,8 +272,9 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun refreshDailyTexts() {
-        binding.tvTodayTime.text = ReminderPrefs.dailyTime(this)
-        binding.tvTomorrowTime.text = ReminderPrefs.tomorrowTime(this)
+        if (_binding == null) return
+        binding.tvTodayTime.text = ReminderPrefs.dailyTime(ctx)
+        binding.tvTomorrowTime.text = ReminderPrefs.tomorrowTime(ctx)
         val today = LocalDate.now()
         binding.tvDailyPreview.text =
             buildDailyPreview(today, R.string.reminder_preview_today_date)
@@ -264,12 +287,12 @@ class ReminderActivity : AppCompatActivity() {
     private fun setupBeforeClass() {
         binding.swBefore.setOnCheckedChangeListener { _, checked ->
             if (suppressCallbacks) return@setOnCheckedChangeListener
-            ReminderPrefs.setBeforeClassEnabled(this, checked)
+            ReminderPrefs.setBeforeClassEnabled(ctx, checked)
             ReminderRescheduler.request()
             refreshMasterDependents()
         }
 
-        val initial = ReminderPrefs.beforeClassMinutes(this).toString()
+        val initial = ReminderPrefs.beforeClassMinutes(ctx).toString()
         binding.etMinutes.setText(initial)
         binding.etMinutes.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -278,9 +301,11 @@ class ReminderActivity : AppCompatActivity() {
                 // 防抖 500ms：每敲一键就全量 cancelAll + scheduleAll 太贵（查库 + 重排 7 天闹钟）
                 minutesJob?.cancel()
                 val value = s?.toString()?.toIntOrNull() ?: return
-                minutesJob = lifecycleScope.launch {
+                minutesJob = viewLifecycleOwner.lifecycleScope.launch {
                     delay(500)
-                    ReminderPrefs.setBeforeClassMinutes(this@ReminderActivity, value)
+                    // 输完这段时间里页面可能已经被关掉（二级页返回）
+                    val c = _binding?.root?.context ?: return@launch
+                    ReminderPrefs.setBeforeClassMinutes(c, value)
                     ReminderRescheduler.request()
                     refreshBeforePreview()
                 }
@@ -294,10 +319,10 @@ class ReminderActivity : AppCompatActivity() {
             } else {
                 ReminderPrefs.MODE_BANNER
             }
-            ReminderPrefs.setBeforeClassMode(this, mode)
+            ReminderPrefs.setBeforeClassMode(ctx, mode)
             if (mode != ReminderPrefs.MODE_FLUID) {
                 // 切回横幅必须真正停掉流体云：FluidCloudService 的 15s 循环会不断 re-post，卡片会复活
-                runCatching { FluidCloudService.requestStop(this) }
+                runCatching { FluidCloudService.requestStop(ctx) }
             }
             ReminderRescheduler.request()
             applyModeState()
@@ -313,8 +338,8 @@ class ReminderActivity : AppCompatActivity() {
         )
         binding.ddPrimary.setOnItemClickListener { _, _, position, _ ->
             val value = primaryValues.getOrNull(position) ?: return@setOnItemClickListener
-            ReminderPrefs.setFluidPrimary(this, value)
-            ReminderPrefs.setBeforeClassMode(this, ReminderPrefs.MODE_FLUID)
+            ReminderPrefs.setFluidPrimary(ctx, value)
+            ReminderPrefs.setBeforeClassMode(ctx, ReminderPrefs.MODE_FLUID)
             syncModeButtons()
             applyModeState()
             ReminderRescheduler.request()
@@ -326,7 +351,8 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun applyModeState() {
-        val fluid = ReminderPrefs.isBeforeClassFluidEnabled(this)
+        if (_binding == null) return
+        val fluid = ReminderPrefs.isBeforeClassFluidEnabled(ctx)
         binding.sectionFluid.visibility = if (fluid) View.VISIBLE else View.GONE
         binding.tvModeSub.setText(
             if (fluid) R.string.reminder_mode_fluid_sub else R.string.reminder_mode_banner_sub
@@ -336,15 +362,17 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun syncModeButtons() {
+        if (_binding == null) return
         suppressCallbacks = true
         binding.toggleMode.check(
-            if (ReminderPrefs.isBeforeClassFluidEnabled(this)) R.id.btnModeFluid else R.id.btnModeBanner
+            if (ReminderPrefs.isBeforeClassFluidEnabled(ctx)) R.id.btnModeFluid else R.id.btnModeBanner
         )
         suppressCallbacks = false
     }
 
     private fun refreshBeforeClassTexts() {
-        val fieldLabel = when (ReminderPrefs.fluidPrimary(this)) {
+        if (_binding == null) return
+        val fieldLabel = when (ReminderPrefs.fluidPrimary(ctx)) {
             ReminderPrefs.FIELD_NAME -> R.string.reminder_fluid_field_name
             ReminderPrefs.FIELD_TIME -> R.string.reminder_fluid_field_time
             ReminderPrefs.FIELD_COUNTDOWN -> R.string.reminder_fluid_field_countdown
@@ -364,17 +392,18 @@ class ReminderActivity : AppCompatActivity() {
      * 会被旧值误拦。
      */
     private fun startFluidTestWithGate() {
+        val c = _binding?.root?.context ?: return
         val missing = mutableListOf<Int>()
-        if (!NotifPermission.isGranted(this)) {
+        if (!NotifPermission.isGranted(c)) {
             missing += R.string.reminder_fluid_gate_notification
         }
         if (Build.VERSION.SDK_INT >= 36) {
-            val nm = getSystemService(NotificationManager::class.java)
+            val nm = c.getSystemService(NotificationManager::class.java)
             val allowed = runCatching { nm?.canPostPromotedNotifications() == true }
                 .getOrDefault(false)
             if (!allowed) missing += R.string.reminder_fluid_gate_promoted
         }
-        val cap = inspectVendorCapability(this, detectLiveCardVendor())
+        val cap = inspectVendorCapability(c, detectLiveCardVendor())
         if (cap.state == VendorCapabilityState.NOTIFICATION_PERMISSION_REQUIRED) {
             if (R.string.reminder_fluid_gate_notification !in missing) {
                 missing += R.string.reminder_fluid_gate_notification
@@ -389,7 +418,7 @@ class ReminderActivity : AppCompatActivity() {
             startFluidTest()
             return
         }
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(c)
             .setTitle(R.string.reminder_fluid_gate_title)
             .setMessage(
                 getString(R.string.reminder_fluid_gate_message) + "\n\n" +
@@ -405,10 +434,11 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun startFluidTest() {
-        val intent = Intent(this, FluidCloudService::class.java)
+        val c = _binding?.root?.context ?: return
+        val intent = Intent(c, FluidCloudService::class.java)
             .setAction(FluidCloudService.ACTION_TEST)
         val started = runCatching {
-            ContextCompat.startForegroundService(this, intent)
+            ContextCompat.startForegroundService(c, intent)
             true
         }.getOrDefault(false)
         if (!started) {
@@ -422,8 +452,9 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun stopFluidTest() {
+        val c = _binding?.root?.context ?: return
         val stopped = runCatching {
-            FluidCloudService.requestStop(this)
+            FluidCloudService.requestStop(c)
             true
         }.getOrDefault(false)
         if (!stopped) {
@@ -434,13 +465,15 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun refreshFluidTestState() {
+        if (_binding == null) return
         val casting = FluidCastState.casting
         binding.rowFluidCasting.isVisible = casting
         binding.btnFluidTest.isVisible = !casting
     }
 
     private fun refreshFluidStatus() {
-        val granted = NotifPermission.isGranted(this)
+        if (_binding == null) return
+        val granted = NotifPermission.isGranted(ctx)
         binding.tvFluidStatus.setText(
             if (granted) R.string.reminder_fluid_status_unknown
             else R.string.reminder_fluid_status_notification_required
@@ -458,15 +491,16 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun openVendorSettings() {
+        val c = _binding?.root?.context ?: return
         val vendor = detectLiveCardVendor()
-        for (intent in vendorSettingsIntents(this, vendor)) {
+        for (intent in vendorSettingsIntents(c, vendor)) {
             val opened = runCatching {
-                startActivity(intent)
+                c.startActivity(intent)
                 true
             }.getOrDefault(false)
             if (opened) return
         }
-        NotifPermission.openSettings(this, ReminderNotify.CHANNEL_FLUID)
+        NotifPermission.openSettings(c, ReminderNotify.CHANNEL_FLUID)
     }
 
     // ==================== 上课自动勿扰 ====================
@@ -492,6 +526,7 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun setDnd(enabled: Boolean) {
+        if (_binding == null) return
         suppressCallbacks = true
         binding.swDnd.isChecked = enabled
         suppressCallbacks = false
@@ -499,18 +534,21 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun persistDnd(enabled: Boolean) {
-        ReminderPrefs.setClassDndEnabled(this, enabled)
-        ClassDndScheduler(this).syncFromPrefs()
+        val c = _binding?.root?.context ?: return
+        ReminderPrefs.setClassDndEnabled(c, enabled)
+        ClassDndScheduler(c).syncFromPrefs()
         refreshDndStatus()
     }
 
     private fun policyAccessGranted(): Boolean {
-        val nm = getSystemService(NotificationManager::class.java) ?: return false
+        val c = _binding?.root?.context ?: return false
+        val nm = c.getSystemService(NotificationManager::class.java) ?: return false
         return nm.isNotificationPolicyAccessGranted
     }
 
     private fun refreshDndStatus() {
-        val missing = ReminderPrefs.isClassDndEnabled(this) && !policyAccessGranted()
+        if (_binding == null) return
+        val missing = ReminderPrefs.isClassDndEnabled(ctx) && !policyAccessGranted()
         binding.tvDndStatus.visibility = if (missing) View.VISIBLE else View.GONE
         binding.tvDndStatus.setText(R.string.reminder_dnd_permission_needed)
     }
@@ -519,25 +557,29 @@ class ReminderActivity : AppCompatActivity() {
 
     private fun setupReliability() {
         binding.btnReliabilityAttention.setOnClickListener {
-            // 直接滚到权限卡，用户立刻看到该处理的是哪一项（Sleepy 的相同行为）
-            binding.scroll.smoothScrollTo(0, binding.cardReliability.top)
+            // 直接滚到权限卡，用户立刻看到该处理的是哪一项（Sleepy 的相同行为）。
+            // 二级页的滚动容器在宿主上（scrollDetail），这里顺着视图树找最近的 NestedScrollView：
+            // 卡片自身已经不套滚动容器了（内层再套一层会把手指的滑动吃掉）
+            scrollHostToCard(binding.cardReliability)
         }
         binding.rowRelNotification.setOnClickListener {
-            if (!NotifPermission.isGranted(this)) NotifPermission.request(this, permissionLauncher)
+            if (!NotifPermission.isGranted(ctx)) {
+                NotifPermission.request(requireActivity(), permissionLauncher)
+            }
         }
         binding.rowRelExact.setOnClickListener {
             if (!exactAlarmGranted()) openExactAlarmSettings()
         }
         binding.rowRelBattery.setOnClickListener {
-            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+            if (!batteryOptimizationIgnored()) launchBatterySettings(ctx)
         }
         // 置顶红条本身就是入口：这一条是「不响」的头号原因，不该还要用户往下滚才找到
         binding.tvRelBatteryAlert.setOnClickListener {
-            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+            if (!batteryOptimizationIgnored()) launchBatterySettings(ctx)
         }
         // 分桶限流的对策仍然是放开电池优化（官方写明可以覆盖），所以跳同一个设置页
         binding.rowRelBucket.setOnClickListener {
-            if (!batteryOptimizationIgnored()) launchBatterySettings(this)
+            if (!batteryOptimizationIgnored()) launchBatterySettings(ctx)
         }
         // P0-6：开关开着、窗口里有课、账本却是空的 —— 点一下直接重排
         binding.tvRelLost.setOnClickListener {
@@ -557,32 +599,55 @@ class ReminderActivity : AppCompatActivity() {
         }
     }
 
-    private fun exactAlarmGranted(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            (getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true)
+    /**
+     * 让宿主的 scrollDetail 滚到某张卡。
+     *
+     * 以前页面自己是一个 NestedScrollView，`binding.scroll.smoothScrollTo(0, card.top)` 就够了；
+     * 现在卡片直接躺在宿主的滚动容器里，卡片 top 就是滚动内容里的偏移（根视图在容器里位于 y=0）。
+     */
+    private fun scrollHostToCard(card: View) {
+        val scroll = generateSequence(card.parent) { it.parent }
+            .filterIsInstance<androidx.core.widget.NestedScrollView>()
+            .firstOrNull() ?: return
+        scroll.smoothScrollTo(0, card.top)
+    }
 
-    private fun batteryOptimizationIgnored(): Boolean =
-        getSystemService(android.os.PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) == true
+    private fun exactAlarmGranted(): Boolean {
+        val c = _binding?.root?.context ?: return false
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (c.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true)
+    }
 
-    private fun promotedOngoingAllowed(): Boolean =
-        Build.VERSION.SDK_INT >= 36 &&
-            (getSystemService(NotificationManager::class.java)?.let {
+    private fun batteryOptimizationIgnored(): Boolean {
+        val c = _binding?.root?.context ?: return false
+        return c.getSystemService(android.os.PowerManager::class.java)
+            ?.isIgnoringBatteryOptimizations(c.packageName) == true
+    }
+
+    private fun promotedOngoingAllowed(): Boolean {
+        val c = _binding?.root?.context ?: return false
+        return Build.VERSION.SDK_INT >= 36 &&
+            (c.getSystemService(NotificationManager::class.java)?.let {
                 runCatching { it.canPostPromotedNotifications() }.getOrDefault(false)
             } == true)
+    }
 
     private fun openPromotedSettings() {
+        val c = _binding?.root?.context ?: return
         // Android 16 的实时更新授权页（ColorOS 16 流体云官方开关在此）
         val intent = Intent(ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-        val opened = runCatching { startActivity(intent); true }.getOrDefault(false)
-        if (!opened) NotifPermission.openSettings(this, ReminderNotify.CHANNEL_FLUID)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, c.packageName)
+        val opened = runCatching { c.startActivity(intent); true }.getOrDefault(false)
+        if (!opened) NotifPermission.openSettings(c, ReminderNotify.CHANNEL_FLUID)
     }
 
     private fun refreshReliability() {
-        lifecycleScope.launch {
-            val snapshot = withContext(Dispatchers.IO) { ReminderReliability.snapshot(this@ReminderActivity) }
+        if (_binding == null) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            val c0 = _binding?.root?.context ?: return@launch
+            val snapshot = withContext(Dispatchers.IO) { ReminderReliability.snapshot(c0) }
             val lost = withContext(Dispatchers.IO) { ReminderScheduler.scheduleLooksLost() }
-            if (isFinishing || isDestroyed) return@launch
+            if (_binding == null) return@launch
             val res = resources
 
             // 一行 = 状态一行 + 缺一个点就缺一个点，缺什么直接告诉用户，点它去补
@@ -703,7 +768,7 @@ class ReminderActivity : AppCompatActivity() {
 
             // P0-4：跨周补拉连续失败 → 红条。一次失败多半只是离线，连续两次才是真的同步不上，
             // 也是「下周才开始的课整门排不进闹钟」的信号。
-            val fails = ReminderPrefs.coverFailStreak(this@ReminderActivity)
+            val fails = ReminderPrefs.coverFailStreak(c0)
             binding.tvRelDataAlert.visibility = if (fails >= 2) View.VISIBLE else View.GONE
             if (fails >= 2) {
                 binding.tvRelDataAlert.text = res.getString(R.string.reminder_rel_data_gap, fails)
@@ -716,7 +781,7 @@ class ReminderActivity : AppCompatActivity() {
 
     /** 单行权限状态：√/× 图标 + 标题 + 正文 +（缺时）「去开启/去设置」文字；就绪时整行不可点。 */
     private fun bindPermissionRow(
-        row: android.view.View,
+        row: View,
         icon: android.widget.ImageView,
         body: android.widget.TextView,
         action: android.widget.TextView,
@@ -742,25 +807,27 @@ class ReminderActivity : AppCompatActivity() {
 
     private fun openExactAlarmSettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val c = _binding?.root?.context ?: return
         val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-            .setData("package:$packageName".toUri())
+            .setData("package:${c.packageName}".toUri())
         val opened = runCatching {
-            startActivity(intent)
+            c.startActivity(intent)
             true
         }.getOrDefault(false)
-        if (!opened) NotifPermission.openSettings(this)
+        if (!opened) NotifPermission.openSettings(c)
     }
 
     // ==================== 公共 ====================
 
     private fun refreshAll() {
+        if (_binding == null) return
         suppressCallbacks = true
-        binding.swMaster.isChecked = ReminderPrefs.isEnabled(this)
-        binding.swDaily.isChecked = ReminderPrefs.isDailyEnabled(this)
-        binding.swToday.isChecked = ReminderPrefs.isTodayEnabled(this)
-        binding.swTomorrow.isChecked = ReminderPrefs.isTomorrowEnabled(this)
-        binding.swBefore.isChecked = ReminderPrefs.isBeforeClassEnabled(this)
-        binding.swDnd.isChecked = ReminderPrefs.isClassDndEnabled(this)
+        binding.swMaster.isChecked = ReminderPrefs.isEnabled(ctx)
+        binding.swDaily.isChecked = ReminderPrefs.isDailyEnabled(ctx)
+        binding.swToday.isChecked = ReminderPrefs.isTodayEnabled(ctx)
+        binding.swTomorrow.isChecked = ReminderPrefs.isTomorrowEnabled(ctx)
+        binding.swBefore.isChecked = ReminderPrefs.isBeforeClassEnabled(ctx)
+        binding.swDnd.isChecked = ReminderPrefs.isClassDndEnabled(ctx)
         suppressCallbacks = false
 
         refreshMasterDependents()
@@ -774,13 +841,14 @@ class ReminderActivity : AppCompatActivity() {
 
     /** 总开关关闭时，下面三张卡整体隐藏（与 Sleepy 的 `if (masterEnabled)` 一致）。 */
     private fun refreshMasterDependents() {
-        val enabled = ReminderPrefs.isEnabled(this)
+        if (_binding == null) return
+        val enabled = ReminderPrefs.isEnabled(ctx)
         binding.cardDaily.isVisible = enabled
         binding.cardBefore.isVisible = enabled
         binding.cardDnd.isVisible = enabled
         // 卡片内部再按自己的开关二次隐藏（Sleepy 的 if (dailyEnabled) / if (beforeClassEnabled)）
-        binding.groupDailyDetail.isVisible = ReminderPrefs.isDailyEnabled(this)
-        binding.groupBeforeDetail.isVisible = ReminderPrefs.isBeforeClassEnabled(this)
+        binding.groupDailyDetail.isVisible = ReminderPrefs.isDailyEnabled(ctx)
+        binding.groupBeforeDetail.isVisible = ReminderPrefs.isBeforeClassEnabled(ctx)
     }
 
     private fun pickTime(
@@ -799,7 +867,9 @@ class ReminderActivity : AppCompatActivity() {
             .setTitleText(R.string.reminder_pick_time)
             .build()
         picker.addOnPositiveButtonClickListener { onPicked(picker.hour, picker.minute) }
-        picker.show(supportFragmentManager, "reminder_time")
+        // 时间选择器弹在宿主的 FragmentManager 上：挂在子 FragmentManager 会随二级页一起消失，
+        // 旋转/重建后弹窗状态也就断了
+        picker.show(parentFragmentManager, "reminder_time")
     }
 
     private fun clock(hour: Int, minute: Int): String =
@@ -826,6 +896,7 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     private fun refreshBeforePreview() {
+        if (_binding == null) return
         val res = resources
         val next = ReminderData.nextCourse()
             ?: run {

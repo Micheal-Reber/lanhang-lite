@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  发起群聊顶栏：只有右侧一个「创建」文字动作（左边是返回键 + 标题）。
+  选了人之后标题会带上人数（见 ImCreateGroupActivity.renderSelected），
+  这样滚回顶部之前也能看到自己选了几个。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_im_create_group"
+        android:title="@string/im_create_group_confirm"
+        app:showAsAction="always" />
+</menu>
