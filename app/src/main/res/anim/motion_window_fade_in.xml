@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 独立 Activity 的进入阶段：与 Motion.fadeThrough 共用 210ms / emphasizedDecelerate。 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="@integer/motion_fade_through_in"
+    android:fromAlpha="0.0"
+    android:interpolator="@interpolator/m3_emphasized_decelerate"
+    android:toAlpha="1.0" />

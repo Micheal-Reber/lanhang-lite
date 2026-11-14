@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 独立 Activity 的退出阶段：与 Motion.fadeThrough 共用 90ms / emphasizedAccelerate。 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="@integer/motion_fade_through_out"
+    android:fromAlpha="1.0"
+    android:interpolator="@interpolator/m3_emphasized_accelerate"
+    android:toAlpha="0.0" />

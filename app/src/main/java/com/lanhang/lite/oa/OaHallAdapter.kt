@@ -3,6 +3,8 @@ package com.lanhang.lite.oa
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import com.lanhang.lite.R
 import com.lanhang.lite.databinding.ItemOaAppBinding
 import com.lanhang.lite.databinding.ItemOaSectionBinding
 
@@ -60,9 +62,18 @@ class OaHallAdapter(
 
         fun bind(app: OaApp, onApp: (OaApp) -> Unit) {
             binding.tvName.text = app.name.orEmpty()
-            // 图标是**自绘**的（首字 + 圆角底，见 OaAppIconView）：服务端下发的 logo 图一半是
-            // 白底、校外网络下不下来、尺寸也不一致，抠白底那套算法已经删掉了。
-            binding.ivLogo.bind(app.name.orEmpty())
+            // 恢复服务端默认 Logo；地址为空或加载失败时退回统一的本地占位图标。
+            // 白底图先抠掉与边缘连通的白色，避免深色卡片上出现一块白方块。
+            val logoUrl = app.logoUrl?.takeIf { it.isNotBlank() }
+            binding.ivLogo.load(logoUrl, OaIconLoader.get(binding.root.context)) {
+                crossfade(false)
+                // URL 即固定缓存键：不变就一直读本地，变更时才缓存新图。
+                diskCacheKey(logoUrl)
+                transformations(StripWhiteBackdropTransformation())
+                placeholder(R.drawable.ic_view_grid)
+                error(R.drawable.ic_view_grid)
+                fallback(R.drawable.ic_view_grid)
+            }
             binding.root.setOnClickListener { onApp(app) }
             binding.root.contentDescription = app.name.orEmpty()
         }

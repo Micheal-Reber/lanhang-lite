@@ -9,6 +9,13 @@
       - windowLightStatusBar 见 values-night/themes.xml（只覆盖这一个条目）
     -->
     <style name="Base.Theme.LanhangLite" parent="Theme.Material3.DayNight.NoActionBar">
+        <!--
+          设置二级页统一为淡入淡出：页内 Fragment 走 Motion.fadeThrough，独立 Activity
+          （成员录 / 我的资料 / 工具里的各功能页）由这套窗口动画接管，不再吃 ROM 的左右滑动。
+          时长与插值器直接引用 Motion 的 90/210ms token，两套承载方式不会再各调各的。
+        -->
+        <item name="android:windowAnimationStyle">@style/Animation.Lanhang.Window</item>
+
         <!-- 品牌色 -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/on_primary</item>
@@ -40,6 +47,14 @@
     </style>
 
     <style name="Theme.LanhangLite" parent="Base.Theme.LanhangLite" />
+
+    <!-- 普通 Activity 的进入/退出都使用与设置页内切换相同的淡入淡出资源。 -->
+    <style name="Animation.Lanhang.Window" parent="android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/motion_window_fade_in</item>
+        <item name="android:activityOpenExitAnimation">@anim/motion_window_fade_out</item>
+        <item name="android:activityCloseEnterAnimation">@anim/motion_window_fade_in</item>
+        <item name="android:activityCloseExitAnimation">@anim/motion_window_fade_out</item>
+    </style>
 
     <!--
       注意：点分样式名会被 AAPT 隐式推断父样式（`A.B.C` 的父是 `A.B`）。
