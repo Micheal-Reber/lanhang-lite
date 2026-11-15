@@ -20,6 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="@dimen/top_app_bar_height"
+        app:menu="@menu/menu_im_chat"
         app:navigationContentDescription="@string/common_back"
         app:navigationIcon="@drawable/ic_back" />
 

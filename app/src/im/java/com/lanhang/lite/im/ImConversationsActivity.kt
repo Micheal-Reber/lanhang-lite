@@ -3,7 +3,9 @@ package com.lanhang.lite.im
 import com.lanhang.lite.core.toast
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -123,9 +125,14 @@ class ImConversationsActivity : AppCompatActivity() {
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
         binding.btnRetry.setOnClickListener {
-            ImClient.retry(this)
-            render()
+            // 后台联网被 ROM 限制时重试多少次都没用，引导用户去系统里放开
+            if (ImClient.bgRestricted) openBatterySettings()
+            else {
+                ImClient.retry(this)
+                render()
+            }
         }
+        binding.tvBgRestricted.setOnClickListener { openBatterySettings() }
         render()
     }
 
@@ -383,13 +390,62 @@ class ImConversationsActivity : AppCompatActivity() {
         binding.progress.isVisible = loading
         binding.stateBox.isVisible = !loading && list.isEmpty()
         binding.btnRetry.isVisible = status == ImClient.Status.FAILED
+        // 横幅只看 bgRestricted：它有两个触发源 —— 45s 看门狗超时（status=FAILED）
+        // 与 NETWORK_UNAVAILABLE+系统网络活着（status 可能还是 CONNECTING/IDLE），
+        // 都说明 ROM 在掐后台联网。连上会自动清零（ImClient 状态回调里）。
+        val restricted = ImClient.bgRestricted
+        // 顶部横幅：有会话时也看得见（stateBox 只在空列表时出现）
+        binding.tvBgRestricted.isVisible = restricted
         binding.tvState.text = when {
+            // 看门狗判定的「后台联网被系统限制」：错误详情没意义，直接给引导文案
+            restricted -> getString(R.string.im_bg_restricted)
             status == ImClient.Status.FAILED -> ImClient.error
                 ?: getString(R.string.im_connecting)
             status == ImClient.Status.CONNECTED -> getString(R.string.im_empty)
             else -> getString(R.string.im_connecting)
         }
+        binding.btnRetry.text = getString(
+            if (restricted) R.string.im_bg_restricted_action else R.string.im_retry
+        )
         if (list.isNotEmpty()) resolveProfiles(list)
+    }
+
+    /**
+     * 引导用户放开省电限制：先尝试一键弹「允许忽略电池优化」对话框
+     * （需要 manifest 里的 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS），MIUI 不吃这套就
+     * 退回本应用详情页（里面的省电/联网入口各 ROM 都在）。根治「后台建连被拦」
+     * 唯一的路在系统层，代码能做的就是把人带去。
+     */
+    private fun openBatterySettings() {
+        // 1) MIUI/HyperOS 专属：省电策略（后台配置）页，直接定位到本应用 ——
+        //    那里才是 HyperOS 真正决定「后台冻结/断网」的开关，改「无限制」一步到位。
+        //    非 MIUI 设备没有 powerkeeper，startActivity 抛异常走下面兜底。
+        val miui = Intent()
+            .setClassName(
+                "com.miui.powerkeeper",
+                "com.miui.powerkeeper.ui.HiddenAppsConfigActivity",
+            )
+            .putExtra("package_name", packageName)
+            .putExtra("package_label", getString(R.string.app_name))
+        val ok = runCatching { startActivity(miui) }.isSuccess
+        if (ok) return
+        // 2) AOSP：一键弹「允许忽略电池优化」对话框
+        val request = Intent(
+            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:$packageName"),
+        )
+        try {
+            startActivity(request)
+        } catch (_: Exception) {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName"),
+                    )
+                )
+            }
+        }
     }
 
     /** 会话里的人名/头像走工作圈那套缓存；命中缓存时不发请求 */

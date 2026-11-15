@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  聊天页顶栏菜单（2026-11-15）：只有「聊天详情」一项。
+  🔴 必须走布局 `app:menu`，不能靠 `onCreateOptionsMenu`：本应用主题是 NoActionBar，
+  没有 ActionBar 就没有菜单宿主，代码里 override 了也不会报错、只是右上角什么都没有。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_chat_detail"
+        android:icon="@drawable/ic_more_vert"
+        android:title="@string/im_chat_detail_title"
+        app:showAsAction="always" />
+</menu>

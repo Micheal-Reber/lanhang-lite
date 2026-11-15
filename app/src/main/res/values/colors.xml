@@ -2,6 +2,9 @@
 <resources>
     <!-- ==================== 品牌色 ==================== -->
     <color name="primary">#084168</color>
+
+    <!-- 私信「文件」行左侧图标的圆角底：主色 12% 透明度（深色主题在 values-night 里换浅蓝） -->
+    <color name="im_file_icon_bg">#1F084168</color>
     <color name="on_primary">#FFFFFFFF</color>
     <color name="primary_container">#D4E9F7</color>
     <color name="on_primary_container">#052F4A</color>

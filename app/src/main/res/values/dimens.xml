@@ -57,6 +57,8 @@
     <dimen name="touch_target_min">48dp</dimen>
     <!-- 图标标准尺寸 -->
     <dimen name="icon_lg">24dp</dimen>
+    <!-- 28dp：详情页「聊天内容」那三个格子的图标（比行首图标重一档，又没有 32dp 那么占地方） -->
+    <dimen name="icon_xl">28dp</dimen>
     <dimen name="icon_md">20dp</dimen>
     <dimen name="icon_sm">16dp</dimen>
     <!-- 分割线 -->

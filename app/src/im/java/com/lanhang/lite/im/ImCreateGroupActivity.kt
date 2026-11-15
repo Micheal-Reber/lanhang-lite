@@ -128,6 +128,17 @@ class ImCreateGroupActivity : AppCompatActivity() {
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
 
+        // 从「聊天详情 → 添加新成员」进来时预选当前对话的对方：
+        // 单聊的「添加新成员」语义就是「把这个会话变成群聊」（官方也是跳建群页）
+        intent.getStringExtra(EXTRA_PRESELECT_ID)?.takeIf { it.isNotBlank() }?.let { id ->
+            selected[id] = Member(
+                id = id,
+                name = intent.getStringExtra(EXTRA_PRESELECT_NAME).orEmpty(),
+                portrait = null,
+                subtitle = null,
+            )
+        }
+
         loadFriends()
     }
 
@@ -442,8 +453,20 @@ class ImCreateGroupActivity : AppCompatActivity() {
         private const val TYPE_SECTION = 0
         private const val TYPE_MEMBER = 1
 
+        /** 预选一个人（聊天详情「添加新成员」用）：进页面时他已经勾上了 */
+        private const val EXTRA_PRESELECT_ID = "preselect_id"
+        private const val EXTRA_PRESELECT_NAME = "preselect_name"
+
         fun start(context: Context) {
             context.startActivity(Intent(context, ImCreateGroupActivity::class.java))
+        }
+
+        fun startWith(context: Context, id: String, name: String) {
+            context.startActivity(
+                Intent(context, ImCreateGroupActivity::class.java)
+                    .putExtra(EXTRA_PRESELECT_ID, id)
+                    .putExtra(EXTRA_PRESELECT_NAME, name)
+            )
         }
     }
 }

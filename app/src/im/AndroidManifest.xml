@@ -23,6 +23,13 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!--
+      私信「后台接收受限」引导（2026-11-15）：一键弹「允许忽略电池优化」对话框的前提。
+      HyperOS 在后台拦截新建 socket，长连接建不起来，消息永远收不到；根治只能请用户
+      放开省电策略，这个权限只为那个引导对话框服务。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!--
       Android 11+ 的包可见性（targetSdk 30 起默认「看不见」别的应用）。
       不声明这些包名，`getPackageInfo("com.autonavi.minimap")` 会抛 NameNotFoundException ——
       明明装了高德，代码却当成没装，直接退到网页版。2026-11-12 用户实测「点位置打开浏览器」
@@ -57,6 +64,20 @@
         <!-- 聊天页：要弹输入法，adjustResize 兜底 Android 14-（15+ 由 ime inset 处理） -->
         <activity
             android:name=".im.ImChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!--
+          聊天详情（2026-11-15，对齐官方 PrivateChatDetailActivity）：头像/名字 + 文件/图片/搜索
+          + 添加新成员 + 免打扰 + 置顶 + 清除聊天记录。入口在聊天页顶栏「⋮」。
+        -->
+        <activity
+            android:name=".im.ImChatDetailActivity"
+            android:exported="false" />
+
+        <!-- 会话内历史（文件 / 图片 / 搜索三合一）：从聊天详情那三个格子进来 -->
+        <activity
+            android:name=".im.ImChatHistoryActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 

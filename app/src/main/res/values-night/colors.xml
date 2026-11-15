@@ -26,6 +26,8 @@
       数值与 ui/LanhangTheme.kt 的 DarkColors 保持一致，View 与 Compose 两套主题不再分叉。
     -->
     <color name="primary">#8ED8F8</color>
+
+    <color name="im_file_icon_bg">#1F8ED8F8</color>
     <color name="on_primary">#00344D</color>
 
     <!-- 其它 -->

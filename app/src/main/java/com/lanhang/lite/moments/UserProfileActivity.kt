@@ -294,7 +294,7 @@ class UserProfileActivity : AppCompatActivity() {
                 FriendRelation.FRIEND -> Unit // 走不到：删除在底部按钮
                 FriendRelation.INCOMING -> acceptFriendRequest()
                 FriendRelation.OUTGOING -> Unit
-                FriendRelation.NONE -> showInviteDialog(name)
+                FriendRelation.NONE -> showInviteDialog()
             }
         }
         val actionable = relation != FriendRelation.OUTGOING
@@ -304,10 +304,16 @@ class UserProfileActivity : AppCompatActivity() {
     }
 
     /**
-     * 加好友：验证语输入框。默认「我是〈我的名字〉」与官方 `InviteFriendActivity` 同款，
+     * 加好友：验证语输入框。默认「我是〈**我的**名字〉」与官方 `InviteFriendActivity` 同款，
      * 可改可清空（服务端允许空串，官方也没做非空校验）。
+     *
+     * 🔴 **不要传形参进来**（2026-11-15 用户实测报错）：这个页面里 `name` 是「正在查看的
+     * 那个人」的名字，早先图省事直接 `showInviteDialog(name)`，结果验证语被填成
+     * 「我是〈对方名字〉」—— 发给对方看的一句话，把自己写成了对方。
+     * 自己的名字一律从 [Session] / `UserInfoCache` 取。
      */
-    private fun showInviteDialog(myName: String) {
+    private fun showInviteDialog() {
+        val myName = selfName()
         val density = resources.displayMetrics.density
         val pad = (20 * density).toInt()
         val container = android.widget.LinearLayout(this).apply {
@@ -321,12 +327,7 @@ class UserProfileActivity : AppCompatActivity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                 android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 3
-            setText(
-                getString(
-                    R.string.friend_invite_default,
-                    myName.ifBlank { Session.name }.ifBlank { Session.username }
-                )
-            )
+            setText(getString(R.string.friend_invite_default, myName))
         }
         input.addView(edit)
         container.addView(input)
@@ -340,6 +341,15 @@ class UserProfileActivity : AppCompatActivity() {
             }
             .show()
     }
+
+    /**
+     * 我自己的显示名：优先用通讯录缓存里那份（改过名 / 改过头像后是最新的），
+     * 其次登录时写入的 [Session.name]，最后退回学号。
+     */
+    private fun selfName(): String =
+        UserInfoCache.get(Session.userId)?.name?.takeIf { it.isNotBlank() }
+            ?: Session.name.takeIf { it.isNotBlank() }
+            ?: Session.username
 
     private fun sendFriendInvite(content: String) {
         lifecycleScope.launch {

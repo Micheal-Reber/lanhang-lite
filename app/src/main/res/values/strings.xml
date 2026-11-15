@@ -163,6 +163,8 @@
     <string name="im_keep_alive_summary">退出应用后仍保持私信在线并弹通知</string>
     <string name="im_keep_alive_on">已开启：私信保持在线，通知栏会显示一条常驻提示</string>
     <string name="im_keep_alive_off">已关闭：退出应用后可能收不到私信通知</string>
+    <string name="im_bg_restricted">后台联网被系统限制，App 退到后台就收不到私信 · 点按去设置</string>
+    <string name="im_bg_restricted_action">去允许后台运行</string>
     <string name="im_keep_alive_channel">私信后台接收</string>
     <string name="im_keep_alive_channel_desc">保持私信在线的常驻提示，不响铃、不振动</string>
     <string name="im_keep_alive_title">私信接收中</string>
@@ -195,11 +197,33 @@
     <string name="im_attach_location">位置</string>
     <string name="im_file_open_with">用其他应用打开</string>
     <string name="im_file_open">打开</string>
-    <string name="im_file_save">保存到本地</string>
+    <string name="im_file_save">保存到手机…</string>
     <string name="im_file_saved">已保存</string>
+    <string name="im_file_saved_to">已保存到 %1$s</string>
+    <!-- ==================== 聊天详情（2026-11-15，对齐官方 PrivateChatDetailActivity） ==================== -->
+    <string name="im_chat_detail_title">聊天详情</string>
+    <string name="im_chat_content">聊天内容</string>
+    <string name="im_chat_files">文件</string>
+    <string name="im_chat_images">图片</string>
+    <string name="im_chat_search">搜索</string>
+    <string name="im_chat_add_member">添加新成员</string>
+    <string name="im_chat_add_member_group">群聊加人暂不支持，请在官方 App 里操作</string>
+    <string name="im_chat_mute">消息免打扰</string>
+    <string name="im_chat_pin">会话置顶</string>
+    <string name="im_chat_clear">清除聊天记录</string>
+    <string name="im_chat_clear_confirm_title">清除聊天记录</string>
+    <string name="im_chat_clear_confirm">只清除本机记录，对方那边不受影响。确定清除？</string>
+    <string name="im_chat_clear_done">已清除</string>
+    <string name="im_chat_switch_failed">设置失败，请稍后重试</string>
+    <string name="im_chat_files_empty">这个会话还没有文件</string>
+    <string name="im_chat_images_empty">这个会话还没有图片</string>
+    <string name="im_chat_search_hint">搜索聊天记录</string>
+    <string name="im_chat_search_empty">没有找到相关消息</string>
+
+    <string name="im_file_save_hint">文件只缓存在应用内；想要自己的副本，长按文件选「保存到手机…」</string>
     <string name="im_file_save_failed">保存失败</string>
     <string name="im_file_open_failed">打开文件失败</string>
-    <string name="im_file_no_app">没有能打开这种文件的应用，可以长按保存到本地</string>
+    <string name="im_file_no_app">没有能打开这种文件的应用，长按文件可「保存到手机…」</string>
     <string name="im_file_downloading">下载中 %1$d%%</string>
     <string name="im_file_downloading_unknown">下载中…</string>
     <string name="im_location_no_coords">这条位置消息没有坐标</string>

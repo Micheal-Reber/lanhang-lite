@@ -7,6 +7,7 @@ import android.util.Log
 import com.lanhang.lite.R
 import com.lanhang.lite.core.isCancellation
 import com.lanhang.lite.moments.UserInfoCache
+import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.net.RceApi
 import com.lanhang.lite.session.Session
 import io.rong.imlib.IRongCallback
@@ -21,6 +22,7 @@ import io.rong.message.LocationMessage
 import io.rong.message.ReadReceiptMessage
 import io.rong.message.SightMessage
 import io.rong.message.TextMessage
+import okhttp3.Request
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -152,6 +154,15 @@ object ImClient {
      */
     private const val PROFILE_TIMEOUT_MS = 3_000L
 
+    /**
+     * 建连看门狗：connect 发出后超过这么久还没有任何回调，判定卡死。
+     * 实测（2026-11-15，HyperOS）：App 在后台时 ROM 拦截新建 socket —— 融云 navi
+     * HTTP 探测可达，但 `connect()` 的回调**永远不来**，状态机永久停在 CONNECTING；
+     * 同一网络切回前台 200ms 内连上。看门狗触发即标记 [bgRestricted]、断掉卡死的
+     * 连接、走 [fail] 的常规退避重试，别干等一个不会来的回调。
+     */
+    private const val CONNECT_TIMEOUT_MS = 45_000L
+
     private val main = Handler(Looper.getMainLooper())
 
     /** 读配置 / 换 token 用的 IO 作用域（这些接口都是同步 OkHttp，不能碰主线程） */
@@ -175,6 +186,18 @@ object ImClient {
     /** 已经排了一颗重连任务（防止断线回调 + 失败回调各排一颗，越排越密） */
     private var reconnectScheduled = false
 
+    /** 每次 connect() 递增；看门狗只认启动时记录的那一代，避免误杀后来的连接 */
+    private var connectAttemptId = 0
+    private var watchdogAttempt = 0
+
+    /**
+     * 后台联网被 ROM 限制过的痕迹（看门狗触发即置真，连上即清零）。
+     * 私信列表据此把「重试」换成「去允许后台运行」——这种失败重试多少次都没用，
+     * 必须引导用户去系统里放开省电策略 / 自启动。
+     */
+    var bgRestricted = false
+        private set
+
     /** 重连任务实体：留着引用才能在网络恢复时把延迟的那颗撤掉、立刻连 */
     private val reconnectTask = Runnable {
         reconnectScheduled = false
@@ -184,6 +207,19 @@ object ImClient {
         status = Status.IDLE
         inFlight = false
         ensureStarted(ctx)
+    }
+
+    /**
+     * 建连看门狗：[CONNECT_TIMEOUT_MS] 后还是 CONNECTING、且仍是自己盯的那一代尝试 →
+     * 判定 connect 卡死（典型：ROM 在后台拦截新建 socket，connect 永不回调）。
+     * 标记 [bgRestricted]、断开卡死的连接、走 [fail]（内部按退避重排重试）。
+     */
+    private val connectWatchdog = Runnable {
+        if (status != Status.CONNECTING || connectAttemptId != watchdogAttempt) return@Runnable
+        Log.w(TAG, "connect stuck ${CONNECT_TIMEOUT_MS}ms, reset (background networking likely blocked)")
+        bgRestricted = true
+        runCatching { RongIMClient.getInstance().disconnect() }
+        fail(text(R.string.im_err_connect_failed, "timeout"))
     }
 
     /** 默认网络回调（只注册一次）：网络恢复时立刻重连，不用等退避到点 */
@@ -494,9 +530,17 @@ object ImClient {
 
     private fun connectWith(token: String, allowTokenRefresh: Boolean) {
         Log.i(TAG, "connect tokenLen=${token.length}")
+        // 挂看门狗：后台被 ROM 拦 socket 时 connect 永不回调，靠它把状态机从
+        // CONNECTING 里拽出来（见 connectWatchdog 注释）
+        main.removeCallbacks(connectWatchdog)
+        connectAttemptId++
+        watchdogAttempt = connectAttemptId
+        main.postDelayed(connectWatchdog, CONNECT_TIMEOUT_MS)
         RongIMClient.connect(token, object : RongIMClient.ConnectCallback() {
             override fun onSuccess(userId: String?) {
                 Log.i(TAG, "connected userId=$userId")
+                main.removeCallbacks(connectWatchdog)
+                bgRestricted = false
                 status = Status.CONNECTED
                 error = null
                 inFlight = false
@@ -517,6 +561,7 @@ object ImClient {
 
             override fun onError(e: RongIMClient.ErrorCode?) {
                 Log.w(TAG, "connect error=$e tokenLen=${token.length}")
+                main.removeCallbacks(connectWatchdog)
                 // IPC_DISCONNECT 之类的瞬时错误（刚杀过进程、SDK 内部服务还在重启）重连即可，
                 // 直接判失败会让用户以为功能坏了
                 if (retryAttempt < MAX_AUTO_RETRY && isRecoverable(e)) {
@@ -534,6 +579,7 @@ object ImClient {
 
             override fun onTokenIncorrect() {
                 Log.w(TAG, "onTokenIncorrect")
+                main.removeCallbacks(connectWatchdog)
                 if (!allowTokenRefresh) {
                     fail(text(R.string.im_err_token_rejected), retryable = false)
                     return
@@ -600,6 +646,19 @@ object ImClient {
     }
 
     /**
+     * 系统层面的默认网络还活着吗（区分「真断网」与「ROM 冻结后台联网」）。
+     * ROM 冻结是按 UID 拦 socket，系统网络本身完好 —— 所以用
+     * NET_CAPABILITY_VALIDATED 判系统网络，能识别出「网在、只有我们被掐」。
+     */
+    private fun deviceNetworkAlive(): Boolean {
+        val ctx = app ?: return false
+        val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    /**
      * 监听默认网络：熄屏 / 切网之后长连接常常已经死了，但断线回调未必及时到。
      * 网络一恢复就主动重连，比干等退避到点快得多。
      *
@@ -626,6 +685,7 @@ object ImClient {
      */
     fun shutdown() {
         main.removeCallbacks(reconnectTask)
+        main.removeCallbacks(connectWatchdog)
         reconnectScheduled = false
         reconnectAttempt = 0
         retryAttempt = 0
@@ -655,6 +715,9 @@ object ImClient {
                     reconnectAttempt = 0
                     reconnectScheduled = false
                     main.removeCallbacks(reconnectTask)
+                    // 连上即证明后台联网此刻没被封，清掉「被冻结」痕迹
+                    bgRestricted = false
+                    notifyChanged()
                 }
                 RongIMClient.ConnectionStatusListener.ConnectionStatus.KICKED_OFFLINE_BY_OTHER_CLIENT -> {
                     // 被另一台设备顶下线：**不能**自动重连，否则两台设备互相踢成死循环。
@@ -670,6 +733,22 @@ object ImClient {
                     // DISCONNECTED / NETWORK_UNAVAILABLE / SOCKET_DISCONNECTED …
                     // 先离开 CONNECTED（UI 显示「连接中」而不是继续假装在线），再排重连
                     if (status == Status.CONNECTED) status = Status.IDLE
+                    // 「系统网络明明活着、SDK 却报断线/网络不可用」= ROM 冻结了本应用的
+                    // 后台联网（HyperOS PowerKeeper 实测信号，13:22 熄屏 4 分钟后
+                    // NETWORK_UNAVAILABLE、TCP socket 还在但 SDK 已认为断网，被广播
+                    // 唤醒后 360ms 重连成功）。与看门狗一样标记 bgRestricted，但**不用等
+                    // 45s 超时** —— 私信列表立刻弹「去设置放开」横幅。只认
+                    // NETWORK_UNAVAILABLE：DISCONNECTED 在前台 WiFi 抖动也会误报。
+                    if (connectionStatus ==
+                        RongIMClient.ConnectionStatusListener.ConnectionStatus.NETWORK_UNAVAILABLE &&
+                        deviceNetworkAlive()
+                    ) {
+                        if (!bgRestricted) {
+                            Log.w(TAG, "NETWORK_UNAVAILABLE while system network alive → background networking frozen")
+                        }
+                        bgRestricted = true
+                        notifyChanged()
+                    }
                     scheduleReconnect()
                 }
             }
@@ -999,16 +1078,29 @@ object ImClient {
                     fullImageUrl = full,
                 )
             }
-            is FileMessage -> base.copy(
-                kind = ImMessage.KIND_FILE,
-                fileName = content.name.orEmpty(),
-                fileSize = content.size,
-                fileMime = content.type,
-                // 本地路径优先：自己发的文件本来就在本地；收到的文件下载完 SDK 会把路径写回
-                // localPath。都没有时留远端地址，点开时再去下载（见 downloadFile）。
-                mediaUrl = (content.localPath ?: content.mediaUrl)?.toString(),
-                text = content.name.orEmpty(),
-            )
+            is FileMessage -> {
+                // 远端地址**不一定在 mediaUrl**（2026-11-15 实测设备库里的原始 JSON）：
+                //   {"name":"s73c.png","size":153702,"type":"bin","fileUrl":"https://...:1446//v4/...png"}
+                // 对端把远端地址塞进了 `fileUrl`，`mediaUrl` 是空的。我们原来只认
+                // `localPath ?: mediaUrl`，于是 SDK 的 downloadMediaMessage 拿不到远端地址、
+                // 必然失败 —— 就是「文件点开提示下载失败，检查网络后重试」。
+                // 所以这里两个字段都要认，且只把**真的在盘上**的本地文件当本地。
+                val local = content.localPath
+                    ?.takeIf { it.scheme == "file" }
+                    ?.path
+                    ?.takeIf { File(it).isFile }
+                val remote = sequenceOf(content.mediaUrl, content.fileUrl)
+                    .mapNotNull { it?.toString() }
+                    .firstOrNull { it.startsWith("http", ignoreCase = true) }
+                base.copy(
+                    kind = ImMessage.KIND_FILE,
+                    fileName = content.name.orEmpty(),
+                    fileSize = content.size,
+                    fileMime = content.type,
+                    mediaUrl = local?.let { "file://$it" } ?: remote ?: content.localPath?.toString(),
+                    text = content.name.orEmpty(),
+                )
+            }
             is LocationMessage -> base.copy(
                 kind = ImMessage.KIND_LOCATION,
                 poi = content.poi.orEmpty(),
@@ -1486,60 +1578,204 @@ object ImClient {
      * 把一个文件消息的真实文件拿到本地（点开 / 保存之前调）。
      *
      * SDK **不会自动下载文件消息**（只有图片会顺手下一张缩略图）：对方发来的文件，
-     * `localPath` 是空的、只有 `mediaUrl` 一个 CDN 地址，所以「点一下就打开」必须先下载。
+     * `localPath` 是空的、只有一个远端地址，所以「点一下就打开」必须先下载。
      *
-     * 这里按 uId 找回原始 [Message]，让 SDK 去下载 —— 下载完成后它会把路径写回
-     * `FileMessage.localPath`，下次进来就不用再下。
+     * 🔴 **不要只靠 `downloadMediaMessage`**（2026-11-15 修）：它内部用的是
+     * `FileMessage.mediaUrl`，而实测对端发来的文件消息常常只填了 `fileUrl`（值为 https 地址），
+     * `mediaUrl` 为空 → SDK 直接失败，用户看到的就是「文件下载失败，检查网络后重试」。
+     * 现在自己按 URL 下（[ApiClient.http]，带会话 Cookie），SDK 只作为「连远端地址都拿不到」
+     * 时的兜底。落点与 [ImChatActivity.copyToRecvDir] 同一套命名（`<key>_<文件名>`），
+     * 所以下完之后那次复制会命中已有文件、不再重复拷贝，下次点开也不必再联网。
      *
+     * @param remoteUrl 调用方从气泡上带过来的远端地址（`ImMessage.mediaUrl`，可能是 https 或本地 file://）
      * @param onProgress 0..100，保证在主线程
      * @param onResult 本地绝对路径；拿不到为 null（调用方负责提示）
      */
-    fun downloadFile(uid: String, onProgress: (Int) -> Unit, onResult: (String?) -> Unit) {
+    fun downloadFile(
+        uid: String,
+        remoteUrl: String?,
+        fileName: String?,
+        fileSize: Long,
+        onProgress: (Int) -> Unit,
+        onResult: (String?) -> Unit,
+    ) {
+        val ctx = app
+        if (ctx == null) {
+            main.post { onResult(null) }
+            return
+        }
         RongIMClient.getInstance().getMessageByUid(
             uid,
             object : RongIMClient.ResultCallback<Message>() {
                 override fun onSuccess(message: Message?) {
+                    proceed(message)
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    // 消息查不到（uid 为空 / 已被清理）不代表下不了：URL 就在手上，照样下
+                    Log.w(TAG, "getMessageByUid failed uid=$uid code=${e?.value}")
+                    proceed(null)
+                }
+
+                private fun proceed(message: Message?) {
                     val content = message?.content as? FileMessage
-                    if (message == null || content == null) {
-                        main.post { onResult(null) }
-                        return
-                    }
                     // 自己发的、或之前下过的：localPath 已经有效，不必再走网络
-                    val cached = localFileOf(content)
+                    val cached = content?.let { localFileOf(it) }
                     if (cached != null) {
                         main.post { onResult(cached) }
                         return
                     }
-                    RongIMClient.getInstance().downloadMediaMessage(
-                        message,
-                        object : IRongCallback.IDownloadMediaMessageCallback {
-                            override fun onSuccess(message: Message?) {
-                                val path = (message?.content as? FileMessage)?.let(::localFileOf)
-                                main.post { onResult(path) }
-                            }
-
-                            override fun onProgress(message: Message?, progress: Int) {
-                                main.post { onProgress(progress) }
-                            }
-
-                            override fun onError(message: Message?, e: RongIMClient.ErrorCode?) {
-                                Log.w(TAG, "download file failed uid=$uid code=${e?.value}")
-                                main.post { onResult(null) }
-                            }
-
-                            override fun onCanceled(message: Message?) {
-                                main.post { onResult(null) }
-                            }
+                    val remote = remoteOf(content)
+                        ?: remoteUrl?.takeIf { it.startsWith("http", ignoreCase = true) }
+                    if (remote != null) {
+                        io.launch {
+                            val path = runCatching {
+                                fetchToRecvDir(
+                                    ctx = ctx,
+                                    key = uid,
+                                    url = remote,
+                                    name = fileName?.takeIf { it.isNotBlank() } ?: content?.name,
+                                    expectSize = if (fileSize > 0) fileSize else content?.size ?: 0,
+                                    onProgress = onProgress,
+                                )
+                            }.getOrNull()
+                            main.post { onResult(path) }
                         }
-                    )
+                        return
+                    }
+                    if (message != null) {
+                        // 连远端地址都拿不到时，最后再让 SDK 试一次（内部可能有别的寻址方式）
+                        downloadViaSdk(message, onProgress, onResult)
+                    } else {
+                        Log.w(TAG, "download file: no url and no message uid=$uid")
+                        main.post { onResult(null) }
+                    }
+                }
+            }
+        )
+    }
+
+    /** 从 FileMessage 里挑出可下载的远端地址：`mediaUrl` 优先，其次 `fileUrl`（对端常把它当远端用） */
+    private fun remoteOf(content: FileMessage?): String? {
+        if (content == null) return null
+        return sequenceOf(content.mediaUrl, content.fileUrl)
+            .mapNotNull { it?.toString() }
+            .firstOrNull { it.startsWith("http", ignoreCase = true) }
+    }
+
+    /** 走 SDK 下载（[downloadFile] 的兜底分支，只在拿不到任何 http 地址时用） */
+    private fun downloadViaSdk(
+        message: Message,
+        onProgress: (Int) -> Unit,
+        onResult: (String?) -> Unit,
+    ) {
+        RongIMClient.getInstance().downloadMediaMessage(
+            message,
+            object : IRongCallback.IDownloadMediaMessageCallback {
+                override fun onSuccess(message: Message?) {
+                    val path = (message?.content as? FileMessage)?.let(::localFileOf)
+                    main.post { onResult(path) }
                 }
 
-                override fun onError(e: RongIMClient.ErrorCode?) {
-                    Log.w(TAG, "getMessageByUid failed uid=$uid code=${e?.value}")
+                override fun onProgress(message: Message?, progress: Int) {
+                    main.post { onProgress(progress) }
+                }
+
+                override fun onError(message: Message?, e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "download file failed code=${e?.value}")
+                    main.post { onResult(null) }
+                }
+
+                override fun onCanceled(message: Message?) {
                     main.post { onResult(null) }
                 }
             }
         )
+    }
+
+    /**
+     * 自己把远端文件下到 `filesDir/im/recv/<key>_<文件名>`。
+     *
+     * 与 [ImChatActivity.copyToRecvDir] 用同一套命名，好处有两个：下完那次「复制到接收目录」
+     * 会看到目标文件已存在（长度相同）直接返回，不会白拷一遍；下次点开同一个文件时
+     * 目标文件还在，就不用再联网。
+     *
+     * @return 本地绝对路径；失败为 null（临时文件会清掉，不留半截）
+     */
+    private fun fetchToRecvDir(
+        ctx: Context,
+        key: String,
+        url: String,
+        name: String?,
+        expectSize: Long,
+        onProgress: (Int) -> Unit,
+    ): String? {
+        val dir = File(ctx.filesDir, "im/recv").apply { mkdirs() }
+        val dst = File(dir, "${key.take(32)}_${safeFileName(name.orEmpty())}")
+        if (dst.isFile && (expectSize <= 0 || dst.length() == expectSize)) return dst.absolutePath
+
+        val tmp = File(dir, "${dst.name}.part")
+        val request = Request.Builder().url(url).get().build()
+        return try {
+            ApiClient.http.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    Log.w(TAG, "download http=${resp.code} url=$url")
+                    return null
+                }
+                val body = resp.body ?: return null
+                val total = body.contentLength()
+                var written = 0L
+                var lastPct = -1
+                tmp.outputStream().use { out ->
+                    body.byteStream().use { input ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n <= 0) break
+                            out.write(buf, 0, n)
+                            written += n
+                            if (total > 0) {
+                                val pct = (written * 100 / total).toInt()
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    main.post { onProgress(pct) }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (total > 0 && written != total) {
+                    Log.w(TAG, "download truncated $written/$total url=$url")
+                    tmp.delete()
+                    return null
+                }
+                if (!tmp.renameTo(dst)) {
+                    tmp.copyTo(dst, overwrite = true)
+                    tmp.delete()
+                }
+                main.post { onProgress(100) }
+                dst.absolutePath
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "download failed url=$url", e)
+            tmp.delete()
+            null
+        }
+    }
+
+    /**
+     * 文件名清洗：对方发来的名字**不可信**。
+     *
+     * `../` 会被拼进路径（路径穿越），`:` `*` 之类在某些分区上直接建不出文件。
+     * 统一换下划线，再掐个长度上限。与 [ImChatActivity.copyToRecvDir] 共用同一规则，
+     * 否则下载落点和复制落点会不一致，每次点开都要重新下载。
+     */
+    fun safeFileName(raw: String): String {
+        val cleaned = raw.replace(Regex("""[/\\:*?"<>|\u0000-\u001f]"""), "_")
+            .trim()
+            .trim('.')
+            .take(80)
+        return cleaned.ifBlank { "file" }
     }
 
     /**
@@ -1551,6 +1787,254 @@ object ImClient {
     private fun localFileOf(content: FileMessage): String? {
         val path = content.localPath?.path ?: return null
         return path.takeIf { File(it).isFile }
+    }
+
+    // ---------------------------------------------------------------- 会话设置（聊天详情页）
+
+    /**
+     * 读会话的两个开关：置顶、消息免打扰。
+     *
+     * 两个接口是分开的（`getConversation` / `getConversationNotificationStatus`），
+     * 都回调了才把结果交出去；任一失败就按「关」处理并带上原因，页面据此提示，
+     * 不要静默显示成关着（那样用户会以为设置被重置了）。
+     */
+    fun conversationSwitches(
+        isGroup: Boolean,
+        peerId: String,
+        onResult: (top: Boolean, muted: Boolean, error: String?) -> Unit,
+    ) {
+        val type = typeOf(isGroup)
+        var top = false
+        var muted = false
+        var error: String? = null
+        var pending = 2
+        fun done() {
+            pending--
+            if (pending == 0) main.post { onResult(top, muted, error) }
+        }
+        RongIMClient.getInstance().getConversation(
+            type, peerId,
+            object : RongIMClient.ResultCallback<Conversation>() {
+                override fun onSuccess(conversation: Conversation?) {
+                    top = conversation?.isTop ?: false
+                    done()
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    error = e?.message ?: "读取会话设置失败"
+                    done()
+                }
+            }
+        )
+        RongIMClient.getInstance().getConversationNotificationStatus(
+            type, peerId,
+            object : RongIMClient.ResultCallback<Conversation.ConversationNotificationStatus>() {
+                override fun onSuccess(status: Conversation.ConversationNotificationStatus?) {
+                    muted = status == Conversation.ConversationNotificationStatus.DO_NOT_DISTURB
+                    done()
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    error = e?.message ?: "读取免打扰状态失败"
+                    done()
+                }
+            }
+        )
+    }
+
+    /** 会话置顶（融云会把它同步到服务端，换设备也在） */
+    fun setConversationTop(isGroup: Boolean, peerId: String, top: Boolean, onDone: (Boolean) -> Unit) {
+        RongIMClient.getInstance().setConversationToTop(
+            typeOf(isGroup), peerId, top,
+            object : RongIMClient.ResultCallback<Boolean>() {
+                override fun onSuccess(ok: Boolean?) {
+                    if (ok == true) refreshConversations()
+                    main.post { onDone(ok == true) }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "setConversationToTop failed ${e?.value}")
+                    main.post { onDone(false) }
+                }
+            }
+        )
+    }
+
+    /** 消息免打扰：只影响通知，不影响未读与消息本身 */
+    fun setConversationMuted(
+        isGroup: Boolean,
+        peerId: String,
+        muted: Boolean,
+        onDone: (Boolean) -> Unit,
+    ) {
+        val status = if (muted) {
+            Conversation.ConversationNotificationStatus.DO_NOT_DISTURB
+        } else {
+            Conversation.ConversationNotificationStatus.NOTIFY
+        }
+        RongIMClient.getInstance().setConversationNotificationStatus(
+            typeOf(isGroup), peerId, status,
+            object : RongIMClient.ResultCallback<Conversation.ConversationNotificationStatus>() {
+                override fun onSuccess(s: Conversation.ConversationNotificationStatus?) {
+                    main.post { onDone(s != null) }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "setConversationNotificationStatus failed ${e?.value}")
+                    main.post { onDone(false) }
+                }
+            }
+        )
+    }
+
+    /**
+     * 清除聊天记录。
+     *
+     * 只清这个会话的本地消息（`clearMessages`），**不动**服务端漫游 —— 与官方行为一致。
+     * 清完必须把内存里那条 `threads` 也清掉再通知，否则聊天页 `render()` 还是旧数据
+     * （它读的是内存缓存，不会自己去查库）。
+     */
+    fun clearConversation(isGroup: Boolean, peerId: String, onDone: (Boolean) -> Unit) {
+        RongIMClient.getInstance().clearMessages(
+            typeOf(isGroup), peerId,
+            object : RongIMClient.ResultCallback<Boolean>() {
+                override fun onSuccess(ok: Boolean?) {
+                    val key = threadKey(peerId, isGroup)
+                    main.post {
+                        threads.remove(key)
+                        notifyChanged()
+                        onDone(ok == true)
+                        refreshConversations()
+                    }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "clearMessages failed ${e?.value}")
+                    main.post { onDone(false) }
+                }
+            }
+        )
+    }
+
+    /**
+     * 按类型取这个会话的历史消息（文件 / 图片格子点进去用）。
+     *
+     * 用 SDK 的 `objectName` 过载，别在本地全量拉一遍再过滤：会话长了以后
+     * 「最近 100 条」里可能一条文件都没有。
+     *
+     * @param objectName `RC:FileMsg` 或 `RC:ImgMsg`
+     */
+    fun loadMessagesOfType(
+        isGroup: Boolean,
+        peerId: String,
+        objectName: String,
+        limit: Int = 100,
+        onResult: (List<ImMessage>) -> Unit,
+    ) {
+        RongIMClient.getInstance().getHistoryMessages(
+            typeOf(isGroup), peerId, objectName, 0, limit,
+            object : RongIMClient.ResultCallback<List<Message>>() {
+                override fun onSuccess(messages: List<Message>?) {
+                    val list = messages.orEmpty().mapNotNull { toImMessage(it) }
+                        .sortedByDescending { it.time }
+                    main.post { onResult(list) }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "getHistoryMessages($objectName) failed ${e?.value}")
+                    main.post { onResult(emptyList()) }
+                }
+            }
+        )
+    }
+
+    /**
+     * 会话内搜索（文本关键词）。
+     *
+     * 融云自己按关键词查库，比自己遍历历史稳（历史可能很长、还可能没全在本地）。
+     * 结果按时间倒序给出去。
+     */
+    fun searchInConversation(
+        isGroup: Boolean,
+        peerId: String,
+        keyword: String,
+        limit: Int = 50,
+        onResult: (List<ImMessage>) -> Unit,
+    ) {
+        val key = keyword.trim()
+        if (key.isEmpty()) {
+            main.post { onResult(emptyList()) }
+            return
+        }
+        RongIMClient.getInstance().searchMessages(
+            typeOf(isGroup), peerId, key, limit, 0L,
+            object : RongIMClient.ResultCallback<List<Message>>() {
+                override fun onSuccess(messages: List<Message>?) {
+                    val list = messages.orEmpty().mapNotNull { toImMessage(it) }
+                        .sortedByDescending { it.time }
+                    main.post { onResult(list) }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "searchMessages failed ${e?.value}")
+                    main.post { onResult(emptyList()) }
+                }
+            }
+        )
+    }
+
+    private fun typeOf(isGroup: Boolean): Conversation.ConversationType =
+        if (isGroup) Conversation.ConversationType.GROUP else Conversation.ConversationType.PRIVATE
+
+    /**
+     * 调试：把某个会话最近若干条消息的关键字段打进 logcat（只在 debug 包生效）。
+     *
+     * 2026-11-15 加。起因是「文件消息点开提示下载失败」，而 `downloadFile` 的几条失败分支里
+     * 有一条**不打日志**（`getMessageByUid` 回 null），光看 logcat 分不清是「找不到消息」
+     * 还是「SDK 下载失败」。这里直接把 uid / mediaUrl / localPath 打出来，一次就能定位。
+     *
+     * 用法（包名与 receiver 见 [ImDebugReceiver]）：
+     * ```
+     * adb shell run-as com.lanhang.lite.im am broadcast --user 0 \
+     *   -n com.lanhang.lite.im/com.lanhang.lite.im.ImDebugReceiver \
+     *   -a com.lanhang.lite.im.DEBUG_DUMP_CHAT --es peer <targetId>
+     * ```
+     */
+    fun dumpConversation(peerId: String, isGroup: Boolean = false) {
+        val type = if (isGroup) Conversation.ConversationType.GROUP else Conversation.ConversationType.PRIVATE
+        RongIMClient.getInstance().getLatestMessages(
+            type, peerId, 60,
+            object : RongIMClient.ResultCallback<List<Message>>() {
+                override fun onSuccess(messages: List<Message>?) {
+                    Log.i(TAG, "dump peer=${peerId.take(8)} count=${messages?.size ?: 0}")
+                    messages.orEmpty().forEach { m ->
+                        val c = m.content
+                        when (c) {
+                            is FileMessage -> {
+                                val local = c.localPath?.path
+                                Log.i(
+                                    TAG,
+                                    "dump FILE uid=${m.uId} dir=${m.messageDirection} name=${c.name} " +
+                                        "size=${c.size} type=${c.type} media=${c.mediaUrl} " +
+                                        "local=$local exists=${local != null && File(local).isFile} " +
+                                        "received=${m.receivedStatus}"
+                                )
+                            }
+                            is ImageMessage -> Log.i(
+                                TAG,
+                                "dump IMG uid=${m.uId} dir=${m.messageDirection} " +
+                                    "media=${c.mediaUrl} thum=${c.thumUri} local=${c.localPath?.path}"
+                            )
+                            else -> Log.i(TAG, "dump ${c?.javaClass?.simpleName} uid=${m.uId}")
+                        }
+                    }
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    Log.w(TAG, "dump failed peer=${peerId.take(8)} code=${e?.value}")
+                }
+            }
+        )
     }
 
     /**

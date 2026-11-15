@@ -49,6 +49,12 @@ class ImDebugReceiver : BroadcastReceiver() {
                     context.getString(R.string.im_notify_friend_requested, "测试同学"),
                 )
             }
+            ACTION_DEBUG_DUMP -> {
+                // 把某会话最近 60 条消息的关键字段打进 logcat：专门用来查
+                // 「文件消息点开提示下载失败」这类「代码里没有可读日志」的问题
+                val peer = intent.getStringExtra(EXTRA_PEER)?.takeIf { it.isNotBlank() } ?: return
+                ImClient.dumpConversation(peer, intent.getBooleanExtra(EXTRA_GROUP, false))
+            }
         }
     }
 
@@ -57,5 +63,19 @@ class ImDebugReceiver : BroadcastReceiver() {
 
         /** `am broadcast -a com.lanhang.lite.im.DEBUG_FRIEND_NOTIFY` */
         const val ACTION_DEBUG_FRIEND = "com.lanhang.lite.im.DEBUG_FRIEND_NOTIFY"
+
+        /**
+         * 打印某会话最近 60 条消息的 uid / mediaUrl / localPath：
+         * ```
+         * adb shell run-as com.lanhang.lite.im am broadcast --user 0 \
+         *   -n com.lanhang.lite.im/com.lanhang.lite.im.ImDebugReceiver \
+         *   -a com.lanhang.lite.im.DEBUG_DUMP_CHAT --es peer <targetId>
+         * ```
+         */
+        const val ACTION_DEBUG_DUMP = "com.lanhang.lite.im.DEBUG_DUMP_CHAT"
+
+        const val EXTRA_PEER = "peer"
+
+        const val EXTRA_GROUP = "group"
     }
 }

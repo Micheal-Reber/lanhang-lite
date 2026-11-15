@@ -22,6 +22,29 @@
         app:navigationIcon="@drawable/ic_back"
         app:title="@string/im_title" />
 
+    <!--
+      后台联网受限横幅：看门狗判定 ROM 在后台拦截建连时显示（有会话也显示 ——
+      不能像 stateBox 那样只在空列表时出来，否则有会话的用户永远看不到提示）。
+      整条可点，跳「允许忽略电池优化」引导。
+    -->
+    <TextView
+        android:id="@+id/tvBgRestricted"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceVariant"
+        android:drawablePadding="@dimen/space_sm"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/space_xl"
+        android:paddingTop="@dimen/space_md"
+        android:paddingEnd="@dimen/space_xl"
+        android:paddingBottom="@dimen/space_md"
+        android:text="@string/im_bg_restricted"
+        android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"
+        app:drawableStartCompat="@drawable/ic_notifications" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
