@@ -18,6 +18,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.doOnLayout
 import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.core.toast
@@ -88,6 +89,16 @@ class OaWebViewActivity : AppCompatActivity() {
     /** 校内域名（`*.nchu.edu.cn`）：决定要不要带 RCE 伪装头 */
     private var campusHost = true
 
+    /** 首次加载的地址；真正的 `loadUrl` 要等 WebView 拿到最终高度（见 [startLoad]） */
+    private var startUrl: String = ""
+
+    /** 页面只加载一次：inset 回调会来很多次，兜底定时器也会来一次 */
+    private var pageLoaded = false
+
+    /** debug 包（诊断脚本只在 debug 注入，正式包不带任何额外 JS） */
+    private val DEBUGGABLE: Boolean
+        get() = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
     /** 网页发起的文件选择请求；用户取消时必须回 null，否则那个 input 永远卡在等待中 */
     private var fileCallback: ValueCallback<Array<Uri>>? = null
 
@@ -113,10 +124,20 @@ class OaWebViewActivity : AppCompatActivity() {
             if (!goBackOrExit()) finish()
         }
 
-        // 避开状态栏/挖孔
+        // 避开状态栏/挖孔；底部也让开导航栏（页面自带底部 tab 的站点，比如赣青二课，
+        // 不然最后一排会被三键导航压住）
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            v.setPadding(v.paddingLeft, bars.top, v.paddingRight, v.paddingBottom)
+            v.setPadding(v.paddingLeft, bars.top, v.paddingRight, bars.bottom)
+            // 🔴 等 WebView **真正完成这次 layout** 之后再 loadUrl（2026-11-15 修「赣青二课顶部
+            // 被压掉一行」）：页面按视口高度排版，先加载再改高度，站点里 position:fixed 的头部 /
+            // 吸顶 tab 会整体错位。
+            //
+            // 这里**不能用 `v.post {}`**（第一版就是这么写的，没修好）：`View.post` 的 runnable
+            // 是被塞进 ViewRootImpl 的 RunQueue，在**下一次 performTraversals 的开头**执行 ——
+            // 也就是「这批 padding 还没 measure/layout」的时候。等于什么都没等到。
+            // `doOnLayout` 挂在 WebView 上，保证回调时它的新高度已经量好、布好。
+            binding.webView.doOnLayout { startLoad() }
             insets
         }
 
@@ -327,11 +348,38 @@ class OaWebViewActivity : AppCompatActivity() {
                 if (gqhwHost) {
                     runCatching { view.evaluateJavascript(GqhwScripts.SCAN_BRIDGE_JS, null) }
                     runCatching { view.evaluateJavascript(GqhwScripts.COMPAT_JS, null) }
+                    // 「二课成绩」页头部多留了 26px 状态栏位置，把顶部那排 tab 压掉一半（详见 GqhwScripts）
+                    runCatching { view.evaluateJavascript(GqhwScripts.HEADER_JS, null) }
+                    // 只在 debug 包跑：把页面内部的真实视口/滚动/顶部元素位置打进 logcat
+                    //（tag OaWebView），用来定位「顶部被裁」到底是谁的问题。release 不注入。
+                    if (DEBUGGABLE) {
+                        runCatching { view.evaluateJavascript(GqhwScripts.DIAG_JS, null) }
+                    }
                 }
             }
         }
 
-        binding.webView.loadUrl(url, headers)
+        startUrl = url
+        // 兜底：极少数环境（无系统栏 / 不派发 inset）永远等不到回调，别让页面一直空白。
+        // 800ms 比 doOnLayout 晚得多，正常路径永远走不到这里。
+        binding.root.postDelayed({ startLoad() }, 800)
+    }
+
+    /**
+     * 真正开加载。
+     *
+     * 从 `onCreate` 里直接 `loadUrl` 改到这里，是因为**高度必须先定死**：本页是
+     * 「根布局 padding 出状态栏/导航栏 + 顶栏占一条」，这些都是布局之后才生效的；
+     * 页面一旦先按整屏 `100vh` 排好版、随后视口被压矮几十像素，站点里靠 vh 定位的固定头部
+     * 会先错位一次再重排，白白闪一下。
+     *
+     * 注意：二课「分类统计/学期统计」被压掉一半**不是**这个原因（当时判断错了），真因是页面自己
+     * 多留了 26px 状态栏、和写死的分类条 `top: 54px` 撞在一起 —— 见 [GqhwScripts.HEADER_JS]。
+     */
+    private fun startLoad() {
+        if (pageLoaded || startUrl.isEmpty()) return
+        pageLoaded = true
+        binding.webView.loadUrl(startUrl, headers)
     }
 
     /**
