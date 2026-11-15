@@ -797,6 +797,13 @@
     <!-- 网页里的非 http(s) 链接（weixin:// / alipays:// / intent://）没有应用能接时的提示 -->
     <string name="oa_web_open_app_failed">没有找到能打开它的应用</string>
 
+    <!-- ==================== 网页扫码（赣青二课的签到/签退） ==================== -->
+    <string name="scan_qr_hint">把二维码放进框内</string>
+    <string name="scan_qr_close">关闭</string>
+    <string name="scan_qr_no_camera">摄像头打不开</string>
+    <string name="scan_qr_init_failed">摄像头初始化失败</string>
+    <string name="scan_qr_permission_needed">需要相机权限才能扫码</string>
+
     <!-- ==================== 校园网（深澜一键认证） ==================== -->
     <string name="settings_campus_net">校园网</string>
     <string name="settings_campus_net_subtitle">一键认证、账号设置</string>

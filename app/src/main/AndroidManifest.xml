@@ -16,6 +16,12 @@
         而且异常发生在算签名之前，看起来像「认证接口坏了」，实际一个请求都没发出去。
     -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+        扫码（赣青二课的签到/签退）：网页的扫码按钮由 JS 桥接到原生的 ScanQrActivity，
+        另外二课自带的 html5-qrcode 扫码页走 getUserMedia 也要这条权限（+ onPermissionRequest 显式 grant）。
+        只在用到时才申请，不授不影响任何其它功能。
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!--
         工作圈互动提醒（Android 13+ 运行时权限）。
@@ -208,6 +214,15 @@
             android:name=".ui.MainActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- 网页扫码页（赣青二课签到）：只由 OaWebViewActivity 内部拉起，黑底全屏、锁竖屏 -->
+        <activity
+            android:name=".ui.ScanQrActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:label="@string/scan_qr_hint"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.LanhangLite.Fullscreen" />
 
         <activity
             android:name=".ui.OaWebViewActivity"

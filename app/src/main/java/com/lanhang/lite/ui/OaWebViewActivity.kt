@@ -3,11 +3,15 @@ package com.lanhang.lite.ui
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -53,6 +57,15 @@ class OaWebViewActivity : AppCompatActivity() {
         /** 网页 `<input type="file">` 弹系统选择器的请求码 */
         private const val REQUEST_FILE_CHOOSER = 4001
 
+        /** 网页发起扫码（赣青二课签到）的请求码 */
+        private const val REQUEST_SCAN_FOR_WEB = 4003
+
+        /** 网页通过 getUserMedia 请求摄像头/麦克风时，补申请系统权限的请求码 */
+        private const val REQUEST_MEDIA_PERMISSION = 4004
+
+        /** 扫码前补申请 CAMERA 权限的请求码 */
+        private const val REQUEST_CAMERA_FOR_SCAN = 4005
+
         /** 官方 `goBack()` 特判的表单设计器域（在它上面按返回直接关页面） */
         private const val FORM_DESIGN_URL = "https://form-design-m.paas.nchu.edu.cn/"
 
@@ -77,6 +90,16 @@ class OaWebViewActivity : AppCompatActivity() {
 
     /** 网页发起的文件选择请求；用户取消时必须回 null，否则那个 input 永远卡在等待中 */
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    /**
+     * 网页（getUserMedia）请求摄像头/麦克风、但系统权限还没给时，把这次请求挂住，
+     * 拿到权限后在 [onRequestPermissionsResult] 里补 grant —— 少这一步网页拿到的是
+     * NotAllowedError，表现得像「进了扫码页但画面全黑」。
+     */
+    private var pendingMediaRequest: PermissionRequest? = null
+
+    /** 用户点了扫码但还没拿到 CAMERA 权限：授权回来后自动继续起扫码页 */
+    private var scanPendingAfterPermission = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -182,6 +205,14 @@ class OaWebViewActivity : AppCompatActivity() {
                 "len=${token?.length ?: 0} campus=$campusHost host=$host"
         )
 
+        // 🔴 JS 桥只给二课站点：网页能直接调 App 的口子，不给其它校外站点留入口。
+        // 站点那边的 `CP2.showScanQr` 是空壳（Promise 永不 resolve），由 GqhwScripts 接管后
+        // 调这里的 LhScan.scan()（见 ScanBridge）。
+        val gqhwHost = host.contains("jxmediacenter.com")
+        if (gqhwHost) {
+            runCatching { binding.webView.addJavascriptInterface(ScanBridge(this), "LhScan") }
+        }
+
         // 网页里的 `<input type="file">` 要 App 代弹系统选择器（「赣青二课」上传头像 / 证明材料）
         binding.webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
@@ -204,6 +235,56 @@ class OaWebViewActivity : AppCompatActivity() {
                     fileCallback = null
                     false
                 }
+            }
+
+            /**
+             * 网页 console 全部转进 logcat（tag OaWebView）。
+             *
+             * uni-app 站点白屏时，唯一的线索就是控制台里那几条报错 —— 没有这一层，
+             * 用户报「二课打不开」时只能靠猜。返回 true 表示已处理，不再写系统日志。
+             */
+            override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
+                val text = "${msg.message()} (${msg.sourceId()}:${msg.lineNumber()})"
+                when (msg.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> android.util.Log.e("OaWebView", text)
+                    ConsoleMessage.MessageLevel.WARNING -> android.util.Log.w("OaWebView", text)
+                    else -> android.util.Log.i("OaWebView", text)
+                }
+                return true
+            }
+
+            /**
+             * 网页用 getUserMedia 要摄像头/麦克风（二课自带的 html5-qrcode 扫码页）：
+             * 清单里声明了权限还不够，这里必须显式 grant，否则网页拿到 NotAllowedError，
+             * 表现就是「进了扫码页但画面全黑」。
+             */
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                if (request == null) return
+                val wanted = request.resources.orEmpty().filter {
+                    it == PermissionRequest.RESOURCE_VIDEO_CAPTURE ||
+                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                }
+                if (wanted.isEmpty()) {
+                    runCatching { request.deny() }
+                    return
+                }
+                val need = wanted.mapNotNull {
+                    if (it == PermissionRequest.RESOURCE_VIDEO_CAPTURE) Manifest.permission.CAMERA
+                    else Manifest.permission.RECORD_AUDIO
+                }.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+                if (need.isEmpty()) {
+                    runCatching { request.grant(wanted.toTypedArray()) }
+                        .onFailure { runCatching { request.deny() } }
+                    return
+                }
+                // 系统权限还没给：先挂住这次请求，拿到权限后在 onRequestPermissionsResult 补 grant
+                pendingMediaRequest?.let { runCatching { it.deny() } }
+                pendingMediaRequest = request
+                runCatching { requestPermissions(need.toTypedArray(), REQUEST_MEDIA_PERMISSION) }
+                    .onFailure {
+                        pendingMediaRequest = null
+                        runCatching { request.deny() }
+                    }
             }
         }
 
@@ -241,6 +322,12 @@ class OaWebViewActivity : AppCompatActivity() {
                 binding.progress.hide()
                 // 登录往往发生在页面内部（uni-app 不整页重载），这里顺手存一次登录态
                 if (!campusHost) WebLoginStore.save(this@OaWebViewActivity, host)
+                // 二课站点：接管扫码入口 + 兜住站点自身的两个 H5 bug（详见 GqhwScripts）。
+                // 两段脚本都带幂等守卫，SPA 内多次 onPageFinished 重复注入无副作用。
+                if (gqhwHost) {
+                    runCatching { view.evaluateJavascript(GqhwScripts.SCAN_BRIDGE_JS, null) }
+                    runCatching { view.evaluateJavascript(GqhwScripts.COMPAT_JS, null) }
+                }
             }
         }
 
@@ -293,9 +380,104 @@ class OaWebViewActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 网页里的 `LhScan.scan()` 落到这里：起原生扫码页（[ScanQrActivity]）。
+     *
+     * JavascriptInterface 的回调线程不是主线程，必须切回 UI 线程再开 Activity。
+     * CAMERA 权限在这里补申请 —— 分叉那边的实现依赖「网页曾经用 getUserMedia 请求过摄像头」
+     * 这个副作用，我们接管 CP2 之后网页不再走那条路，所以必须自己申请，否则扫码永远直接取消。
+     */
+    fun startScanForWeb() {
+        runOnUiThread {
+            if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                launchScan()
+            } else {
+                scanPendingAfterPermission = true
+                runCatching {
+                    requestPermissions(arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA_FOR_SCAN)
+                }.onFailure {
+                    scanPendingAfterPermission = false
+                    toast(R.string.scan_qr_permission_needed)
+                }
+            }
+        }
+    }
+
+    private fun launchScan() {
+        runCatching { startActivityForResult(ScanQrActivity.intent(this), REQUEST_SCAN_FOR_WEB) }
+            .onFailure { toast(R.string.scan_qr_permission_needed) }
+    }
+
+    /**
+     * 把扫码结果按站点约定回填给网页那个挂起的 Promise。
+     *
+     * 站点判定是 `code == 1` 且 `data.qrCode` 有值，结构必须严格对上；
+     * 取消时回 `{code:0}`，让网页自己决定提示什么，不会一直挂着。
+     */
+    private fun deliverScanResult(resultCode: Int, data: Intent?) {
+        val text = if (resultCode == ScanQrActivity.RESULT_SCANNED) {
+            data?.getStringExtra(ScanQrActivity.EXTRA_RESULT).orEmpty()
+        } else {
+            ""
+        }
+        val js = if (text.isEmpty()) {
+            "window.__lhScanResolve && window.__lhScanResolve({code:0});"
+        } else {
+            val esc = text.replace("\\", "\\\\").replace("'", "\\'")
+            "window.__lhScanResolve && window.__lhScanResolve({code:1,data:{qrCode:'" + esc + "'}});"
+        }
+        runOnUiThread { runCatching { binding.webView.evaluateJavascript(js, null) } }
+    }
+
+    /** 权限回来：扫码继续 / 把挂起的 getUserMedia 请求补 grant 或 deny */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            REQUEST_CAMERA_FOR_SCAN -> {
+                val pending = scanPendingAfterPermission
+                scanPendingAfterPermission = false
+                if (!pending) return
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                    launchScan()
+                } else {
+                    toast(R.string.scan_qr_permission_needed)
+                }
+            }
+            REQUEST_MEDIA_PERMISSION -> {
+                val req = pendingMediaRequest
+                pendingMediaRequest = null
+                if (req == null) return
+                val wanted = req.resources.orEmpty().filter {
+                    it == PermissionRequest.RESOURCE_VIDEO_CAPTURE ||
+                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                }
+                val granted = wanted.isNotEmpty() && wanted.all { res ->
+                    val perm = if (res == PermissionRequest.RESOURCE_VIDEO_CAPTURE) {
+                        Manifest.permission.CAMERA
+                    } else {
+                        Manifest.permission.RECORD_AUDIO
+                    }
+                    checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED
+                }
+                runCatching {
+                    if (granted) req.grant(wanted.toTypedArray()) else req.deny()
+                }
+            }
+        }
+    }
+
     /** 把系统文件选择器的结果回填给网页（多选取 clipData，单选取 data，取消回 null） */
     @Deprecated("WebView 的文件选择仍走 onActivityResult（FileChooserParams 没给 ActivityResult API）")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // 二课扫码页回来：把结果交还给网页那个挂起的 Promise
+        if (requestCode == REQUEST_SCAN_FOR_WEB) {
+            deliverScanResult(resultCode, data)
+            return
+        }
         if (requestCode != REQUEST_FILE_CHOOSER) {
             super.onActivityResult(requestCode, resultCode, data)
             return

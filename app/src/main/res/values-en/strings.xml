@@ -735,7 +735,7 @@
     <string name="seat_sign_code_action">Code</string>
     <string name="seat_sign_code_refresh">Refresh code</string>
     <string name="seat_sign_code_hint">Scan this code on the library check-in terminal. The check-in window is 30 minutes before to 30 minutes after the start. If scanning fails or the code has expired, tap "Refresh code".</string>
-    <string name="seat_sign_code_failed">Failed to load the check-in code, tap "Refresh code" to retry</string>
+    <string name="seat_sign_code_failed">Failed to load the check-in code. Tap "Refresh code" to retry</string>
     <string name="seat_action_cancel_ok">Booking canceled</string>
     <string name="seat_cancel_confirm_title">Cancel booking</string>
     <string name="seat_cancel_confirm">The seat will be released immediately. Cancel this booking?</string>
@@ -789,6 +789,12 @@
     <string name="oa_common_add">Add to frequently used</string>
     <string name="oa_common_remove">Remove from frequently used</string>
     <string name="oa_web_open_app_failed">No app can open this link</string>
+
+    <string name="scan_qr_hint">Point the camera at the QR code</string>
+    <string name="scan_qr_close">Close</string>
+    <string name="scan_qr_no_camera">Camera unavailable</string>
+    <string name="scan_qr_init_failed">Camera failed to start</string>
+    <string name="scan_qr_permission_needed">Camera permission is required to scan</string>
 
     <!-- ==================== Campus network (Srun sign-in) ==================== -->
     <string name="settings_campus_net">Campus network</string>
