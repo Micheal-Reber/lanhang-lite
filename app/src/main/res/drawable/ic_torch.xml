@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    扫码头灯（补光）图标，用在 ScanQrActivity 右下角那个圆形按钮上。
+
+    造型走 Google Material Icons 的 flashlight_on：宽灯头 + 细筒身 + 灯头横向纹理。
+    之前试过自绘三版（「灯头+筒身+两条竖线」像插头、「宽灯头+收窄筒身+两侧短横线」像 T 字、
+    「横向手电筒+斜光束」像叉子），全部失败 —— 这类小图标别手绘，直接抄现成的 path 更快。
+
+    `fillType="evenOdd"` 是关键：后两段子路径落在第一段轮廓内部，用 evenOdd 才会被**挖空**，
+    于是筒身变成描边、灯头保留实体并留出那道横向纹理。用默认的 nonZero 会画成一整块实心板。
+
+    颜色写死黑色，由 ScanQrActivity 按状态 imageTintList 染成白色 / 深色 —— 与项目其它图标一致。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M6,2h12v6l-2,3v11H8V11L6,8V2zM16,4H8v1h8V4zM14,11.4V20h-4v-8.6l-2,-3V6h8v2.4L14,11.4z" />
+</vector>

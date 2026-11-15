@@ -11,7 +11,10 @@ package com.lanhang.lite.ui
  * 2. **「我的活动 → 更多」整页白屏**：① 该页 `onLoad` 第一句就写 `this.$refs.draftsItem.handleSearchData("")`，
  *    而 `draftsItem` 是「草稿箱」tab 里的组件，默认 tab 下根本没渲染 → TypeError → 页面挂载中断；
  *    ② 即使挂上了，` .content-list → .uni-scroll-view` 整条祖先链高度全是 0，而滚动容器带
- *    `overflow:hidden`，内容被整块裁掉，看起来也是白屏。→ [COMPAT_JS] 打桩 + 补高度。
+ *    `overflow:hidden`，内容被整块裁掉，看起来也是白屏；
+ *    ③ 从活动详情**返回列表时又白屏**（只有点刷新才恢复）：uni-app 的页面是复用的，
+ *    返回走 `onShow` 而不是 `mounted`，而缓存页面重新摆上来时高度又塌回 0。
+ *    → [COMPAT_JS] 打桩 + 补高度，并把补高度分别挂在 `mounted` / `onShow` / 700ms 轮询三个触发点上。
  *
  * 两段脚本都带幂等守卫（`window.__lh*`），同一次页面里重复注入无副作用。
  */
@@ -141,8 +144,39 @@ internal object GqhwScripts {
                         setTimeout(lhFixList, 1200);
                         setTimeout(lhFixList, 2600);
                         setTimeout(lhFixList, 5000);
+                    },
+                    // ③ 从活动详情返回列表页时这个页面组件是**复用**的，mounted 不会再跑一次；
+                    //    而 uni-app 把缓存页面重新摆上来时那条 flex 高度链又塌回 0，于是又白屏
+                    //    （用户点右下角刷新之所以能恢复，正是因为刷新重建了 DOM 并重新触发 mounted）。
+                    //    所以在这里给页面的 onShow 包一层，返回时立刻补修。
+                    created: function () {
+                        try {
+                            var opts = this['${'$'}options'] || {};
+                            if (opts.__lhShowWrapped) return;
+                            if (typeof opts.onShow !== 'function') return;
+                            opts.__lhShowWrapped = true;
+                            var orig = opts.onShow;
+                            opts.onShow = function () {
+                                var r = orig.apply(this, arguments);
+                                // 三次延时都是必要的：120ms 抓「DOM 已重建」、
+                                // 500ms 抓「数据回来重排完」、1500ms 收尾兜住慢网。
+                                setTimeout(lhFixList, 120);
+                                setTimeout(lhFixList, 500);
+                                setTimeout(lhFixList, 1500);
+                                return r;
+                            };
+                        } catch (e) { }
                     }
                 });
+            }
+            // ④ 还有些折返路径压根不走 onShow（例如从别的 tab 切回来、栈被重置），
+            //    低频轮询兜底。lhFixList 第一句就是找 .list-bg，找不到立即 return，
+            //    开销可以忽略；页面在后台时（document.hidden）直接跳过，不占 CPU。
+            if (!window.__lhFixTimer) {
+                window.__lhFixTimer = setInterval(function () {
+                    if (document.hidden) return;
+                    lhFixList();
+                }, 700);
             }
         })()
     """.trimIndent()

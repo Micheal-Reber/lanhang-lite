@@ -806,6 +806,9 @@
     <string name="scan_qr_no_camera">摄像头打不开</string>
     <string name="scan_qr_init_failed">摄像头初始化失败</string>
     <string name="scan_qr_permission_needed">需要相机权限才能扫码</string>
+    <string name="scan_qr_not_ready">摄像头还没准备好</string>
+    <string name="scan_qr_torch_unsupported">这个摄像头不支持手电筒</string>
+    <string name="scan_qr_torch_on">手电筒已打开</string>
 
     <!-- ==================== 校园网（深澜一键认证） ==================== -->
     <string name="settings_campus_net">校园网</string>

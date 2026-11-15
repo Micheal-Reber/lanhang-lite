@@ -798,6 +798,9 @@
     <string name="scan_qr_no_camera">Camera unavailable</string>
     <string name="scan_qr_init_failed">Camera failed to start</string>
     <string name="scan_qr_permission_needed">Camera permission is required to scan</string>
+    <string name="scan_qr_not_ready">Camera is not ready yet</string>
+    <string name="scan_qr_torch_unsupported">This camera does not support the flashlight</string>
+    <string name="scan_qr_torch_on">Flashlight on</string>
 
     <!-- ==================== Campus network (Srun sign-in) ==================== -->
     <string name="settings_campus_net">Campus network</string>
