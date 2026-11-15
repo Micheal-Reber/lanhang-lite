@@ -29,6 +29,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -86,28 +89,62 @@ class MySeatBookingsActivity : AppCompatActivity() {
 
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
-        binding.swipe.setOnRefreshListener { load(refresh = true) }
+        binding.swipe.setOnRefreshListener { load() }
 
         beginLoading()
-        load(refresh = false)
+        load()
     }
 
     /** 首次加载由 onCreate 发起；之后每次回到前台都重新拉，签到器签完回来不该还显示「待签到」 */
     private var firstResume = true
+
+    /** 待签到订单的静默轮询；只在页面可见、且列表里确实有「待签到」时才跑 */
+    private var pendingPoll: Job? = null
 
     override fun onResume() {
         super.onResume()
         if (firstResume) {
             firstResume = false
         } else {
-            load(refresh = true)
+            load()
         }
     }
 
-    private fun load(@Suppress("UNUSED_PARAMETER") refresh: Boolean) {
+    override fun onStart() {
+        super.onStart()
+        startPendingPoll()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        pendingPoll?.cancel()
+        pendingPoll = null
+    }
+
+    /**
+     * 每 15 秒静默重拉一次（不转圈、不弹 toast）。
+     *
+     * 签到这一步往往不是在 App 里点的：用户走到馆内签到机前扫码，或者在微信端完成。
+     * 本机不主动重拉就会一直停在「待签到」，于是出现「明明已经签到了却还提示未签到」。
+     * 没有待签到订单时直接跳过，全部变成使用中 / 已结束就自然不再请求。
+     */
+    private fun startPendingPoll() {
+        if (pendingPoll?.isActive == true) return
+        pendingPoll = lifecycleScope.launch {
+            while (isActive) {
+                delay(PENDING_POLL_MS)
+                // 正在加载或有写操作在飞时别插队，等下一轮
+                if (loading || pendingOps > 0) continue
+                if (!adapter.hasPendingSign()) continue
+                load(showSpinner = false, silent = true)
+            }
+        }
+    }
+
+    private fun load(showSpinner: Boolean = true, silent: Boolean = false) {
         if (loading) return
         loading = true
-        beginLoading()
+        if (showSpinner) beginLoading()
         lifecycleScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) {
@@ -119,15 +156,21 @@ class MySeatBookingsActivity : AppCompatActivity() {
                 binding.tvEmpty.text = getString(R.string.library_seat_bookings_empty)
             } catch (e: Exception) {
                 if (e.isCancellation) throw e
-                binding.tvEmpty.text =
-                    e.userMessage(this@MySeatBookingsActivity, R.string.library_seat_load_failed)
-                binding.tvEmpty.isVisible = adapter.itemCount == 0
-                if (adapter.itemCount > 0) {
-                    toast(e.userMessage(this@MySeatBookingsActivity, R.string.library_seat_load_failed))
+                // 后台静默轮询失败不上屏：列表还是原来那份，用户没做任何操作，
+                // 弹一句「加载失败」只会让他以为出问题了
+                if (!silent) {
+                    binding.tvEmpty.text =
+                        e.userMessage(this@MySeatBookingsActivity, R.string.library_seat_load_failed)
+                    binding.tvEmpty.isVisible = adapter.itemCount == 0
+                    if (adapter.itemCount > 0) {
+                        toast(
+                            e.userMessage(this@MySeatBookingsActivity, R.string.library_seat_load_failed)
+                        )
+                    }
                 }
             } finally {
                 loading = false
-                endLoading()
+                if (showSpinner) endLoading()
                 binding.swipe.isRefreshing = false
             }
         }
@@ -180,7 +223,7 @@ class MySeatBookingsActivity : AppCompatActivity() {
                     LibrarySeatApi.perform(action, booking)
                 }
                 toast(getString(successTextOf(action)))
-                load(refresh = true)
+                load()
             } catch (e: Exception) {
                 if (e.isCancellation) throw e
                 toast(e.userMessage(this@MySeatBookingsActivity, R.string.seat_action_failed))
@@ -215,6 +258,9 @@ class MySeatBookingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        /** 待签到订单的静默重拉间隔。与分叉第 65 轮同一节奏，足够跟上馆内签到机的回写 */
+        private const val PENDING_POLL_MS = 15_000L
+
         fun start(context: Context) {
             context.startActivity(Intent(context, MySeatBookingsActivity::class.java))
         }
@@ -237,6 +283,15 @@ class MySeatBookingsActivity : AppCompatActivity() {
             items.addAll(list)
             notifyDataSetChanged()
         }
+
+        /**
+         * 是否还有「待签到」的订单。
+         *
+         * 静默轮询只在为真时跑：签到这步往往不是在 App 里点的（用户走到馆内签到机前
+         * 扫码，或者用微信端完成），本机不主动重拉就会一直停在「待签到」。
+         * 全部变成使用中 / 已结束就自然停下，不会白白耗流量。
+         */
+        fun hasPendingSign(): Boolean = items.any { it.isPendingSign }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             val binding = ItemSeatBookingBinding.inflate(
@@ -285,8 +340,14 @@ class MySeatBookingsActivity : AppCompatActivity() {
                         },
                     )
                 }
-                // 馆内签到器扫的是「签到码」，和这里的「签到」按钮是两条入口，能签到时两个都给
-                if (SeatAction.CHECK_IN in actions) {
+                // 馆内签到器扫的是「签到码」，和 `checkIn` 那条接口是两条完全不同的路。
+                // 扫码签到的馆藏下 actionsFor 已经不产出 CHECK_IN 了，所以这个按钮的
+                // 显示条件不能挂在 `CHECK_IN in actions` 上，得看服务端配置的签到方式。
+                //
+                // 条件是「可能支持扫码」而不是「一定支持扫码」：两个字段都没下发时
+                // （= 老响应 / 字段缺失）保持以前的行为，把签到码给出来 —— 少一个能用的
+                // 入口比多一个没用的入口糟得多。只有**明确配成纯蓝牙签到**时才藏。
+                if (booking.canCheckIn() && (booking.signInQrcode || !booking.signInBluetooth)) {
                     binding.llActions.addView(
                         buildButton(context, context.getString(R.string.seat_sign_code_action)) {
                             onSignCode()
@@ -334,11 +395,15 @@ class MySeatBookingsActivity : AppCompatActivity() {
         }
 
         companion object {
-            /** 状态机驱动按钮；窗口判定用服务端下发的 `nowTime` + limitSignAgo/limitSignBack */
+            /** 状态机驱动按钮；窗口判定用服务端的实时时间（`nowTime` + 停留时长） */
             fun actionsFor(booking: SeatBooking): List<SeatAction> = buildList {
                 when {
                     booking.isPendingSign -> {
-                        if (booking.canCheckIn()) add(SeatAction.CHECK_IN)
+                        // 🔴 `POST /Seat/Index/checkIn` 是给「蓝牙签到」场景用的（原设计是 iBeacon
+                        // 靠近检测）。馆方只配扫码签到时它必然失败，用户点了只会看到「签到失败」，
+                        // 而旁边「签到码」那条路才是对的。所以这里只在**不是扫码签到**时才给
+                        // 「签到」按钮，扫码签到统一由「签到码」入口走。
+                        if (booking.canCheckIn() && !booking.signByQrCode) add(SeatAction.CHECK_IN)
                         add(SeatAction.CANCEL)
                     }
 

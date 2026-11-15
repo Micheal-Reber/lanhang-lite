@@ -736,6 +736,9 @@
     <string name="seat_sign_code_refresh">Refresh code</string>
     <string name="seat_sign_code_hint">Scan this code on the library check-in terminal. The check-in window is 30 minutes before to 30 minutes after the start. If scanning fails or the code has expired, tap "Refresh code".</string>
     <string name="seat_sign_code_failed">Failed to load the check-in code. Tap "Refresh code" to retry</string>
+    <string name="seat_sign_code_polling">Waiting for the terminal to scan…</string>
+    <string name="seat_sign_code_ok">Checked in</string>
+    <string name="seat_sign_code_retrying">Network is unstable, still retrying…</string>
     <string name="seat_action_cancel_ok">Booking canceled</string>
     <string name="seat_cancel_confirm_title">Cancel booking</string>
     <string name="seat_cancel_confirm">The seat will be released immediately. Cancel this booking?</string>
