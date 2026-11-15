@@ -1553,11 +1553,23 @@ object ImClient {
         }
     }
 
-    /** 发文件（任意本地文件）：文件名与大小都要带上，对方列表才显示得出来 */
+    /**
+     * 发文件（**任意类型**，没有白名单）。
+     *
+     * 官方也没有白名单：`RceExtensionModule` 里的「文件」是 IMKit 的 `FilePlugin`，
+     * 打开它自带的 `FileManagerActivity`（浏览本机任意文件），一次可多选，逐个发一条消息。
+     *
+     * 🔴 `type` 要填**后缀**（`doc` / `pdf` / `mp3`…），不是 MIME：官方就是
+     * `fileMessage.setType(fileInfo.getSuffix())`。官方客户端的文件列表/气泡按这个字段分图标
+     * （`FileListActivity` 判 `type.startsWith("doc")`、`equals("mp3")` 等），
+     * 留空一律显示通用文件图标；反过来我们收到官方发来的文件时，`type` 也是后缀，
+     * 所以 `ImFileOpen.resolveMime` 只认带斜杠的声明值 —— 两边语义必须一致。
+     */
     fun sendFile(peerId: String, isGroup: Boolean, uri: android.net.Uri, name: String, size: Long) {
         val content = FileMessage.obtain(uri).apply {
             this.name = name
             this.size = size
+            this.type = suffixOf(name)
         }
         sendMedia(peerId, isGroup, content, push = name) { key ->
             ImMessage(
@@ -2035,6 +2047,18 @@ object ImClient {
                 }
             }
         )
+    }
+
+    /**
+     * 文件名后缀（`报告.pdf` → `pdf`）。
+     *
+     * 只接受 1–8 位字母数字：有的文件名带点（`v1.2`）或没后缀，
+     * 那种情况宁可为空（官方按空处理成通用图标），也不要把 `2` 当后缀发出去。
+     */
+    private fun suffixOf(name: String): String {
+        val suffix = name.substringAfterLast('.', "").lowercase(java.util.Locale.US)
+        return suffix.takeIf { it.isNotEmpty() && it.length <= 8 && it.all { c -> c.isLetterOrDigit() } }
+            .orEmpty()
     }
 
     /**

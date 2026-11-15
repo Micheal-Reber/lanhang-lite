@@ -21,6 +21,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.MimeTypeMap
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -75,10 +76,16 @@ class ImChatActivity : AppCompatActivity() {
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) sendPickedImage(uri) }
 
-    /** 文件选择：SAF，任意类型（同样不需要存储权限） */
+    /**
+     * 文件选择：SAF，**任意类型 + 可多选**（都不需要存储权限）。
+     *
+     * 对齐官方：它那边是 IMKit 的 `FilePlugin` → `FileManagerActivity`，同样没有类型白名单，
+     * 一次可选多个文件，**每个文件单独发一条消息**。传入通配类型就是「全部类型」，
+     * 别为了「只看文档」去加 MIME 过滤 —— 用户要发 zip/apk/日志都能发。
+     */
     private val filePicker = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) sendPickedFile(uri) }
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> uris.forEach { sendPickedFile(it) } }
 
     /**
      * 聊天详情页返回：在那边「清除聊天记录」后要把这一页重绘，否则读的还是内存里的旧列表。
@@ -445,7 +452,7 @@ class ImChatActivity : AppCompatActivity() {
 
     private fun sendPickedFile(uri: Uri) {
         lifecycleScope.launch {
-            val name = queryName(uri) ?: "file"
+            val name = withExtension(uri, queryName(uri))
             val size = querySize(uri)
             val file = withContext(Dispatchers.IO) { copyToCache(uri, name) }
             if (file == null) {
@@ -520,6 +527,22 @@ class ImChatActivity : AppCompatActivity() {
         } ?: return null
         out.takeIf { it.length() > 0 }
     }.getOrNull()
+
+    /**
+     * 保证文件名带扩展名。
+     *
+     * 有些 provider（截图分享、云盘直链）给的 `DISPLAY_NAME` 没有后缀，原样发出去对方
+     * 既没法按类型给图标、也没法推断该用什么应用打开 —— 官方是拿本机文件，天然带后缀。
+     * 这里用 `ContentResolver.getType(uri)` 反查扩展名补上；查不到就保持原样。
+     */
+    private fun withExtension(uri: Uri, name: String?): String {
+        val base = name?.takeIf { it.isNotBlank() } ?: "file"
+        if (base.contains('.')) return base
+        val ext = runCatching {
+            contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return base
+        return "$base.$ext"
+    }
 
     private fun queryName(uri: Uri): String? {
         if (uri.scheme == "file") return uri.lastPathSegment
