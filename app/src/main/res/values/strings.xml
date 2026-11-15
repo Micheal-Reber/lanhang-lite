@@ -158,6 +158,17 @@
     <string name="im_notify_friend_accepted">%1$s 同意了你的好友申请</string>
     <string name="im_notify_friend_generic">你有新的好友申请</string>
     <string name="im_notify_friend_accepted_generic">有人同意了你的好友申请</string>
+    <!-- 后台接收（ImKeepAliveService）：开关在私信列表的溢出菜单里 -->
+    <string name="im_keep_alive">后台接收消息</string>
+    <string name="im_keep_alive_summary">退出应用后仍保持私信在线并弹通知</string>
+    <string name="im_keep_alive_on">已开启：私信保持在线，通知栏会显示一条常驻提示</string>
+    <string name="im_keep_alive_off">已关闭：退出应用后可能收不到私信通知</string>
+    <string name="im_keep_alive_channel">私信后台接收</string>
+    <string name="im_keep_alive_channel_desc">保持私信在线的常驻提示，不响铃、不振动</string>
+    <string name="im_keep_alive_title">私信接收中</string>
+    <string name="im_keep_alive_text">保持在线，新消息会弹出系统通知；可在「设置 → 通用」关闭</string>
+    <!-- 被另一台设备顶下线（ConnectionStatusListener）：不自动重连，避免互相踢 -->
+    <string name="im_err_kicked">账号已在其他设备登录，本机已断开；打开私信页可重新连接</string>
     <string name="im_image">图片</string>
     <string name="im_preview_image">[图片]</string>
     <string name="im_preview_other">[消息]</string>

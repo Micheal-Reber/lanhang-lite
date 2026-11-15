@@ -639,6 +639,29 @@ class SettingsFragment : Fragment() {
                     PermissionControlActivity.start(requireContext())
                 }
                 // 退出登录**不在这里**：与「我的资料」页底部那颗按钮重复（2026-11-13 用户要求删）
+
+                // 后台接收消息（2026-11-15 从私信页菜单挪来）：读写都走 ImBridge 注入，
+                // 这里不出现任何融云符号 —— lite 版没注入实现，整行（连同分隔线）隐藏
+                if (com.lanhang.lite.core.ImBridge.canOpen()) {
+                    val keepAliveSwitch =
+                        root.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(
+                            R.id.switchImKeepAlive
+                        )
+                    keepAliveSwitch.isChecked =
+                        com.lanhang.lite.core.ImBridge.isKeepAliveEnabled(requireContext())
+                    keepAliveSwitch.setOnCheckedChangeListener { _, checked ->
+                        com.lanhang.lite.core.ImBridge.setKeepAlive(requireContext(), checked)
+                        toast(
+                            getString(
+                                if (checked) R.string.im_keep_alive_on
+                                else R.string.im_keep_alive_off
+                            )
+                        )
+                    }
+                } else {
+                    root.findViewById<View>(R.id.rowImKeepAlive).visibility = View.GONE
+                    root.findViewById<View>(R.id.dividerImKeepAlive).visibility = View.GONE
+                }
             }
             PAGE_CACHE -> {
                 val ttlSummary = root.findViewById<TextView>(R.id.tvCacheTtlSummary)

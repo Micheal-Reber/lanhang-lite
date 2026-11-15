@@ -33,16 +33,34 @@ object ImBridge {
     @Volatile
     private var warmUpAction: ((Context) -> Unit)? = null
 
+    /** 退出登录时断开私信连接、停后台接收（im 版注入；lite 版为 null） */
+    @Volatile
+    private var logoutAction: ((Context) -> Unit)? = null
+
+    /** 「后台接收消息」开关的读（im 版注入；lite 版为 null，设置页整行隐藏） */
+    @Volatile
+    private var keepAliveGetter: ((Context) -> Boolean)? = null
+
+    /** 「后台接收消息」开关的写（写完即对账服务启停） */
+    @Volatile
+    private var keepAliveSetter: ((Context, Boolean) -> Unit)? = null
+
     fun install(
         list: (Context) -> Unit,
         chat: (Context, String) -> Unit,
         unread: () -> Int,
         warmUp: (Context) -> Unit,
+        logout: (Context) -> Unit,
+        keepAliveEnabled: (Context) -> Boolean,
+        keepAliveSet: (Context, Boolean) -> Unit,
     ) {
         listLauncher = list
         chatLauncher = chat
         unreadProvider = unread
         warmUpAction = warmUp
+        logoutAction = logout
+        keepAliveGetter = keepAliveEnabled
+        keepAliveSetter = keepAliveSet
     }
 
     /**
@@ -57,6 +75,25 @@ object ImBridge {
 
     /** 未读私信条数（会话列表里的未读之和）；未注入时 0 */
     fun unread(): Int = unreadProvider?.invoke() ?: 0
+
+    /**
+     * 退出登录时调用：断开融云长连接、停掉后台接收服务、撤掉常驻提示。
+     *
+     * 不断开的话旧身份还在收消息，通知会落到下一个登录者的机器上（串号）。
+     * lite 版没有注入 → 空操作。
+     */
+    fun logout(context: Context) {
+        logoutAction?.invoke(context.applicationContext)
+    }
+
+    /** 「后台接收消息」是否开启；lite 版（没注入）恒 false，设置页按 [canOpen] 决定显隐 */
+    fun isKeepAliveEnabled(context: Context): Boolean =
+        keepAliveGetter?.invoke(context.applicationContext) ?: false
+
+    /** 设置页的开关回调；lite 版是空操作 */
+    fun setKeepAlive(context: Context, enabled: Boolean) {
+        keepAliveSetter?.invoke(context.applicationContext, enabled)
+    }
 
     /** 入口是否可用（im 版注入成功后为 true） */
     fun canOpen(): Boolean = listLauncher != null

@@ -161,6 +161,17 @@
     <string name="im_notify_friend_accepted">%1$s accepted your friend request</string>
     <string name="im_notify_friend_generic">You have a new friend request</string>
     <string name="im_notify_friend_accepted_generic">Someone accepted your friend request</string>
+    <!-- Background receiving (ImKeepAliveService): toggle lives in the conversations overflow menu -->
+    <string name="im_keep_alive">Receive messages in background</string>
+    <string name="im_keep_alive_summary">Keep messages online and alerting after you leave the app</string>
+    <string name="im_keep_alive_on">Enabled: messages stay online with a silent ongoing notice</string>
+    <string name="im_keep_alive_off">Disabled: you may miss message alerts while the app is closed</string>
+    <string name="im_keep_alive_channel">Message background service</string>
+    <string name="im_keep_alive_channel_desc">Silent ongoing notice that keeps messages online</string>
+    <string name="im_keep_alive_title">Receiving messages</string>
+    <string name="im_keep_alive_text">Staying online for new message alerts; disable in Settings → General</string>
+    <!-- Kicked offline by another device (ConnectionStatusListener): no auto-reconnect -->
+    <string name="im_err_kicked">Signed in on another device; reopen this page to reconnect</string>
     <string name="im_image">Photo</string>
     <string name="im_preview_image">[Photo]</string>
     <string name="im_preview_other">[Message]</string>

@@ -92,6 +92,26 @@
             android:exported="true" />
 
         <!--
+          私信后台接收：前台服务保活 + 被杀后系统拉回（START_STICKY）。
+          类型 specialUse 与课前流体云一致，FOREGROUND_SERVICE / FOREGROUND_SERVICE_SPECIAL_USE
+          两条权限已在 main 清单声明，不要在这里再写一遍。
+        -->
+        <service
+            android:name=".im.ImKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!-- 开机 / 覆盖升级后重建私信长连接（服务不跨重启，见 ImBootReceiver） -->
+        <receiver
+            android:name=".im.ImBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
           不接第三方推送（本项目在前台由 SDK 回调、后台后续用系统通知）。
           IMLib 自带的推送组有两个问题：
           1. `PushService` 会再起一个 `io.rong.push` 常驻进程，纯耗内存；

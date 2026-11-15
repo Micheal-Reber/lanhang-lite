@@ -36,6 +36,21 @@ object ImNotify {
     /** 好友申请单独一条渠道：用户可以在系统里只关私信、保留好友提醒（反之亦然） */
     const val CHANNEL_FRIEND_ID = "im_friend_request"
 
+    /**
+     * 保活前台服务的常驻提示：单独一条**低重要性**渠道，不响铃、不弹横幅、不打扰。
+     *
+     * 和消息提醒分开是必须的：这条在通知栏一直挂着，用户想关它时不该连带关掉私信提醒。
+     */
+    const val CHANNEL_KEEP_ALIVE_ID = "im_keep_alive"
+
+    /**
+     * 保活常驻通知的 id。
+     *
+     * 必须落在会话通知区间（4800..6847）之外、也不与好友申请（6900）撞号，
+     * 否则它会被某条私信顶掉，前台服务随之失去通知而崩。
+     */
+    const val NOTIFY_KEEP_ALIVE = 6910
+
     private const val TAG = "LanhangIM"
 
     /** 通知 id 基数：不与上课提醒（5000+）、工作圈互动（4700）撞号 */
@@ -53,6 +68,8 @@ object ImNotify {
     private const val RC_MAIN = 4890
 
     private const val RC_FRIEND = 4891
+
+    private const val RC_KEEP_ALIVE = 4892
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -81,6 +98,52 @@ object ImNotify {
                 }
             )
         }
+        if (nm.getNotificationChannel(CHANNEL_KEEP_ALIVE_ID) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_KEEP_ALIVE_ID,
+                    context.getString(R.string.im_keep_alive_channel),
+                    // LOW：抽屉里有一条说明，但不响铃、不振动、不弹横幅
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = context.getString(R.string.im_keep_alive_channel_desc)
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
+            )
+        }
+    }
+
+    /**
+     * 保活前台服务的常驻通知（[ImKeepAliveService] 的唯一用途）。
+     *
+     * `startForeground` 本身不需要 POST_NOTIFICATIONS 运行时权限：用户没授权通知时
+     * 这条不显示在抽屉里，但服务照常运行，消息提醒仍由系统按权限决定。
+     */
+    fun keepAliveNotification(context: Context): android.app.Notification {
+        ensureChannel(context)
+        val pending = runCatching {
+            TaskStackBuilder.create(context)
+                .addNextIntent(Intent(context, MainActivity::class.java))
+                .addNextIntent(Intent(context, ImConversationsActivity::class.java))
+                .getPendingIntent(
+                    RC_KEEP_ALIVE,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+        }.getOrNull()
+        return NotificationCompat.Builder(context, CHANNEL_KEEP_ALIVE_ID)
+            .setSmallIcon(R.drawable.ic_notifications)
+            .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+            .setContentTitle(context.getString(R.string.im_keep_alive_title))
+            .setContentText(context.getString(R.string.im_keep_alive_text))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOngoing(true)
+            .setSilent(true)
+            .setShowWhen(false)
+            .setContentIntent(pending)
+            .build()
     }
 
     /** 权限判定统一委托 [NotifPermission]，与上课提醒、工作圈互动共用一份逻辑 */

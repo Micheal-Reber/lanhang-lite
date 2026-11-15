@@ -37,6 +37,8 @@ object Logout {
         ApiClient.clearCookies()
         // 融云侧也要断：只清本地 token 的话，服务端会话仍然保活，下次登录会复用旧身份
         MomentsApi.logout()
+        // 私信同样要断：长连接与后台接收服务都还挂在旧身份上（lite 版是空操作）
+        com.lanhang.lite.core.ImBridge.logout(app)
 
         // 互动消息的本地状态（已读、已通知基线）跟着账号走：换人登录后必须重来，
         // 否则旧账号的 message_id 会让新账号的消息被误判成「已通知 / 已读」

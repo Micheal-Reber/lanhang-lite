@@ -20,7 +20,17 @@ class ImInitializer : ContentProvider() {
             list = { context -> ImConversationsActivity.start(context) },
             chat = { context, peerId -> ImChatActivity.startWithPeer(context, peerId) },
             unread = { ImClient.conversations.sumOf { it.unread } },
-            warmUp = { context -> ImClient.warmUp(context) },
+            warmUp = { context ->
+                // 先对账后台接收服务（未登录 / 用户关了开关时它会自己停掉），再建连
+                ImKeepAliveService.sync(context)
+                ImClient.warmUp(context)
+            },
+            logout = { context ->
+                ImKeepAliveService.stop(context)
+                ImClient.shutdown()
+            },
+            keepAliveEnabled = { context -> ImKeepAliveService.isEnabled(context) },
+            keepAliveSet = { context, enabled -> ImKeepAliveService.setEnabled(context, enabled) },
         )
         return true
     }

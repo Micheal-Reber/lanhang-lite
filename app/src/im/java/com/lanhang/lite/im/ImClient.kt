@@ -137,6 +137,16 @@ object ImClient {
     private const val MAX_AUTO_RETRY = 3
 
     /**
+     * 断线后自动重连的退避封顶。
+     *
+     * 为什么必须有这套东西（2026-11-15 用户反馈「不打开 App 就没有私信通知」）：
+     * 融云是长连接，只有 `connect()` 那一次会主动建连；后台断网、系统回收 socket、
+     * 弱网超时之后，旧代码把状态停在 FAILED，**没有任何人再连一次** —— 直到用户手动
+     * 打开私信页。没有厂商推送通道时，这就等于「不打开 App 永远收不到消息」。
+     */
+    private const val RECONNECT_MAX_DELAY_MS = 60_000L
+
+    /**
      * 补「发送者姓名」的等待上限：拿不到就保持占位通知，不把更新吊死在网络上。
      * `/staffs/batch` 正常几百毫秒，3s 足够覆盖弱网，再久用户早看到通知了。
      */
@@ -158,6 +168,26 @@ object ImClient {
     private var sdkReady = false
     private var inFlight = false
     private var retryAttempt = 0
+
+    /** 断线重连的退避次数（2s → 4s → … → 60s 封顶），连上即归零 */
+    private var reconnectAttempt = 0
+
+    /** 已经排了一颗重连任务（防止断线回调 + 失败回调各排一颗，越排越密） */
+    private var reconnectScheduled = false
+
+    /** 重连任务实体：留着引用才能在网络恢复时把延迟的那颗撤掉、立刻连 */
+    private val reconnectTask = Runnable {
+        reconnectScheduled = false
+        val ctx = app ?: return@Runnable
+        if (status == Status.CONNECTED || status == Status.CONNECTING) return@Runnable
+        // ensureStarted 在 FAILED 之外的状态会直接复用，这里显式回到 IDLE 让它走建连
+        status = Status.IDLE
+        inFlight = false
+        ensureStarted(ctx)
+    }
+
+    /** 默认网络回调（只注册一次）：网络恢复时立刻重连，不用等退避到点 */
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
 
     /** 建连用的 application context（收消息时要弹通知，得有个长期存活的 Context） */
     @Volatile
@@ -352,6 +382,7 @@ object ImClient {
         val appCtx = context.applicationContext
         app = appCtx
         loadReadUntil(appCtx)
+        watchNetwork(appCtx)
         when (status) {
             Status.CONNECTED -> {
                 refreshConversations()
@@ -399,12 +430,12 @@ object ImClient {
         // 先判 im 再判 appKey：`appKey` 是从 `im` 里取的，合在一起写会让「im == null」那段
         // 变成恒假分支（编译器也是这么提示的），真出问题时反而看不出走的是哪条
         if (im == null) {
-            main.post { fail(text(R.string.im_err_config_no_im)) }
+            main.post { fail(text(R.string.im_err_config_no_im), retryable = false) }
             return
         }
         val appKey = im.appKey?.takeIf { it.isNotBlank() }
         if (appKey == null) {
-            main.post { fail(text(R.string.im_err_config_no_key)) }
+            main.post { fail(text(R.string.im_err_config_no_key), retryable = false) }
             return
         }
 
@@ -470,6 +501,9 @@ object ImClient {
                 error = null
                 inFlight = false
                 retryAttempt = 0
+                reconnectAttempt = 0
+                reconnectScheduled = false
+                main.removeCallbacks(reconnectTask)
                 notifyChanged()
                 refreshConversations()
                 // 会话列表是本地库，本地没有的群要另外问服务端（见 loadGroups）
@@ -501,7 +535,7 @@ object ImClient {
             override fun onTokenIncorrect() {
                 Log.w(TAG, "onTokenIncorrect")
                 if (!allowTokenRefresh) {
-                    fail(text(R.string.im_err_token_rejected))
+                    fail(text(R.string.im_err_token_rejected), retryable = false)
                     return
                 }
                 Session.imToken = ""
@@ -520,7 +554,7 @@ object ImClient {
                             Session.imToken = fresh
                             connectWith(fresh, allowTokenRefresh = false)
                         } else {
-                            fail(text(R.string.im_err_token_rejected))
+                            fail(text(R.string.im_err_token_rejected), retryable = false)
                         }
                     }
                 }
@@ -533,11 +567,79 @@ object ImClient {
         return name.contains("IPC") || name.contains("NETWORK") || name.contains("TIMEOUT")
     }
 
-    private fun fail(message: String) {
+    private fun fail(message: String, retryable: Boolean = true) {
         status = Status.FAILED
         error = message
         inFlight = false
         notifyChanged()
+        // 瞬时失败（网络、网关抖动）也要自己爬起来：后台没有 UI，没人替它点「重试」。
+        // 永久性失败（学校没开私信、token 被拒）不传 retryable，免得每分钟空打一次配置接口
+        if (retryable) scheduleReconnect()
+    }
+
+    /** 排一颗延迟重连（退避 2s 起、60s 封顶）；已排过或已连上就不再排 */
+    private fun scheduleReconnect() {
+        val ctx = app ?: return
+        if (Session.token.isBlank() && Session.imToken.isBlank()) return // 已退出登录
+        if (reconnectScheduled) return
+        reconnectScheduled = true
+        val delay = (2_000L shl reconnectAttempt.coerceAtMost(5)).coerceAtMost(RECONNECT_MAX_DELAY_MS)
+        reconnectAttempt++
+        Log.i(TAG, "reconnect scheduled in ${delay}ms attempt=$reconnectAttempt")
+        main.postDelayed(reconnectTask, delay)
+    }
+
+    /** 立刻重连：撤掉还在等退避的那颗，马上建连（网络恢复时用） */
+    private fun reconnectNow() {
+        if (app == null) return // 还没建连过，没有上下文可用
+        if (status == Status.CONNECTED || status == Status.CONNECTING) return
+        if (Session.token.isBlank() && Session.imToken.isBlank()) return
+        main.removeCallbacks(reconnectTask)
+        reconnectScheduled = false
+        main.post(reconnectTask)
+    }
+
+    /**
+     * 监听默认网络：熄屏 / 切网之后长连接常常已经死了，但断线回调未必及时到。
+     * 网络一恢复就主动重连，比干等退避到点快得多。
+     *
+     * 只在进程存活期内有效（不持久注册、不唤醒设备），不额外耗电。
+     */
+    private fun watchNetwork(ctx: Context) {
+        if (networkCallback != null) return
+        val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                reconnectNow()
+            }
+        }
+        runCatching { cm.registerDefaultNetworkCallback(callback) }
+            .onSuccess { networkCallback = callback }
+            .onFailure { Log.w(TAG, "registerNetworkCallback failed", it) }
+    }
+
+    /**
+     * 退出登录：断开融云、撤掉重连任务、清空本进程的会话与已读水位线。
+     *
+     * 只清 `Session` 不断连接的话，旧身份的长连接还在收消息，通知会发到下一个
+     * 登录者的机器上（串号）。由 `ImBridge.logout` 在 `Logout.clear` 里调用。
+     */
+    fun shutdown() {
+        main.removeCallbacks(reconnectTask)
+        reconnectScheduled = false
+        reconnectAttempt = 0
+        retryAttempt = 0
+        inFlight = false
+        status = Status.IDLE
+        error = null
+        conversations = emptyList()
+        threads.clear()
+        joinedGroups = emptyList()
+        readUntil.clear()
+        readVerified.clear()
+        visibleThreadKey = null
+        runCatching { RongIMClient.getInstance().logout() }
+            .onFailure { Log.w(TAG, "rong logout failed", it) }
     }
 
     // ---------------------------------------------------------------- 监听
@@ -545,6 +647,33 @@ object ImClient {
     private fun installListeners() {
         if (listenersInstalled) return
         listenersInstalled = true
+        // 长连接状态：断线必须自己连回去，否则后台期间断一次就永远收不到消息
+        RongIMClient.setConnectionStatusListener { connectionStatus ->
+            Log.i(TAG, "connection status=$connectionStatus")
+            when (connectionStatus) {
+                RongIMClient.ConnectionStatusListener.ConnectionStatus.CONNECTED -> {
+                    reconnectAttempt = 0
+                    reconnectScheduled = false
+                    main.removeCallbacks(reconnectTask)
+                }
+                RongIMClient.ConnectionStatusListener.ConnectionStatus.KICKED_OFFLINE_BY_OTHER_CLIENT -> {
+                    // 被另一台设备顶下线：**不能**自动重连，否则两台设备互相踢成死循环。
+                    // 留在 FAILED，等用户打开私信页手动重连
+                    status = Status.FAILED
+                    error = text(R.string.im_err_kicked)
+                    inFlight = false
+                    notifyChanged()
+                }
+                // CONNECTING：自己正在连，不排重连（实测会多排一颗 2s 的废任务）
+                RongIMClient.ConnectionStatusListener.ConnectionStatus.CONNECTING -> Unit
+                else -> {
+                    // DISCONNECTED / NETWORK_UNAVAILABLE / SOCKET_DISCONNECTED …
+                    // 先离开 CONNECTED（UI 显示「连接中」而不是继续假装在线），再排重连
+                    if (status == Status.CONNECTED) status = Status.IDLE
+                    scheduleReconnect()
+                }
+            }
+        }
         RongIMClient.setOnReceiveMessageListener { message, _ ->
             // ① 好友事件：消费掉 —— 不进气泡、不刷会话、更不弹「新私信」
             if (isFriendNotify(message)) {
