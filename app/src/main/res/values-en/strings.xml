@@ -176,6 +176,8 @@
     <string name="im_err_kicked">Signed in on another device; reopen this page to reconnect</string>
     <string name="im_image">Photo</string>
     <string name="im_preview_image">[Photo]</string>
+    <string name="im_preview_video">[Video]</string>
+    <string name="im_preview_voice">[Voice]</string>
     <string name="im_preview_other">[Message]</string>
     <string name="im_yesterday">Yesterday</string>
     <string name="im_err_config_read">Could not read school config (%1$s)</string>
@@ -188,14 +190,32 @@
     <string name="im_err_token_rejected">The token was rejected, please sign in again</string>
     <string name="im_err_not_connected">Not connected, the message was not sent</string>
     <string name="im_err_send_failed">Send failed (%1$s)</string>
+    <string name="im_err_msg_too_large">Content exceeds the size limit (video thumbnail too large), try another video</string>
     <string name="im_unknown_error">unknown error</string>
     <string name="im_push_image">[Photo]</string>
     <string name="im_push_video">[Video]</string>
+    <string name="im_push_voice">[Voice]</string>
     <string name="im_emoji">Emoji</string>
     <string name="im_attach">More</string>
     <string name="im_attach_image">Photo</string>
     <string name="im_attach_video">Video</string>
     <string name="im_video_open_failed">No app can play this video</string>
+    <!-- Video length limit (server side; 300s fallback when unavailable) -->
+    <string name="im_video_too_long">Videos can be at most %1$d seconds</string>
+    <!-- Voice: hold-to-talk mic button in the composer (official RC:VcMsg) -->
+    <string name="im_voice_hold_to_speak">Hold to talk</string>
+    <string name="im_voice_too_short">Recording was too short</string>
+    <string name="im_voice_denied">No microphone permission to send voice messages</string>
+    <string name="im_voice_play_failed">Could not play this voice message</string>
+    <string name="im_voice_record_failed">Recording failed, try again</string>
+    <!-- Voice mode: leftmost key toggles voice/keyboard, composer becomes a hold-to-talk bar -->
+    <string name="im_voice_hold_button">Hold to talk</string>
+    <string name="im_switch_to_voice">Switch to voice input</string>
+    <string name="im_switch_to_keyboard">Switch to keyboard</string>
+    <!-- Recording overlay hints: idle / will cancel / will send -->
+    <string name="im_voice_slide_up_cancel">Slide up to cancel</string>
+    <string name="im_voice_release_to_cancel">Release to cancel</string>
+    <string name="im_voice_release_to_send">Release to send</string>
     <string name="im_attach_file">File</string>
     <string name="im_attach_location">Location</string>
     <string name="im_file_open_with">Open with</string>

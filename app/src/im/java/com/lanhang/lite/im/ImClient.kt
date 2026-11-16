@@ -17,11 +17,13 @@ import io.rong.imlib.model.Group
 import io.rong.imlib.model.Message
 import io.rong.imlib.model.MessageContent
 import io.rong.message.FileMessage
+import io.rong.message.HQVoiceMessage
 import io.rong.message.ImageMessage
 import io.rong.message.LocationMessage
 import io.rong.message.ReadReceiptMessage
 import io.rong.message.SightMessage
 import io.rong.message.TextMessage
+import io.rong.message.VoiceMessage
 import okhttp3.Request
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -53,10 +55,10 @@ data class ImConversation(
      */
     val read: Boolean = false,
 ) {
-    enum class PreviewKind { TEXT, IMAGE, OTHER }
+    enum class PreviewKind { TEXT, IMAGE, VIDEO, VOICE, OTHER }
 }
 
-/** 聊天页的一条消息（文本 / 图片 / 文件 / 位置四种，2026-10-31 补齐后三种） */
+/** 聊天页的一条消息（文本 / 图片 / 文件 / 位置 / 视频 / 语音，2026-11-15 补齐后两种） */
 data class ImMessage(
     val key: String,
     val text: String,
@@ -92,7 +94,7 @@ data class ImMessage(
     val lat: Double = 0.0,
     /** 位置消息的经度 */
     val lng: Double = 0.0,
-    /** 视频时长（秒，[kind] == [KIND_VIDEO] 时有值） */
+    /** 时长（秒，[kind] 是 [KIND_VIDEO] / [KIND_VOICE] 时有值） */
     val duration: Int = 0,
     /** 视频/文件的媒体地址（本地路径或媒体服务器地址，点开时要用） */
     val mediaUrl: String? = null,
@@ -101,6 +103,13 @@ data class ImMessage(
      * 群聊不回执已读，这里的值恒为 false，界面也不展示。
      */
     val read: Boolean = false,
+    /**
+     * 发送失败的**具体原因**（只在 [state] == [STATE_FAILED] 时有值）。
+     *
+     * 气泡上那行小字优先显示它：只写「发送失败」，用户无从判断是网络断了还是内容超限，
+     * 视频发不出去时尤其需要一句人话（见 `ImClient.describeSendError`）。
+     */
+    val errorText: String? = null,
 ) {
     val isImage: Boolean get() = kind == KIND_IMAGE
 
@@ -114,6 +123,8 @@ data class ImMessage(
         const val KIND_FILE = 2
         const val KIND_LOCATION = 3
         const val KIND_VIDEO = 4
+        /** 语音（`RC:VcMsg`；高清语音 `RC:HQVCMsg` 同样映射到这里，只是落盘方式不同） */
+        const val KIND_VOICE = 5
     }
 }
 
@@ -513,6 +524,12 @@ object ImClient {
             // 单独 catch：注册失败只是退化成「读不出事件内容」，不能连 SDK 都不起。
             runCatching { RongIMClient.registerMessageType(ContactNtfyMessage::class.java) }
                 .onFailure { Log.e(TAG, "registerMessageType failed", it) }
+            // 视频同理，而且更隐蔽：`initSDK` 的默认注册表里有 Voice/HQVoice，**唯独没有
+            // SightMessage**（aar 字节码核对过）—— 不注册就解成 UnknownMessage，
+            // toImMessage 直接返回 null，对方发来的视频被静默丢掉（连通知都不弹）。
+            // 同样单独 catch：注册失败只影响视频，不能连 SDK 都不起。
+            runCatching { RongIMClient.registerMessageType(SightMessage::class.java) }
+                .onFailure { Log.e(TAG, "registerMessageType sight failed", it) }
             val ok = runCatching {
                 if (navi != null) RongIMClient.setServerInfo(navi, media.orEmpty())
                 RongIMClient.init(app, appKey)
@@ -1002,8 +1019,17 @@ object ImClient {
         val ctx = app ?: return
         val peerId = message.targetId.orEmpty()
         val senderId = message.senderUserId.orEmpty()
-        val text = (message.content as? TextMessage)?.content.orEmpty()
-            .ifBlank { ctx.getString(R.string.im_notify_body_placeholder) }
+        // 正文按消息类型选：语音/图片/视频没有文字，不能都落到占位的「[消息]」
+        // （用户看到的会是「来了一条私信」这种没信息量的提醒）
+        val body = when (val content = message.content) {
+            is TextMessage -> content.content.orEmpty()
+            is VoiceMessage, is HQVoiceMessage -> ctx.getString(R.string.im_push_voice)
+            is SightMessage -> ctx.getString(R.string.im_push_video)
+            is ImageMessage -> ctx.getString(R.string.im_push_image)
+            is FileMessage -> content.name.orEmpty()
+            else -> ""
+        }
+        val text = body.ifBlank { ctx.getString(R.string.im_notify_body_placeholder) }
         // 单聊看发送者、群聊也要发送者（正文里带「谁说了什么」）
         val known = UserInfoCache.get(senderId)?.name.orEmpty()
         ImNotify.show(
@@ -1052,8 +1078,9 @@ object ImClient {
     /**
      * 把 SDK 的消息转成界面用的 [ImMessage]。
      *
-     * 目前认两类：文本、图片。其余类型（语音/文件/位置）返回 null —— 界面上不显示，
-     * 但**照样会弹通知**（收消息回调里单独处理），不会「静悄悄地没反应」。
+     * 认六类：文本、图片、文件、位置、视频、语音。其余（官方在「同意好友」时插的系统气泡、
+     * 没注册成功的自定义消息）返回 null —— 界面上不显示，也**不弹通知**
+     * （收消息回调里对 null 直接跳过，见那里「静默」的注释）。
      */
     private fun toImMessage(message: Message): ImMessage? {
         val content = message.content
@@ -1111,9 +1138,30 @@ object ImClient {
             is SightMessage -> base.copy(
                 kind = ImMessage.KIND_VIDEO,
                 duration = content.duration,
-                // 气泡里显示封面（对方发来的封面是远端地址，coil 直接下）
-                imageUrl = content.thumbUri?.toString(),
-                mediaUrl = (content.mediaUrl ?: content.localPath)?.toString(),
+                fileSize = content.size,
+                // 气泡里显示封面（对端把封面 base64 内联，decode 时已落盘成 .jpg）。
+                // 🔴 **只认封面，不回落到 mediaUrl** —— 那是 .mp4 的地址，coil 解不出位图，
+                // 结果是「复用的 holder 还留着上一条的图」这种串图。没封面就走占位块
+                // （`bindMedia` 的空地址分支，视频照样可点开）。
+                imageUrl = pick(content.thumbUri?.toString()),
+                // 点开播放：**本地已有的排第一**（视频不像图片要区分缩略/原图，
+                // 本地那份就是完整视频），没有才用媒体服务器地址（点开时先下载）
+                mediaUrl = pick(content.localPath?.toString(), content.mediaUrl?.toString()),
+            )
+            // 普通语音：base64 内联，decode 时直接落盘成 `<msgId>.amr` 并填进 uri，
+            // **没有下载环节**（所以不用挂 ensureImageDownloaded）
+            is VoiceMessage -> base.copy(
+                kind = ImMessage.KIND_VOICE,
+                duration = content.duration,
+                mediaUrl = pick(content.uri?.toString()),
+                text = "",
+            )
+            // 高音质语音：走媒体服务器（`sendMediaMessage`），本地可能还没下
+            is HQVoiceMessage -> base.copy(
+                kind = ImMessage.KIND_VOICE,
+                duration = content.duration,
+                mediaUrl = pick(content.localPath?.toString(), content.mediaUrl?.toString()),
+                text = "",
             )
             else -> return null
         }
@@ -1403,13 +1451,15 @@ object ImClient {
     /**
      * 会话预览该按哪种类型渲染。
      *
-     * 分三类而不是「是不是图片」：语音/文件/位置这些也没文本，混进「没有消息」会显示成
+     * 分五类而不是「是不是图片」：语音/视频/文件/位置这些也没文本，混进「没有消息」会显示成
      * 「还没有私信」，看着像 bug —— 那是空会话的文案。
      */
     private fun previewKindOf(c: Conversation): ImConversation.PreviewKind = when (c.latestMessage) {
         null -> ImConversation.PreviewKind.TEXT
         is TextMessage -> ImConversation.PreviewKind.TEXT
         is ImageMessage -> ImConversation.PreviewKind.IMAGE
+        is SightMessage -> ImConversation.PreviewKind.VIDEO
+        is VoiceMessage, is HQVoiceMessage -> ImConversation.PreviewKind.VOICE
         else -> ImConversation.PreviewKind.OTHER
     }
 
@@ -1517,7 +1567,7 @@ object ImClient {
 
                 override fun onError(message: Message?, e: RongIMClient.ErrorCode?) {
                     Log.w(TAG, "send error=$e")
-                    markState(peerId, isGroup, key, ImMessage.STATE_FAILED)
+                    markState(peerId, isGroup, key, ImMessage.STATE_FAILED, describeSendError(e))
                     error = text(R.string.im_err_send_failed, e?.name ?: text(R.string.im_unknown_error))
                 }
             }
@@ -1566,11 +1616,20 @@ object ImClient {
      * 所以 `ImFileOpen.resolveMime` 只认带斜杠的声明值 —— 两边语义必须一致。
      */
     fun sendFile(peerId: String, isGroup: Boolean, uri: android.net.Uri, name: String, size: Long) {
-        val content = FileMessage.obtain(uri).apply {
-            this.name = name
-            this.size = size
-            this.type = suffixOf(name)
+        val content = FileMessage.obtain(uri) ?: run {
+            Log.w(TAG, "sendFile obtain failed uri=$uri")
+            error = text(R.string.im_err_send_failed, text(R.string.im_unknown_error))
+            notifyChanged()
+            return
         }
+        // `obtain` 内部已经按 File 填好 name/size。这里：
+        // - name 必须覆盖成**展示名**（缓存文件名带时间戳前缀，不能让对方看到那个前缀）；
+        // - size **绝不能用调用方传来的 OpenableColumns 值覆盖**：SAF 经常回 SIZE=0，
+        //   覆盖成 0 字节会被服务端拒收（参考项目同款结论）。只有 SDK 读出来是 0 时才回退。
+        content.name = name
+        content.size = content.size.takeIf { it > 0 } ?: size
+        content.type = suffixOf(name)
+        val actualSize = content.size
         sendMedia(peerId, isGroup, content, push = name) { key ->
             ImMessage(
                 key = key,
@@ -1581,7 +1640,7 @@ object ImClient {
                 senderId = Session.userId,
                 kind = ImMessage.KIND_FILE,
                 fileName = name,
-                fileSize = size,
+                fileSize = actualSize,
             )
         }
     }
@@ -2090,7 +2149,17 @@ object ImClient {
      * 发小视频（`SightMessage`）。
      *
      * 和图片一样走 `sendMediaMessage`（要上传）。封面必须自己抽一帧传进来 ——
-     * SDK 不会替视频生成缩略图，不传的话对方列表里就是一块空白。
+     * SDK 不会替视频生成缩略图（拿不到封面时它才会退回去用 `ThumbnailUtils` 自己补一帧）。
+     *
+     * 🔴 **必须用两参 `obtain(video, durationSec)`**（aar 字节码核对过）：
+     * - 两参版内部走 `SightMessage(File, Uri, int)`，会把 `name` / `size` 按文件填上；
+     * - 三参版 `obtain(thumb, local, duration)` 只设 `thumbUri` + `localPath` + `duration`，
+     *   **不填 name/size** → 服务端判 `PARAMETER_ERROR`，视频发不出去。
+     * 填完再单独把封面挂上去，两件事不能合在一个调用里。
+     *
+     * 🔴 **封面绝不能退回「封面 = 视频本身」**：发送链路会把 `thumbUri` 的字节整个 base64
+     * 塞进消息体，而消息体上限只有 128KB —— 那等于把整段视频塞进去，必爆
+     * `RC_MSG_SIZE_OUT_OF_LIMIT`。拿不到合规封面就不设，让 SDK 自己补。
      */
     fun sendVideo(
         peerId: String,
@@ -2099,7 +2168,18 @@ object ImClient {
         thumb: android.net.Uri?,
         durationSec: Int,
     ) {
-        val content = SightMessage.obtain(video, thumb ?: video, durationSec)
+        val content = SightMessage.obtain(video, durationSec) ?: run {
+            // 只有「不是 file:// / 文件不在盘上」才会走到这里；真发生也别硬发一条残缺消息
+            Log.w(TAG, "sendVideo obtain failed uri=$video")
+            error = text(R.string.im_err_send_failed, text(R.string.im_unknown_error))
+            notifyChanged()
+            return
+        }
+        // 缓存文件名带 13 位时间戳前缀（防同名覆盖，见 `ImChatActivity.copyToCache`），
+        // 发到对端的 name 要还原成原始文件名 —— 对方保存视频时用的就是它
+        content.name = stripCachePrefix(content.name)
+        val cover = thumb?.let { ImVideoCover.ensureSmall(it) }
+        cover?.let { content.thumbUri = it }
         sendMedia(peerId, isGroup, content, push = text(R.string.im_push_video)) { key ->
             ImMessage(
                 key = key,
@@ -2109,14 +2189,57 @@ object ImClient {
                 state = ImMessage.STATE_SENDING,
                 senderId = Session.userId,
                 kind = ImMessage.KIND_VIDEO,
-                imageUrl = (thumb ?: video).toString(),
+                // 封面只认 thumb：回落到视频文件会让 coil 去解 mp4（解不出，显示成空白）
+                imageUrl = cover?.toString(),
                 duration = durationSec,
                 mediaUrl = video.toString(),
             )
         }
     }
 
-    /** 不走上传通道的消息（文本 / 位置）：`sendMessage` 与 `sendLocationMessage` 长一个样 */
+    /**
+     * 去掉 [ImChatActivity.copyToCache] 给缓存文件加的 `<13 位时间戳>_` 前缀。
+     *
+     * 只在形态完全吻合（13 个数字 + `_` + 还剩至少 1 个字符）时才截，
+     * 免得把原始文件名里本来就有的数字前缀误伤掉。
+     */
+    private fun stripCachePrefix(name: String?): String? {
+        val n = name ?: return null
+        if (n.length < 15 || n[13] != '_') return n
+        if (!n.take(13).all { it.isDigit() }) return n
+        return n.substring(14)
+    }
+
+    /**
+     * 发语音（`RC:VcMsg`，普通音质）。
+     *
+     * 🔴 **必须走 `sendPlain`（`sendMessage`），不能走 `sendMedia`**：`VoiceMessage` 继承的是
+     * `MessageContent`，没有媒体上传环节 —— 它的 `VoiceMessageHandler.encodeMessage` 自己把
+     * 文件读成 base64 塞进消息体。走 `sendMediaMessage` 只会白等一个不存在的上传（官方
+     * `AudioRecordManager:660` 也是 `sendMessage`）。高清语音 `RC:HQVCMsg` 才是
+     * `MediaMessageContent`、才走 `sendMediaMessage`，这一版先不做发送。
+     *
+     * @param file 录音落盘的 `.amr`（调用方保证在盘上，`encodeMessage` 要按 uri 读字节）
+     * @param durationSec 秒；界面按它显示时长
+     */
+    fun sendVoice(peerId: String, isGroup: Boolean, file: java.io.File, durationSec: Int) {
+        val content = VoiceMessage.obtain(android.net.Uri.fromFile(file), durationSec)
+        sendPlain(peerId, isGroup, content, push = text(R.string.im_push_voice)) { key ->
+            ImMessage(
+                key = key,
+                text = "",
+                mine = true,
+                time = System.currentTimeMillis(),
+                state = ImMessage.STATE_SENDING,
+                senderId = Session.userId,
+                kind = ImMessage.KIND_VOICE,
+                duration = durationSec,
+                mediaUrl = "file://${file.absolutePath}",
+            )
+        }
+    }
+
+    /** 不走上传通道的消息（文本 / 位置 / 语音）：`sendMessage` 与 `sendLocationMessage` 长一个样 */
     private fun sendPlain(
         peerId: String,
         isGroup: Boolean,
@@ -2146,7 +2269,7 @@ object ImClient {
 
             override fun onError(message: Message?, e: RongIMClient.ErrorCode?) {
                 Log.w(TAG, "send plain error=$e")
-                markState(peerId, isGroup, key, ImMessage.STATE_FAILED)
+                markState(peerId, isGroup, key, ImMessage.STATE_FAILED, describeSendError(e))
                 error = text(R.string.im_err_send_failed, e?.name ?: text(R.string.im_unknown_error))
             }
         }
@@ -2200,7 +2323,7 @@ object ImClient {
 
                 override fun onError(message: Message?, e: RongIMClient.ErrorCode?) {
                     Log.w(TAG, "send media error=$e")
-                    markState(peerId, isGroup, key, ImMessage.STATE_FAILED)
+                    markState(peerId, isGroup, key, ImMessage.STATE_FAILED, describeSendError(e))
                     error = text(R.string.im_err_send_failed, e?.name ?: text(R.string.im_unknown_error))
                 }
             }
@@ -2317,13 +2440,31 @@ object ImClient {
         }
     }
 
-    private fun markState(peerId: String, isGroup: Boolean, key: String, state: Int) {
+    private fun markState(
+        peerId: String,
+        isGroup: Boolean,
+        key: String,
+        state: Int,
+        errorText: String? = null,
+    ) {
         main.post {
             val list = threads[threadKey(peerId, isGroup)] ?: return@post
             val index = list.indexOfFirst { it.key == key }
-            if (index >= 0) list[index] = list[index].copy(state = state)
+            if (index >= 0) list[index] = list[index].copy(state = state, errorText = errorText)
             notifyChanged()
         }
+    }
+
+    /**
+     * 把 SDK 的错误码翻成人话；认不出来的返回 null（界面退回通用的「发送失败」）。
+     *
+     * 只翻译**我们真的知道怎么回事**的那一个：`RC_MSG_SIZE_OUT_OF_LIMIT` 是消息体超过 128KB，
+     * 在我们这儿几乎只可能是视频封面没压住（见 `ImVideoCover`），不提示的话用户只会反复重发。
+     */
+    private fun describeSendError(e: RongIMClient.ErrorCode?): String? = when (e?.name) {
+        "RC_MSG_SIZE_OUT_OF_LIMIT", "MSG_SIZE_OUT_OF_LIMIT" ->
+            text(R.string.im_err_msg_too_large)
+        else -> null
     }
 
     /**

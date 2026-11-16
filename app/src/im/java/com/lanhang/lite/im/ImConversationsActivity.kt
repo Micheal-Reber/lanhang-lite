@@ -514,9 +514,11 @@ class ImConversationsActivity : AppCompatActivity() {
             fun bind(conversation: ImConversation) {
                 val title = titleOf(conversation)
                 b.tvTitle.text = title
-                // 图片/语音这些没有文本预览，换成对应文案（本地化，别在数据层存成品文案）
+                // 图片/视频/语音这些没有文本预览，换成对应文案（本地化，别在数据层存成品文案）
                 b.tvPreview.text = when (conversation.previewKind) {
                     ImConversation.PreviewKind.IMAGE -> getString(R.string.im_preview_image)
+                    ImConversation.PreviewKind.VIDEO -> getString(R.string.im_preview_video)
+                    ImConversation.PreviewKind.VOICE -> getString(R.string.im_preview_voice)
                     ImConversation.PreviewKind.OTHER -> getString(R.string.im_preview_other)
                     ImConversation.PreviewKind.TEXT -> conversation.preview.ifBlank {
                         // 群可能只是本地还没有消息（从「我加入的群」补进来的），

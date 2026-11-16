@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「按住 说话」长条：描边 + 容器底色。
+  录音时由代码换 [bg_im_hold_active]（底色加深），松手复原 —— 不给按下反馈的话，
+  用户分不清「按到了但没开始录」和「按歪了」。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="8dp" />
+    <solid android:color="?attr/colorSurfaceContainerHigh" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/colorOutlineVariant" />
+</shape>

@@ -173,6 +173,8 @@
     <string name="im_err_kicked">账号已在其他设备登录，本机已断开；打开私信页可重新连接</string>
     <string name="im_image">图片</string>
     <string name="im_preview_image">[图片]</string>
+    <string name="im_preview_video">[视频]</string>
+    <string name="im_preview_voice">[语音]</string>
     <string name="im_preview_other">[消息]</string>
     <string name="im_yesterday">昨天</string>
     <string name="im_err_config_read">读取学校配置失败（%1$s）</string>
@@ -185,14 +187,32 @@
     <string name="im_err_token_rejected">登录令牌不被私信服务认可，请重新登录后再试</string>
     <string name="im_err_not_connected">私信未连接，消息没有发出去</string>
     <string name="im_err_send_failed">发送失败（%1$s）</string>
+    <string name="im_err_msg_too_large">内容超过大小限制（视频封面过大），换一个视频再发</string>
     <string name="im_unknown_error">未知错误</string>
     <string name="im_push_image">[图片]</string>
     <string name="im_push_video">[视频]</string>
+    <string name="im_push_voice">[语音]</string>
     <string name="im_emoji">表情</string>
     <string name="im_attach">更多</string>
     <string name="im_attach_image">图片</string>
     <string name="im_attach_video">视频</string>
     <string name="im_video_open_failed">没有能播放视频的应用</string>
+    <!-- 发视频时长上限（服务端下发，取不到时用 300 秒兜底） -->
+    <string name="im_video_too_long">视频最长 %1$d 秒</string>
+    <!-- 语音：输入条上的麦克风按住说话（2026-11-15 对齐官方 RC:VcMsg） -->
+    <string name="im_voice_hold_to_speak">按住说话</string>
+    <string name="im_voice_too_short">说话时间太短</string>
+    <string name="im_voice_denied">没有麦克风权限，无法发送语音</string>
+    <string name="im_voice_play_failed">无法播放这条语音</string>
+    <string name="im_voice_record_failed">录音失败，请重试</string>
+    <!-- 语音模式（2026-11-16 照微信改造）：输入条最左是「语音 ⇄ 键盘」，中间换成「按住 说话」长条 -->
+    <string name="im_voice_hold_button">按住 说话</string>
+    <string name="im_switch_to_voice">切换到语音输入</string>
+    <string name="im_switch_to_keyboard">切换到键盘</string>
+    <!-- 录音浮层的提示语：默认状态 / 已滑进取消区 / 松手即发送 -->
+    <string name="im_voice_slide_up_cancel">手指上滑，取消发送</string>
+    <string name="im_voice_release_to_cancel">松开手指，取消发送</string>
+    <string name="im_voice_release_to_send">松开手指，发送</string>
     <string name="im_attach_file">文件</string>
     <string name="im_attach_location">位置</string>
     <string name="im_file_open_with">用其他应用打开</string>

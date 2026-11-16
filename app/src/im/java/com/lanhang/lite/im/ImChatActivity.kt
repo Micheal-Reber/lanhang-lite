@@ -8,16 +8,24 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
 import android.location.Geocoder
 import android.location.Location
 import android.util.Log
 import android.location.LocationManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -34,6 +42,7 @@ import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -50,6 +59,7 @@ import com.lanhang.lite.R
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.databinding.ActivityImChatBinding
 import com.lanhang.lite.databinding.ItemImMessageBinding
+import io.rong.imlib.RongIMClient
 
 /**
  * 聊天页（IM 版专属，MVP 只收发文本）。
@@ -68,6 +78,9 @@ class ImChatActivity : AppCompatActivity() {
 
     private var peerId: String = ""
     private var isGroup: Boolean = false
+
+    /** 刚展开面板、键盘还在收起动画里：这几帧的 `ime.bottom > 0` 不能当成「用户要键盘」 */
+    private var panelOpening = false
 
     private val onChanged: () -> Unit = { if (::binding.isInitialized) render() }
 
@@ -102,6 +115,55 @@ class ImChatActivity : AppCompatActivity() {
 
     /** key → 下载进度（-1 = 已发起、还没有进度回调）；有值就在气泡上显示「下载中」 */
     private val downloading = mutableMapOf<String, Int>()
+
+    // ---------------------------------------------------------------- 语音（2026-11-15，2026-11-16 改微信式）
+
+    /** 录音器：按住说话期间一直拿着，页面切走必须 [ImVoiceRecorder.cancel] */
+    private val voiceRecorder = ImVoiceRecorder(this)
+
+    /**
+     * 输入条当前是不是语音模式（中间换成「按住 说话」长条，最左那颗键变成键盘图标）。
+     *
+     * 与「有没有在录音」是两件事：模式是常驻状态，录音只是其中一次按下。
+     */
+    private var voiceMode = false
+
+    /** 手指正按在「按住 说话」上且录音进行中（权限弹窗期间是 false，见 [startVoice]） */
+    private var recordingVoice = false
+
+    /** 按下时的 Y：往上滑出一段距离 = 取消这次录音 */
+    private var voiceStartRawY = 0f
+
+    /** 上滑取消的当前状态（只在跨过阈值时改，用来切浮层提示语） */
+    private var voiceSlideCancel = false
+
+    /** 这次录音的起点（`elapsedRealtime`，不受用户改系统时间影响），浮层计时用 */
+    private var voiceStartAt = 0L
+
+    /** 60 秒上限：到点自动松手发送（官方 `AudioRecordManager.RECORD_INTERVAL = 60`） */
+    private val voiceMaxTask = Runnable { if (recordingVoice) finishVoice() }
+
+    /**
+     * 录音浮层的秒表（200ms 一跳）。
+     *
+     * 用 200ms 而不是 1000ms：跳秒时的边界抖动肉眼可见（0:01 停 1.2 秒才跳），
+     * 而这点刷新开销在录音期间可以忽略。
+     */
+    private val voiceTickTask = object : Runnable {
+        override fun run() {
+            if (!recordingVoice) return
+            val seconds = ((SystemClock.elapsedRealtime() - voiceStartAt) / 1000L).toInt()
+            binding.tvVoiceTime.text = durationText(seconds)
+            mainHandler.postDelayed(this, 200L)
+        }
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** 正在播放的语音 key（同一时刻只放一条）；气泡按它显示 ▶ / ■ */
+    private var playingKey: String? = null
+
+    private var player: MediaPlayer? = null
 
     /**
      * 「保存到手机」：交给系统的另存为对话框，**目录和文件名都由用户自己挑**。
@@ -146,6 +208,20 @@ class ImChatActivity : AppCompatActivity() {
         if (granted) sendLocationNow() else toast(getString(R.string.im_location_denied))
     }
 
+    /**
+     * 录音权限（**只有 im 变体的清单里有这条**，见 `src/im/AndroidManifest.xml`）。
+     *
+     * 🔴 授权回来**不自动开始录音**：弹权限框那一下手指早就抬起来了，
+     * 自动开录只会在没人按着的情况下录 60 秒再误发一条。提示一句「按住说话」，
+     * 用户再按一次即可 —— 少一次惊喜比少一次点击重要。
+     */
+    private val audioPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) toast(R.string.im_voice_hold_to_speak)
+        else toast(getString(R.string.im_voice_denied))
+    }
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.wrap(newBase))
     }
@@ -188,8 +264,9 @@ class ImChatActivity : AppCompatActivity() {
             val tb = binding.toolbar
             tb.setPadding(tb.paddingLeft, bars.top, tb.paddingRight, 0)
             applyComposerInsets()
-            // 键盘一露头就把面板收掉：三者（键盘 / 表情 / 附件）同屏会把输入区顶掉半屏
-            if (ime.bottom > 0) hidePanels()
+            // 键盘一露头就把面板收掉：三者（键盘 / 表情 / 附件）同屏会把输入区顶掉半屏。
+            // 刚点开面板的那 400ms 不算（键盘正在收起，ime 还是旧值），否则面板会被自己关掉
+            if (ime.bottom > 0 && !panelOpening) hidePanels()
             insets
         }
 
@@ -199,6 +276,7 @@ class ImChatActivity : AppCompatActivity() {
 
         buildEmojiPanel()
         binding.btnEmoji.setOnClickListener {
+            // 只有文字模式能看到这个键（语音模式下它是 GONE），所以这里只会走「文字态 ⇄ 面板」两条路
             if (binding.emojiPanel.isVisible) {
                 hidePanels()
                 showKeyboard()
@@ -207,6 +285,7 @@ class ImChatActivity : AppCompatActivity() {
             }
         }
         binding.btnAttach.setOnClickListener {
+            // 同表情键：附件面板也是就地展开，不改输入条形态
             if (binding.attachPanel.isVisible) hidePanels() else showAttachPanel()
         }
         binding.attachImage.setOnClickListener {
@@ -237,6 +316,12 @@ class ImChatActivity : AppCompatActivity() {
                 locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
+
+        // 输入条两态：文字模式（输入框 + 有字才出的发送键）/ 语音模式（按住说话 + ＋）
+        syncComposerButtons()
+        binding.editText.doAfterTextChanged { syncComposerButtons() }
+        binding.btnVoiceMode.setOnClickListener { setVoiceMode(!voiceMode) }
+        binding.btnHold.setOnTouchListener { _, event -> onVoiceTouch(event) }
 
         binding.btnSend.setOnClickListener { send() }
         binding.editText.setOnEditorActionListener { _, actionId, _ ->
@@ -277,12 +362,250 @@ class ImChatActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        // 录到一半切走：直接作废（回来得重新按住，不会有半截语音留在后台）
+        if (recordingVoice) cancelVoice()
+        stopVoicePlayback()
         // 只清自己那一份：用户可能已经跳到另一条会话（那边 onResume 先于这里执行）
         if (ImClient.visibleThreadKey == ImClient.threadKey(peerId, isGroup)) {
             ImClient.visibleThreadKey = null
         }
         ImClient.removeObserver(onChanged)
         super.onPause()
+    }
+
+    // ---------------------------------------------------------------- 语音（2026-11-15，2026-11-16 改微信式）
+
+    /**
+     * 输入条两态（2026-11-16 用户拿微信截图要求对齐）：
+     * - 文字模式：`[麦克风] [输入框] [表情] [＋ 或 发送]`
+     * - 语音模式：`[键盘]   [按住 说话]        [表情] [＋]`
+     *
+     * 「＋」与发送键叠在同一个 FrameLayout 里互斥：有字才出发送键，语音模式下一律出「＋」
+     * —— 那个模式里发送是松手完成的，再摆一个发送键会让人以为还得点一下。
+     */
+    private fun syncComposerButtons() {
+        if (!::binding.isInitialized) return
+        val hasText = !binding.editText.text.isNullOrEmpty()
+        binding.editText.isVisible = !voiceMode
+        binding.btnHold.isVisible = voiceMode
+        binding.btnVoiceMode.setImageResource(
+            if (voiceMode) R.drawable.ic_im_keyboard else R.drawable.ic_im_mic
+        )
+        binding.btnVoiceMode.contentDescription = getString(
+            if (voiceMode) R.string.im_switch_to_keyboard else R.string.im_switch_to_voice
+        )
+        // 表情键只在文字模式出现（2026-11-16 用户要求）：「按住 说话」要把表情键那块位置也吃下来，
+        // 语音模式下藏掉它，长条靠 weight 自动延伸过去 —— 否则中间空一格，看着像断了一截。
+        // 语音模式进不来表情面板（setVoiceMode 里 hidePanels），所以不存在「面板开着却关不掉」。
+        binding.btnEmoji.isVisible = !voiceMode
+        binding.btnSend.isVisible = hasText && !voiceMode
+        binding.btnAttach.isVisible = !hasText || voiceMode
+    }
+
+    /**
+     * 切「语音 ⇄ 键盘」：进语音先把键盘收起，回文字直接把键盘弹出来。
+     *
+     * @param popKeyboard 回文字态时是否立刻弹键盘。点表情 / 「＋」时传 false —— 那两个面板
+     *   要占键盘的位置，弹出来又被 `ime.bottom > 0` 的 inset 回调收掉，会闪一下。
+     */
+    private fun setVoiceMode(on: Boolean, popKeyboard: Boolean = true) {
+        if (voiceMode == on) return
+        voiceMode = on
+        if (on) {
+            hidePanels()
+            hideKeyboard()
+            // 焦点必须挪走：只 hide 键盘的话输入框仍是焦点，某些 ROM 会在下一次布局时把键盘再弹回来，
+            // 那正好和「按住说话」叠在一起
+            binding.editText.clearFocus()
+        }
+        syncComposerButtons()
+        if (!on && popKeyboard) {
+            val edit = binding.editText
+            edit.requestFocus()
+            edit.setSelection(edit.text?.length ?: 0)
+            // post 一帧：这一帧才刚把输入框从 GONE 翻成可见，立刻 showSoftInput 会被系统忽略
+            edit.post { showKeyboard() }
+        }
+        scrollToBottom()
+    }
+
+    /**
+     * 「按住 说话」的手势。
+     *
+     * DOWN 开录、UP 发送、**上滑超过阈值取消**（手指往上挪一段就能反悔，微信同款）。
+     * 全程返回 true：DOWN 一旦被系统改判成别的（长按选字之类），后面的 MOVE/UP 就再也
+     * 送不进来 —— 松手既不发也不停，录音会一直挂着。
+     */
+    private fun onVoiceTouch(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                voiceStartRawY = event.rawY
+                voiceSlideCancel = false
+                startVoice()
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (!recordingVoice) return true
+                val cancel = event.rawY < voiceStartRawY - slideCancelDistance()
+                if (cancel != voiceSlideCancel) {
+                    voiceSlideCancel = cancel
+                    // 滑进取消区就换提示语：不给反馈的话，用户不知道抬手会不会发出去
+                    applyVoiceOverlayHint()
+                }
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (!recordingVoice) return true
+                if (voiceSlideCancel) cancelVoice() else finishVoice()
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                if (recordingVoice) cancelVoice()
+                return true
+            }
+        }
+        // 多指按下之类的其它 action：必须继续吞掉，否则这一串手势会被系统中途收走
+        return true
+    }
+
+    /** 上滑多少算「取消」：60dp（按下后要明显挪一段，避免正常抖动就作废） */
+    private fun slideCancelDistance(): Float = resources.displayMetrics.density * 60f
+
+    private fun startVoice() {
+        hidePanels()
+        if (ImClient.status != ImClient.Status.CONNECTED) {
+            toast(R.string.im_err_not_connected)
+            return
+        }
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            audioPermission.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        if (!voiceRecorder.start()) {
+            toast(R.string.im_voice_record_failed)
+            return
+        }
+        recordingVoice = true
+        voiceSlideCancel = false
+        voiceStartAt = SystemClock.elapsedRealtime()
+        binding.btnHold.setBackgroundResource(R.drawable.bg_im_hold_active)
+        showVoiceOverlay()
+        mainHandler.removeCallbacks(voiceMaxTask)
+        mainHandler.postDelayed(voiceMaxTask, VOICE_MAX_MS)
+    }
+
+    /** 录音浮层：提示语复位 + 计时归零，然后开始跳秒 */
+    private fun showVoiceOverlay() {
+        binding.tvVoiceTime.text = durationText(0)
+        applyVoiceOverlayHint()
+        binding.voiceOverlay.isVisible = true
+        mainHandler.removeCallbacks(voiceTickTask)
+        mainHandler.post(voiceTickTask)
+    }
+
+    /** 提示语两态：正常（白，上滑可取消）/ 已滑进取消区（浅红，松手即作废） */
+    private fun applyVoiceOverlayHint() {
+        binding.tvVoiceTip.setText(
+            if (voiceSlideCancel) R.string.im_voice_release_to_cancel
+            else R.string.im_voice_slide_up_cancel
+        )
+        binding.tvVoiceTip.setTextColor(
+            if (voiceSlideCancel) TIP_CANCELLING_COLOR else Color.WHITE
+        )
+    }
+
+    /** 收起浮层，并把「按住 说话」长条还原成未按下的底色 */
+    private fun hideVoiceOverlay() {
+        mainHandler.removeCallbacks(voiceTickTask)
+        binding.voiceOverlay.isVisible = false
+        binding.btnHold.setBackgroundResource(R.drawable.bg_im_hold)
+    }
+
+    /** 松手发送：太短/失败各自提示，成功直接交给 ImClient（乐观上屏 + 回调改状态） */
+    private fun finishVoice() {
+        mainHandler.removeCallbacks(voiceMaxTask)
+        recordingVoice = false
+        voiceSlideCancel = false
+        hideVoiceOverlay()
+        when (val result = voiceRecorder.stop()) {
+            is ImVoiceRecorder.VoiceResult.Ok ->
+                ImClient.sendVoice(peerId, isGroup, result.file, result.seconds)
+
+            ImVoiceRecorder.VoiceResult.TooShort -> toast(R.string.im_voice_too_short)
+            ImVoiceRecorder.VoiceResult.Failed -> toast(R.string.im_voice_record_failed)
+        }
+    }
+
+    /** 上滑取消 / 页面切走：不提示（用户主动反悔的，不用强调） */
+    private fun cancelVoice() {
+        mainHandler.removeCallbacks(voiceMaxTask)
+        recordingVoice = false
+        voiceSlideCancel = false
+        hideVoiceOverlay()
+        voiceRecorder.cancel()
+    }
+
+    /** 点语音气泡：▶ 开始播放，■ 停止（同一时刻只放一条，切到别的先停上一条） */
+    private fun toggleVoice(message: ImMessage) {
+        if (playingKey == message.key) {
+            stopVoicePlayback()
+            return
+        }
+        val file = localPathOf(message.mediaUrl)
+        if (file == null) {
+            // 普通语音是 base64 内联落盘的，正常一定在；不在 = 缓存被清，只能直说
+            toast(R.string.im_voice_play_failed)
+            return
+        }
+        stopVoicePlayback()
+        val p = MediaPlayer()
+        try {
+            p.setDataSource(file.absolutePath)
+        } catch (e: Throwable) {
+            Log.w("LanhangIM", "voice setDataSource failed", e)
+            runCatching { p.release() }
+            toast(R.string.im_voice_play_failed)
+            return
+        }
+        p.setOnPreparedListener { mp ->
+            // prepare 期间用户可能已经切到别的语音 / 页面切走了（那时 player 已被换掉或释放）
+            if (player !== mp) return@setOnPreparedListener
+            playingKey = message.key
+            refreshBubble(message.key)
+            runCatching { mp.start() }
+        }
+        p.setOnCompletionListener { stopVoicePlayback() }
+        p.setOnErrorListener { _, _, _ ->
+            stopVoicePlayback()
+            toast(R.string.im_voice_play_failed)
+            true
+        }
+        player = p
+        p.prepareAsync()
+    }
+
+    private fun stopVoicePlayback() {
+        val key = playingKey
+        val p = player
+        playingKey = null
+        player = null
+        if (p != null) {
+            runCatching { p.stop() }
+            runCatching { p.release() }
+        }
+        key?.let { refreshBubble(it) }
+    }
+
+    /** 语音气泡正文：▶ 待播放 / ■ 播放中（两个字形都在 Roboto 里，不会变豆腐块） */
+    private fun voiceText(message: ImMessage): String {
+        val icon = if (message.key == playingKey) "■" else "▶"
+        return if (message.duration > 0) "$icon ${durationText(message.duration)}" else icon
     }
 
     // ---------------------------------------------------------------- 表情
@@ -311,6 +634,8 @@ class ImChatActivity : AppCompatActivity() {
     }
 
     private fun insertEmoji(emoji: String) {
+        // 语音模式下插表情 = 用户要发文字了：把输入框叫回来（不弹键盘，表情面板正占着键盘位）
+        if (voiceMode) setVoiceMode(false, popKeyboard = false)
         val edit = binding.editText
         val start = edit.selectionStart.coerceAtLeast(0)
         val end = edit.selectionEnd.coerceAtLeast(0)
@@ -320,7 +645,7 @@ class ImChatActivity : AppCompatActivity() {
     // ---------------------------------------------------------------- 面板互斥
 
     private fun showEmojiPanel() {
-        hideKeyboard()
+        openPanel()
         binding.attachPanel.isVisible = false
         binding.emojiPanel.isVisible = true
         applyComposerInsets()
@@ -328,11 +653,25 @@ class ImChatActivity : AppCompatActivity() {
     }
 
     private fun showAttachPanel() {
-        hideKeyboard()
+        openPanel()
         binding.emojiPanel.isVisible = false
         binding.attachPanel.isVisible = true
         applyComposerInsets()
         scrollToBottom()
+    }
+
+    /**
+     * 开面板的统一动作：收键盘 + 给 [panelOpening] 打个短标记。
+     *
+     * 🔴 为什么要有这个标记（2026-11-16 查「点表情没反应」时揪出来的）：
+     * `hideKeyboard()` 只是**发起**收起，键盘动画那几帧里 `ime.bottom` 仍然是旧值，
+     * inset 回调会命中 `if (ime.bottom > 0) hidePanels()` —— 刚展开的面板当场被自己关掉。
+     * 键盘收完（约 300ms）之前屏蔽那次收起即可。
+     */
+    private fun openPanel() {
+        hideKeyboard()
+        panelOpening = true
+        binding.root.postDelayed({ panelOpening = false }, 400L)
     }
 
     private fun hidePanels() {
@@ -398,7 +737,10 @@ class ImChatActivity : AppCompatActivity() {
      *
      * 两件事必须做全：① 复制（SAF/相册给的是临时授权，上传是异步的）；
      * ② 抽封面（SDK 不会给视频生成缩略图，不传的话对方列表里是一块空白，见 `sendVideo` 注释）。
-     * 抽帧失败就退回「封面 = 视频本身」，至少 SDK 能拿到一个合法 Uri。
+     *
+     * 🔴 **抽出来的帧必须压过再发**（见 [ImVideoCover]）：封面会被整个 base64 进消息体，
+     * 而消息体上限只有 128KB —— 以前直接把全分辨率首帧 JPEG 发出去，视频必然发不出去。
+     * 抽帧失败改成给**占位封面**，不再退回「封面 = 视频本身」（那等于把整段视频塞进消息体）。
      */
     private fun sendPickedVideo(uri: Uri) {
         lifecycleScope.launch {
@@ -408,6 +750,16 @@ class ImChatActivity : AppCompatActivity() {
                 return@launch
             }
             val (file, thumb, seconds) = prepared
+            // 时长上限是服务端下发的（`getVideoLimitTime`，默认 300 秒）：超限的话
+            // NativeClient 发送时会直接拒，与其等到那时才报一个看不懂的错误码，
+            // 不如在这里按人话拦下，并把刚复制的那份丢掉（视频很大，别占着 cache）
+            val limit = videoLimitSeconds()
+            if (seconds > limit) {
+                runCatching { file.delete() }
+                runCatching { thumb?.delete() }
+                toast(getString(R.string.im_video_too_long, limit))
+                return@launch
+            }
             ImClient.sendVideo(
                 peerId,
                 isGroup,
@@ -418,11 +770,23 @@ class ImChatActivity : AppCompatActivity() {
         }
     }
 
-    /** 复制视频 + 抽封面 + 读时长；任一步失败返回 null（IO 线程调用） */
+    /**
+     * 服务端允许的视频时长（秒）。
+     *
+     * 取不到（还没连上、SDK 内部抛异常）时退回300 —— 与
+     * `NavigationCacheHelper.DEFAULT_VIDEO_TIME` 一致，宁可按默认值拦，
+     * 也不要因为读不到就放行一条注定发不出去的视频。
+     */
+    private fun videoLimitSeconds(): Int = runCatching {
+        RongIMClient.getInstance().videoLimitTime
+    }.getOrDefault(0).takeIf { it > 0 } ?: DEFAULT_VIDEO_LIMIT_S
+
+    /** 复制视频 + 抽封面 + 读时长；复制失败返回 null（IO 线程调用） */
     private fun prepareVideo(uri: Uri): Triple<File, File?, Int>? = runCatching {
         val name = (queryName(uri) ?: "video_${System.currentTimeMillis()}.mp4")
             .replace('/', '_')
         val video = copyToCache(uri, name) ?: return null
+        val dir = File(cacheDir, "im").apply { mkdirs() }
         val retriever = android.media.MediaMetadataRetriever()
         val ms = try {
             retriever.setDataSource(video.absolutePath)
@@ -431,35 +795,43 @@ class ImChatActivity : AppCompatActivity() {
         } finally {
             runCatching { retriever.release() }
         }
-        val thumb = runCatching {
+        // 抽帧 → 压到 ≤360px / ≤48KB；抽不到就给占位封面。两条路都保证有一个**够小**的封面，
+        // 绝不能退成「封面 = 视频文件」——那会把整段视频 base64 进消息体（见 ImVideoCover 注释）。
+        val frame = runCatching {
             val r2 = android.media.MediaMetadataRetriever()
             try {
                 r2.setDataSource(video.absolutePath)
-                val frame = r2.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                frame?.let { bitmap ->
-                    val out = File(File(cacheDir, "im"), "thumb_${System.currentTimeMillis()}.jpg")
-                    out.outputStream().use { os ->
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, os)
-                    }
-                    out.takeIf { it.length() > 0 }
-                }
+                r2.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
             } finally {
                 runCatching { r2.release() }
             }
         }.getOrNull()
+        val stamp = "${System.currentTimeMillis()}"
+        val thumb = if (frame != null) {
+            try {
+                ImVideoCover.write(frame, File(dir, "thumb_$stamp.jpg"))
+            } finally {
+                frame.recycle()
+            }
+        } else {
+            ImVideoCover.placeholder(File(dir, "thumb_$stamp.jpg"))
+        }
+        // 时长读不到时按 1 秒兜底（照参考项目）：0 秒在部分机型上会被发送端直接判为非法参数，
+        // 宁可发一条「1 秒」也不要因此整条发不出去。
         Triple(video, thumb, (ms / 1000L).toInt().coerceAtLeast(1))
     }.getOrNull()
 
     private fun sendPickedFile(uri: Uri) {
         lifecycleScope.launch {
             val name = withExtension(uri, queryName(uri))
-            val size = querySize(uri)
             val file = withContext(Dispatchers.IO) { copyToCache(uri, name) }
             if (file == null) {
                 toast(getString(R.string.im_attach_failed))
                 return@launch
             }
-            ImClient.sendFile(peerId, isGroup, Uri.fromFile(file), name, size)
+            // 字节数以**落盘的那份**为准：SAF 的 OpenableColumns.SIZE 经常回 0，
+            // 拿 0 去发服务端会判「0 字节文件」直接拒（`sendFile` 里还会再兜一次）
+            ImClient.sendFile(peerId, isGroup, Uri.fromFile(file), name, file.length())
         }
     }
 
@@ -515,13 +887,23 @@ class ImChatActivity : AppCompatActivity() {
         return best to poi
     }
 
-    /** 把选中的 `content://` 复制进 cache/im/，返回落盘文件（IO 线程调用） */
+    /**
+     * 把选中的 `content://` 复制进 cache/im/，返回落盘文件（IO 线程调用）。
+     *
+     * 两个坑（都踩过 / 参考项目第七十三轮同款）：
+     * 1. **文件名必须带时间戳前缀**：不带的话同一个文件第二次发会覆盖上一份，
+     *    而上传是异步的 —— SDK 再去读时内容已经换了，必失败。
+     * 2. **`?` `#` 要换掉**：SDK 的 `obtain(uri)` 是拿 `uri.toString().substring(7)` 还原路径的，
+     *    文件名里带这两个字符会把 query/fragment 当成路径的一部分 → 判「文件不存在」→ 发不出去。
+     */
     private fun copyToCache(uri: Uri, name: String? = null): File? = runCatching {
         val dir = File(cacheDir, "im").apply { mkdirs() }
-        val fileName = (name ?: "im_${System.currentTimeMillis()}")
+        val base = (name ?: "im")
             .replace('/', '_')
-            .take(80)
-        val out = File(dir, fileName)
+            .replace('?', '_')
+            .replace('#', '_')
+            .take(60)
+        val out = File(dir, "${System.currentTimeMillis()}_$base")
         contentResolver.openInputStream(uri)?.use { input ->
             out.outputStream().use { output -> input.copyTo(output) }
         } ?: return null
@@ -553,17 +935,6 @@ class ImChatActivity : AppCompatActivity() {
             }
         }.getOrNull() ?: uri.lastPathSegment
     }
-
-    private fun querySize(uri: Uri): Long = runCatching {
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
-                cursor.getLong(index)
-            } else {
-                0L
-            }
-        } ?: 0L
-    }.getOrDefault(0L)
 
     private fun scrollToBottom() {
         val count = adapter.itemCount
@@ -598,18 +969,71 @@ class ImChatActivity : AppCompatActivity() {
         String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
 
     /**
-     * 点视频 → 交给系统播放器。
+     * 点视频 → 拿到本地文件交给系统播放器。
      *
      * 不内置播放器：一个能用的播放器要处理解码、全屏、音频焦点、横竖屏切换，
      * 成本和「看一个聊天视频」不匹配；系统播放器 / 相册都能直接放。
+     *
+     * 🔴 **本地没有就先下载**（2026-11-15 之前直接把 https 地址丢给 ACTION_VIEW，
+     * 系统播放器没有网络权限读外链，表现就是「点了没反应」或「无法播放」）。
+     * 下载与文件消息共用 `ImClient.downloadFile`（自己按 URL 下，SDK 的
+     * `downloadMediaMessage` 只认 `mediaUrl`，实测常常拿不到地址）。
      */
-    private fun openVideo(context: Context, message: ImMessage) {
-        val url = message.mediaUrl ?: return
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(Uri.parse(url), "video/*")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        runCatching { context.startActivity(intent) }
-            .onFailure { toast(getString(R.string.im_video_open_failed)) }
+    private fun openVideo(message: ImMessage) {
+        localPathOf(message.mediaUrl)?.let { return playVideoFile(it, message) }
+        if (message.mediaUrl.isNullOrBlank()) {
+            toast(R.string.im_video_open_failed)
+            return
+        }
+        if (downloading.containsKey(message.key)) return
+        downloading[message.key] = -1
+        refreshBubble(message.key)
+        ImClient.downloadFile(
+            uid = message.key,
+            remoteUrl = message.mediaUrl,
+            fileName = videoNameOf(message),
+            fileSize = message.fileSize,
+            onProgress = { percent ->
+                downloading[message.key] = percent
+                refreshBubble(message.key)
+            },
+            onResult = { path ->
+                downloading.remove(message.key)
+                refreshBubble(message.key)
+                if (path == null) toast(R.string.im_file_download_failed)
+                else playVideoFile(File(path), message)
+            },
+        )
+    }
+
+    /** 视频文件名：远端地址最后一段（去掉查询串），拿不出后缀就补一个 `.mp4` */
+    private fun videoNameOf(message: ImMessage): String {
+        val fromUrl = message.mediaUrl
+            ?.substringAfterLast('/')
+            ?.substringBefore('?')
+            .orEmpty()
+        return if (fromUrl.contains('.')) fromUrl else "video.mp4"
+    }
+
+    /**
+     * 播放本地视频：先复制进 `filesDir/im/recv/`（FileProvider 白名单在那里，
+     * cache 里的文件直接给出去会抛 IllegalArgumentException），复制放 IO 线程
+     * —— 视频几十 MB，主线程拷一次就够卡一下。
+     */
+    private fun playVideoFile(file: File, message: ImMessage) {
+        lifecycleScope.launch {
+            val name = videoNameOf(message)
+            val safe = withContext(Dispatchers.IO) {
+                ImFileOpen.ensureInRecvDir(this@ImChatActivity, file, message.key, name)
+            }
+            if (safe == null) {
+                toast(R.string.im_file_open_failed)
+                return@launch
+            }
+            if (!ImFileOpen.openBestEffort(this@ImChatActivity, safe, name, "video/mp4")) {
+                toast(R.string.im_video_open_failed)
+            }
+        }
     }
 
     // ==================== 文件消息：打开 / 保存 ====================
@@ -741,7 +1165,7 @@ class ImChatActivity : AppCompatActivity() {
         localPathOf(message.mediaUrl)?.let { return onReady(it) }
 
         downloading[message.key] = -1
-        refreshFileBubble(message.key)
+        refreshBubble(message.key)
         ImClient.downloadFile(
             uid = message.key,
             // 远端地址可能只在 fileUrl 里（mediaUrl 为空），两个都由 ImClient 兜住
@@ -750,18 +1174,18 @@ class ImChatActivity : AppCompatActivity() {
             fileSize = message.fileSize,
             onProgress = { percent ->
                 downloading[message.key] = percent
-                refreshFileBubble(message.key)
+                refreshBubble(message.key)
             },
             onResult = { path ->
                 downloading.remove(message.key)
-                refreshFileBubble(message.key)
+                refreshBubble(message.key)
                 onReady(path?.let(::File))
             },
         )
     }
 
-    /** 「下载中 xx%」那行要跟着变，重绑这一条就够 */
-    private fun refreshFileBubble(key: String) {
+    /** 某条气泡要重绑：下载进度、语音播放状态（▶/■）都走它 */
+    private fun refreshBubble(key: String) {
         val index = adapter.indexOf(key)
         if (index >= 0) adapter.notifyItemChanged(index)
     }
@@ -921,8 +1345,15 @@ class ImChatActivity : AppCompatActivity() {
                 b.tvBubble.isVisible = !hasMedia
                 b.mediaBox.isVisible = hasMedia
                 b.tvPlay.isVisible = isVideo
-                b.tvDuration.isVisible = isVideo && message.duration > 0
-                b.tvDuration.text = if (isVideo) durationText(message.duration) else ""
+                // 视频下载时把进度顶到时长胶囊上（气泡是封面图，没有第三行可用）
+                val progress = downloading[message.key]
+                b.tvDuration.isVisible = isVideo && (message.duration > 0 || progress != null)
+                b.tvDuration.text = when {
+                    !isVideo -> ""
+                    progress == null -> durationText(message.duration)
+                    progress < 0 -> ctx.getString(R.string.im_file_downloading_unknown)
+                    else -> ctx.getString(R.string.im_file_downloading, progress)
+                }
 
                 if (hasMedia) {
                     bindMedia(message, ctx.resources.displayMetrics, isVideo)
@@ -942,7 +1373,10 @@ class ImChatActivity : AppCompatActivity() {
                 // 单聊里我发的消息再接一截「已读 / 未读」（群聊不回执已读，不显示）。
                 val stateText = when (message.state) {
                     ImMessage.STATE_SENDING -> ctx.getString(R.string.im_sending)
-                    ImMessage.STATE_FAILED -> ctx.getString(R.string.im_send_failed)
+                    // 失败时带上具体原因（如「内容超限」）；认不出的原因退回通用文案
+                    ImMessage.STATE_FAILED -> message.errorText
+                        ?.let { ctx.getString(R.string.im_err_send_failed, it) }
+                        ?: ctx.getString(R.string.im_send_failed)
                     else -> {
                         val at = clockTime(message.time)
                         if (message.mine && !isGroup) {
@@ -972,6 +1406,14 @@ class ImChatActivity : AppCompatActivity() {
 
             private fun bindText(message: ImMessage) {
                 val ctx = b.root.context
+                // 🔴 语音气泡必须关掉文本选择（2026-11-16 用户反馈「只能点播放按钮，点气泡没反应」）：
+                // `textIsSelectable=true` 的 TextView 把单击当「开始选字」吞掉，OnClickListener 不触发。
+                // 文字/文件/位置仍然保留可选中复制 —— 只有语音整块是「点击即播放」的按钮。
+                // 注意：setTextIsSelectable 会重置 clickable，所以必须在挂监听之前调。
+                val selectable = message.kind != ImMessage.KIND_VOICE
+                if (b.tvBubble.isTextSelectable != selectable) {
+                    b.tvBubble.setTextIsSelectable(selectable)
+                }
                 // 文件和位置也用气泡承载，但正文是拼出来的：文件带大小，位置带地名
                 // 复用来的 holder 可能还挂着上一条的监听（图片那边踩过同样的坑）：
                 // 只有文件气泡可点，别让普通文字也能点开上一个文件的菜单
@@ -995,6 +1437,7 @@ class ImChatActivity : AppCompatActivity() {
                         }
                     }
                     ImMessage.KIND_LOCATION -> locationText(message)
+                    ImMessage.KIND_VOICE -> voiceText(message)
                     else -> message.text
                 }
                 // 气泡最大宽度 = 屏幕 78%：窄屏上 280dp 固定值会顶到边
@@ -1021,6 +1464,25 @@ class ImChatActivity : AppCompatActivity() {
                 } else if (message.kind == ImMessage.KIND_LOCATION) {
                     // 位置：点一下交给地图 App（坐标在里面转 GCJ02，否则会偏几百米）
                     b.tvBubble.setOnClickListener { openLocation(message) }
+                } else if (message.kind == ImMessage.KIND_VOICE) {
+                    // 语音：点一下播放、再点停止（普通语音是 base64 内联落盘的，没有下载环节）
+                    b.tvBubble.setOnClickListener { toggleVoice(message) }
+                }
+
+                if (message.kind == ImMessage.KIND_VOICE) {
+                    // 气泡宽度随时长增长（微信同款）：短语音是个小方块，60 秒拉满一行。
+                    // 这不只是好看 —— 语音气泡整块可点，收得只剩「▶ 1"」时很难点准。
+                    val dp = ctx.resources.displayMetrics.density
+                    val stretch = message.duration.coerceIn(0, 60) * 1.4f
+                    b.tvBubble.minWidth = ((72 + stretch) * dp).toInt()
+                    // 播放中加粗：■ 已经换了字形，再加一层重量，一眼看出哪条在放
+                    b.tvBubble.setTypeface(
+                        null, if (message.key == playingKey) Typeface.BOLD else Typeface.NORMAL
+                    )
+                } else {
+                    // 复用来的 holder 必须清掉上一条语音留下的宽度与字重，否则文字气泡被撑开
+                    b.tvBubble.minWidth = 0
+                    b.tvBubble.setTypeface(null, Typeface.NORMAL)
                 }
             }
 
@@ -1028,7 +1490,7 @@ class ImChatActivity : AppCompatActivity() {
              * 媒体消息（图片 / 视频封面）：宽度上限 66% 屏宽、高度上限 40% 屏高，等比缩放。
              *
              * 地址为空说明图还没落盘（刚收到、或本地缓存被清），此时给一块底色占位，
-             * 不显示破图。视频点开交给系统播放器（`ACTION_VIEW`），我们不做内置播放器。
+             * 不显示破图。视频点开先确保本地有文件（没有就下），再交系统播放器。
              */
             private fun bindMedia(
                 message: ImMessage,
@@ -1043,7 +1505,13 @@ class ImChatActivity : AppCompatActivity() {
                     b.ivImage.setImageDrawable(null)
                     // 复用来的 holder 可能还挂着上一条的点击 —— 必须清掉，否则点空块会打开别人的图
                     b.ivImage.setOnClickListener(null)
-                    b.mediaBox.setOnClickListener(null)
+                    // 视频没有封面也得能点开（封面是对方内联的 base64，可能解不出来）：
+                    // 这时占位块本身就是入口，清掉监听就变成「看得到、点不动」
+                    if (isVideo) {
+                        b.mediaBox.setOnClickListener { openVideo(message) }
+                    } else {
+                        b.mediaBox.setOnClickListener(null)
+                    }
                     lp.width = (metrics.widthPixels * 0.28f).toInt()
                     lp.height = (metrics.heightPixels * 0.12f).toInt()
                     b.ivImage.layoutParams = lp
@@ -1056,7 +1524,7 @@ class ImChatActivity : AppCompatActivity() {
                 b.ivImage.load(url) { crossfade(true) }
 
                 if (isVideo) {
-                    b.mediaBox.setOnClickListener { view -> openVideo(view.context, message) }
+                    b.mediaBox.setOnClickListener { openVideo(message) }
                 } else {
                     b.mediaBox.setOnClickListener { view ->
                         val urls = adapter.imageUrls()
@@ -1110,6 +1578,15 @@ class ImChatActivity : AppCompatActivity() {
 
         /** 「文件只在应用内、想要副本请另存为」这句提示只弹一次的标记（SP 键） */
         private const val KEY_FILE_SAVE_HINT = "file_save_hint_shown"
+
+        /** 录音浮层进入「取消区」时的提示色：浅红，压在深灰卡片上仍看得清 */
+        private val TIP_CANCELLING_COLOR = Color.parseColor("#FF8A80")
+
+        /** 单条语音时长上限（官方 `AudioRecordManager.RECORD_INTERVAL = 60`） */
+        private const val VOICE_MAX_MS = 60_000L
+
+        /** 视频时长上限兜底秒数（`NavigationCacheHelper.DEFAULT_VIDEO_TIME = 300`） */
+        private const val DEFAULT_VIDEO_LIMIT_S = 300
 
         internal const val EXTRA_PEER = "peer_id"
         internal const val EXTRA_GROUP = "is_group"

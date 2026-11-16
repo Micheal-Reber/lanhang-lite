@@ -23,6 +23,13 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!--
+      录音：私信「按住说话」发语音（2026-11-15 对齐官方 RC:VcMsg）。
+      ⚠️ 只在 im 变体声明 —— lite 不做语音，绝不能替它背这个权限。
+      拒绝时界面直说原因（im_voice_denied），不反复追问。
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
       私信「后台接收受限」引导（2026-11-15）：一键弹「允许忽略电池优化」对话框的前提。
       HyperOS 在后台拦截新建 socket，长连接建不起来，消息永远收不到；根治只能请用户
       放开省电策略，这个权限只为那个引导对话框服务。

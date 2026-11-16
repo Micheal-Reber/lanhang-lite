@@ -6,228 +6,332 @@
 
   表情面板 / 附件面板都放在输入条**下方**、默认 GONE：与键盘三者互斥。
   输入条始终紧贴消息列表底部，展开面板后面板继续向下延伸到导航栏上方。
+
+  输入条排版照微信（2026-11-16 用户拿截图要求对齐）：
+  `[语音/键盘] [输入框 或 按住说话] [表情] [＋/发送]`
+  —— 原来「表情 / 更多」在左边、麦克风挤在发送键位置，进语音模式时中间还留着输入框，
+  点一下语音键只是把右侧那颗图标换成「按住说话」，与用户要的「整条切过去」不是一回事。
+
+  根是 FrameLayout 只为一件事：录音浮层（[voiceOverlay]）要压在整页之上居中显示。
+  它 wrap_content 且不覆盖输入条，所以按住手势仍然落在 [btnHold] 上，不会被浮层截走。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:orientation="vertical">
-
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        style="@style/Widget.Lanhang.Toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="@dimen/top_app_bar_height"
-        app:menu="@menu/menu_im_chat"
-        app:navigationContentDescription="@string/common_back"
-        app:navigationIcon="@drawable/ic_back" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingTop="@dimen/space_sm"
-        android:paddingBottom="@dimen/space_sm"
-        android:scrollbars="none" />
+    android:background="?attr/colorSurface">
 
     <LinearLayout
-        android:id="@+id/inputBar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        android:gravity="bottom"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/space_xs"
-        android:paddingTop="@dimen/space_sm"
-        android:paddingEnd="@dimen/space_sm"
-        android:paddingBottom="@dimen/space_sm">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <ImageButton
-            android:id="@+id/btnEmoji"
-            android:layout_width="@dimen/touch_target_min"
-            android:layout_height="@dimen/touch_target_min"
-            android:background="@null"
-            android:contentDescription="@string/im_emoji"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_im_emoji"
-            app:tint="?attr/colorOnSurfaceVariant" />
-
-        <ImageButton
-            android:id="@+id/btnAttach"
-            android:layout_width="@dimen/touch_target_min"
-            android:layout_height="@dimen/touch_target_min"
-            android:background="@null"
-            android:contentDescription="@string/im_attach"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_add"
-            app:tint="?attr/colorOnSurfaceVariant" />
-
-        <EditText
-            android:id="@+id/editText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@null"
-            android:gravity="center_vertical"
-            android:hint="@string/im_input_hint"
-            android:importantForAutofill="no"
-            android:inputType="textMultiLine|textCapSentences"
-            android:maxLines="4"
-            android:minHeight="@dimen/touch_target_min"
-            android:paddingStart="@dimen/space_sm"
-            android:paddingEnd="@dimen/space_sm"
-            android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
-            android:textColor="?attr/colorOnSurface"
-            android:textColorHint="?attr/colorOnSurfaceVariant" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSend"
-            style="@style/Widget.Material3.Button.IconButton.Filled"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:contentDescription="@string/im_send"
-            app:icon="@drawable/ic_im_send" />
-    </LinearLayout>
-
-    <!-- 表情面板：输入栏下方展开，网格由代码填充。 -->
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/emojiPanel"
-        android:layout_width="match_parent"
-        android:layout_height="208dp"
-        android:background="?attr/colorSurfaceVariant"
-        android:visibility="gone">
-
-        <GridLayout
-            android:id="@+id/emojiGrid"
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            style="@style/Widget.Lanhang.Toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="8"
-            android:padding="@dimen/space_sm" />
-    </androidx.core.widget.NestedScrollView>
+            android:minHeight="@dimen/top_app_bar_height"
+            app:menu="@menu/menu_im_chat"
+            app:navigationContentDescription="@string/common_back"
+            app:navigationIcon="@drawable/ic_back" />
 
-    <!-- 附件面板：输入栏下方展开，图片 / 视频 / 文件 / 位置四格平分。 -->
-    <LinearLayout
-        android:id="@+id/attachPanel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceVariant"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/space_lg"
-        android:paddingTop="@dimen/space_md"
-        android:paddingEnd="@dimen/space_lg"
-        android:paddingBottom="@dimen/space_md"
-        android:visibility="gone">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_sm"
+            android:scrollbars="none" />
 
         <LinearLayout
-            android:id="@+id/attachImage"
-            android:layout_width="0dp"
+            android:id="@+id/inputBar"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
+            android:background="?attr/colorSurface"
+            android:gravity="bottom"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/space_xs"
             android:paddingTop="@dimen/space_sm"
+            android:paddingEnd="@dimen/space_sm"
             android:paddingBottom="@dimen/space_sm">
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_photo"
+
+            <!--
+              语音 / 键盘切换键：常驻最左，一个位置两态（mic ⇄ keyboard）。
+              文字模式下它是「进语音」，语音模式下它是「回文字」。图标与描述由代码切（syncComposerButtons）。
+            -->
+            <ImageButton
+                android:id="@+id/btnVoiceMode"
+                android:layout_width="@dimen/touch_target_min"
+                android:layout_height="@dimen/touch_target_min"
+                android:background="@null"
+                android:contentDescription="@string/im_switch_to_voice"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_im_mic"
                 app:tint="?attr/colorOnSurfaceVariant" />
-            <TextView
-                android:layout_width="wrap_content"
+
+            <EditText
+                android:id="@+id/editText"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_image"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:layout_weight="1"
+                android:background="@null"
+                android:gravity="center_vertical"
+                android:hint="@string/im_input_hint"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine|textCapSentences"
+                android:maxLines="4"
+                android:minHeight="@dimen/im_composer_height"
+                android:paddingStart="@dimen/space_sm"
+                android:paddingEnd="@dimen/space_sm"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodyLarge"
+                android:textColor="?attr/colorOnSurface"
+                android:textColorHint="?attr/colorOnSurfaceVariant" />
+
+            <!--
+              「按住 说话」：语音模式下顶替输入框（同 weight=1，两者互斥）。
+              手势绑在它身上（ImChatActivity#onVoiceTouch）：DOWN 开录、上滑取消、UP 发送。
+            -->
+            <TextView
+                android:id="@+id/btnHold"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/im_hold_height"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="@dimen/space_xs"
+                android:layout_weight="1"
+                android:background="@drawable/bg_im_hold"
+                android:gravity="center"
+                android:text="@string/im_voice_hold_button"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+                android:textColor="?attr/colorOnSurface"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btnEmoji"
+                android:layout_width="@dimen/touch_target_min"
+                android:layout_height="@dimen/touch_target_min"
+                android:background="@null"
+                android:contentDescription="@string/im_emoji"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_im_emoji"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+            <!--
+              「＋」与发送键同位置互斥（FrameLayout 叠放）：无字 / 语音模式显示「＋」，
+              有字显示发送 —— 并排放的话输入框会被挤掉近 50dp，窄屏上直接顶到表情键。
+            -->
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <ImageButton
+                    android:id="@+id/btnAttach"
+                    android:layout_width="@dimen/touch_target_min"
+                    android:layout_height="@dimen/touch_target_min"
+                    android:layout_gravity="center"
+                    android:background="@null"
+                    android:contentDescription="@string/im_attach"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_add"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSend"
+                    style="@style/Widget.Material3.Button.IconButton.Filled"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/im_send"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_im_send" />
+            </FrameLayout>
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/attachVideo"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_video"
-                app:tint="?attr/colorOnSurfaceVariant" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_video"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
+        <!-- 表情面板：输入栏下方展开，网格由代码填充。 -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/emojiPanel"
+            android:layout_width="match_parent"
+            android:layout_height="208dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:visibility="gone">
 
-        <LinearLayout
-            android:id="@+id/attachFile"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_file"
-                app:tint="?attr/colorOnSurfaceVariant" />
-            <TextView
-                android:layout_width="wrap_content"
+            <GridLayout
+                android:id="@+id/emojiGrid"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_file"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
+                android:columnCount="8"
+                android:padding="@dimen/space_sm" />
+        </androidx.core.widget.NestedScrollView>
 
+        <!-- 附件面板：输入栏下方展开，图片 / 视频 / 文件 / 位置四格平分。 -->
         <LinearLayout
-            android:id="@+id/attachLocation"
-            android:layout_width="0dp"
+            android:id="@+id/attachPanel"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingTop="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_sm">
-            <ImageView
-                android:layout_width="@dimen/icon_lg"
-                android:layout_height="@dimen/icon_lg"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_im_location"
-                app:tint="?attr/colorOnSurfaceVariant" />
-            <TextView
-                android:layout_width="wrap_content"
+            android:background="?attr/colorSurfaceVariant"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/space_lg"
+            android:paddingTop="@dimen/space_md"
+            android:paddingEnd="@dimen/space_lg"
+            android:paddingBottom="@dimen/space_md"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/attachImage"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:text="@string/im_attach_location"
-                android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_sm">
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_photo"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="@string/im_attach_image"
+                    android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/attachVideo"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_sm">
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_im_video"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="@string/im_attach_video"
+                    android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/attachFile"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_sm">
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_im_file"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="@string/im_attach_file"
+                    android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/attachLocation"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingBottom="@dimen/space_sm">
+                <ImageView
+                    android:layout_width="@dimen/icon_lg"
+                    android:layout_height="@dimen/icon_lg"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_im_location"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="@string/im_attach_location"
+                    android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
+    <!--
+      录音浮层（按住说话时出现）：大麦克风 + 提示语 + 计时。
+      **不拦触摸**（无 clickable）：手势必须继续派发给下面的 btnHold，否则按下那一帧就断了。
+      提示语三态由代码切：手指上滑，取消发送 / 松开手指，取消发送 / 松开手指，发送。
+    -->
+    <LinearLayout
+        android:id="@+id/voiceOverlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_im_voice_overlay"
+        android:gravity="center_horizontal"
+        android:minWidth="@dimen/im_voice_overlay_width"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/space_lg"
+        android:paddingTop="@dimen/space_lg"
+        android:paddingEnd="@dimen/space_lg"
+        android:paddingBottom="@dimen/space_lg"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ivVoiceIcon"
+            android:layout_width="@dimen/im_voice_icon"
+            android:layout_height="@dimen/im_voice_icon"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_im_mic"
+            app:tint="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tvVoiceTip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:gravity="center"
+            android:text="@string/im_voice_slide_up_cancel"
+            android:textAppearance="@style/TextAppearance.Lanhang.BodyMedium"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tvVoiceTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xxs"
+            android:textAppearance="@style/TextAppearance.Lanhang.LabelMedium"
+            android:textColor="#CCFFFFFF" />
+    </LinearLayout>
+</FrameLayout>

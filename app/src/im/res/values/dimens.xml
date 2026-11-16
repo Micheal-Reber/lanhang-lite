@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  私信页（im flavor）专用尺寸。
+  不并进 main 的 dimens.xml：这些值只服务聊天输入条与录音浮层，lite 变体用不到。
+-->
+<resources>
+    <!--
+      输入框的最小高度（文字模式）。行高其实由两侧 48dp 的图标键撑住，这里只是兜底，
+      免得空输入框被算得过矮、光标贴边。
+    -->
+    <dimen name="im_composer_height">40dp</dimen>
+
+    <!--
+      「按住 说话」的长条高度（2026-11-16 用户两轮反馈「上下太宽」，40 还嫌厚 → 32）。
+      比输入框矮是故意的：里面只有一行字，高度跟着字号走才不显空。
+      整行高度不受它影响（两侧图标 48dp + 输入条 padding 撑着），所以两态切换不会跳。
+    -->
+    <dimen name="im_hold_height">32dp</dimen>
+
+    <!-- 录音浮层卡片最小宽度 + 麦克风图标（截图的卡片是正方形偏宽） -->
+    <dimen name="im_voice_overlay_width">180dp</dimen>
+    <dimen name="im_voice_icon">56dp</dimen>
+</resources>
