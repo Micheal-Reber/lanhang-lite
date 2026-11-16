@@ -266,12 +266,32 @@ class ImChatHistoryActivity : AppCompatActivity() {
 
         inner class VH(private val b: ItemImFileRowBinding) : RecyclerView.ViewHolder(b.root) {
             fun bind(message: ImMessage) {
+                // 点击统一在这里挂：文件列表点开走「下载 → 复制 → 交给系统」，
+                // 搜索结果直接进会话（命中哪一条要精确定位得改聊天页入口，这里不做）
+                b.root.setOnClickListener {
+                    if (showText) {
+                        // 带上 key + 时间：聊天页据此滚到这一条并高亮，
+                        // 时间锚点留给「最近 40 条里没有它、需要翻历史」的情况
+                        ImChatActivity.start(
+                            itemView.context, peerId, isGroup, title,
+                            focusKey = message.key,
+                            focusTime = message.time,
+                        )
+                    } else {
+                        openFile(message)
+                    }
+                }
+
                 if (showText) {
-                    // 搜索结果：正文当标题，命中的是文件就退回文件名
-                    b.tvName.text = message.text.ifBlank { message.fileName.orEmpty() }
+                    // 搜索结果：图标按类型分开（2026-11-16 用户要求，文字消息顶着文件图标很误导），
+                    // 正文当标题，没有正文的给类型占位，别留空行
+                    b.ivIcon.setImageResource(iconOf(message.kind))
+                    b.tvName.text = searchTitle(message)
                     b.tvMeta.text = com.lanhang.lite.core.TimeText.clock(message.time)
                     return
                 }
+
+                b.ivIcon.setImageResource(R.drawable.ic_im_file)
                 b.tvName.text = message.fileName.orEmpty().ifBlank { itemView.context.getString(R.string.im_chat_files) }
                 val meta = buildString {
                     append(humanSize(message.fileSize))
@@ -286,12 +306,6 @@ class ImChatHistoryActivity : AppCompatActivity() {
                     pct == null -> meta
                     pct < 0 -> itemView.context.getString(R.string.im_file_downloading_unknown)
                     else -> itemView.context.getString(R.string.im_file_downloading, pct)
-                }
-                b.root.setOnClickListener {
-                    if (!showText) openFile(message) else {
-                        // 搜索命中：跳到聊天页并定位太复杂，直接打开这一条所在的会话
-                        ImChatActivity.start(itemView.context, peerId, isGroup, title)
-                    }
                 }
             }
         }
@@ -333,6 +347,38 @@ class ImChatHistoryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /** 搜索结果的行图标：按消息类型分开（文件列表那条分支另走固定文件图标） */
+    private fun iconOf(kind: Int): Int = when (kind) {
+        ImMessage.KIND_IMAGE -> R.drawable.ic_photo
+        ImMessage.KIND_VIDEO -> R.drawable.ic_im_video
+        ImMessage.KIND_VOICE -> R.drawable.ic_im_mic
+        ImMessage.KIND_LOCATION -> R.drawable.ic_im_location
+        ImMessage.KIND_FILE -> R.drawable.ic_im_file
+        else -> R.drawable.ic_im_message
+    }
+
+    /**
+     * 搜索结果的标题。
+     *
+     * 只有文字消息自带正文；图片/语音/视频/位置这些 `text` 是空的，直接 `ifBlank` 会得到
+     * 一行空白（比显示「[图片]」还难看出发生了什么），所以按类型给占位。
+     * 文件优先显示文件名 —— 比「文件」两个字有用。
+     */
+    private fun searchTitle(message: ImMessage): String {
+        message.text.takeIf { it.isNotBlank() }?.let { return it }
+        message.fileName?.takeIf { it.isNotBlank() }?.let { return it }
+        return getString(
+            when (message.kind) {
+                ImMessage.KIND_IMAGE -> R.string.im_preview_image
+                ImMessage.KIND_VIDEO -> R.string.im_preview_video
+                ImMessage.KIND_VOICE -> R.string.im_preview_voice
+                ImMessage.KIND_FILE -> R.string.im_attach_file
+                ImMessage.KIND_LOCATION -> R.string.im_attach_location
+                else -> R.string.im_notify_body_placeholder
+            }
+        )
     }
 
     /** 文件大小给人看的样子（与聊天页同一口径：<1KB 给字节，其余一位小数） */

@@ -18,7 +18,12 @@
     android:paddingEnd="@dimen/space_sm"
     android:paddingBottom="@dimen/space_sm">
 
+    <!--
+      行图标：文件列表固定用文件图标；搜索结果按消息类型换（见 ImChatHistoryActivity.iconOf），
+      文字消息顶一个文件图标会让人以为这是一条文件消息。
+    -->
     <ImageView
+        android:id="@+id/ivIcon"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="@drawable/bg_im_file_icon"

@@ -1534,6 +1534,68 @@ object ImClient {
         }.onFailure { Log.w(TAG, "remote history failed: ${it.javaClass.simpleName}") }
     }
 
+    /**
+     * 向服务端要 [beforeTime] 之前的一页历史，并**并进**当前会话。
+     *
+     * 给「聊天记录搜索 → 跳转定位」用：目标消息不在最近 [loadRecent] 那 40 条里时，
+     * 先把那一段拉下来，列表里才有得滚。
+     *
+     * 合并而不是替换：最新的那几张已经上屏，整体换掉会让用户眼前的消息凭空消失。
+     * 走 `getRemoteHistoryMessages`（唯一语义明确的那支，见 [loadRemoteHistory]）；
+     * 学校没开通云端历史时回空 / 报错 → 回调 false，界面保持原样。
+     *
+     * 注意**不碰已读水位线**：翻历史不等于「读到最新」，抬水位会让会话列表的未读红点消失。
+     */
+    fun loadHistoryBefore(
+        peerId: String,
+        isGroup: Boolean,
+        beforeTime: Long,
+        count: Int,
+        onDone: (Boolean) -> Unit,
+    ) {
+        if (status != Status.CONNECTED || peerId.isBlank()) {
+            onDone(false)
+            return
+        }
+        val type = if (isGroup) Conversation.ConversationType.GROUP
+        else Conversation.ConversationType.PRIVATE
+        runCatching {
+            RongIMClient.getInstance().getRemoteHistoryMessages(
+                type, peerId, beforeTime, count,
+                object : RongIMClient.ResultCallback<List<Message>>() {
+                    override fun onSuccess(messages: List<Message>?) {
+                        val raw = messages.orEmpty()
+                        val mapped = raw.mapNotNull { toImMessage(it) }.sortedBy { it.time }
+                        Log.i(TAG, "history before $beforeTime n=${mapped.size}")
+                        if (mapped.isEmpty()) {
+                            main.post { onDone(false) }
+                            return
+                        }
+                        main.post {
+                            val key = threadKey(peerId, isGroup)
+                            val existing = threads[key].orEmpty()
+                            val known = existing.mapTo(HashSet()) { it.key }
+                            threads[key] = (mapped.filterNot { it.key in known } + existing)
+                                .sortedBy { it.time }
+                                .toMutableList()
+                            notifyChanged()
+                            onDone(true)
+                        }
+                        raw.forEach { ensureImageDownloaded(it) }
+                    }
+
+                    override fun onError(e: RongIMClient.ErrorCode?) {
+                        Log.w(TAG, "history before $beforeTime error=$e")
+                        main.post { onDone(false) }
+                    }
+                }
+            )
+        }.onFailure {
+            Log.w(TAG, "history before failed: ${it.javaClass.simpleName}")
+            main.post { onDone(false) }
+        }
+    }
+
     fun sendText(peerId: String, isGroup: Boolean, body: String) {
         val text = body.trim()
         if (text.isEmpty() || peerId.isBlank()) return

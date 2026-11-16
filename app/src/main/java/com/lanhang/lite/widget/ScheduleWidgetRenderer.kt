@@ -336,8 +336,6 @@ object ScheduleWidgetRenderer {
 
         /** 星期名随界面语言（跟随 values / values-en） */
         private val dayLabels = context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names)
-        private val compactDayLabels =
-            context.resources.getStringArray(com.lanhang.lite.R.array.schedule_day_names_compact)
 
         /** 相对今天的偏移天数：0=今天，>0=未来，<0=过去（翻天按钮改的就是它） */
         private val offsetDays = ChronoUnit.DAYS.between(today, target)

@@ -209,10 +209,9 @@
     <string name="im_voice_hold_button">按住 说话</string>
     <string name="im_switch_to_voice">切换到语音输入</string>
     <string name="im_switch_to_keyboard">切换到键盘</string>
-    <!-- 录音浮层的提示语：默认状态 / 已滑进取消区 / 松手即发送 -->
+    <!-- 录音浮层的提示语：默认状态 / 已滑进取消区 -->
     <string name="im_voice_slide_up_cancel">手指上滑，取消发送</string>
     <string name="im_voice_release_to_cancel">松开手指，取消发送</string>
-    <string name="im_voice_release_to_send">松开手指，发送</string>
     <string name="im_attach_file">文件</string>
     <string name="im_attach_location">位置</string>
     <string name="im_file_open_with">用其他应用打开</string>
@@ -239,6 +238,8 @@
     <string name="im_chat_images_empty">这个会话还没有图片</string>
     <string name="im_chat_search_hint">搜索聊天记录</string>
     <string name="im_chat_search_empty">没有找到相关消息</string>
+    <!-- 搜索结果跳转定位：目标不在最近一页里、云端历史也拉不到时提示一句 -->
+    <string name="im_chat_locate_failed">没找到这条消息，可能已被清理</string>
 
     <string name="im_file_save_hint">文件只缓存在应用内；想要自己的副本，长按文件选「保存到手机…」</string>
     <string name="im_file_save_failed">保存失败</string>
@@ -436,15 +437,6 @@
         <item>周五</item>
         <item>周六</item>
         <item>周日</item>
-    </string-array>
-    <string-array name="schedule_day_names_compact">
-        <item>一</item>
-        <item>二</item>
-        <item>三</item>
-        <item>四</item>
-        <item>五</item>
-        <item>六</item>
-        <item>日</item>
     </string-array>
 
     <!-- ==================== 课程详情 ==================== -->

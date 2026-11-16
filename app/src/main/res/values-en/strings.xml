@@ -212,10 +212,9 @@
     <string name="im_voice_hold_button">Hold to talk</string>
     <string name="im_switch_to_voice">Switch to voice input</string>
     <string name="im_switch_to_keyboard">Switch to keyboard</string>
-    <!-- Recording overlay hints: idle / will cancel / will send -->
+    <!-- Recording overlay hints: idle / will cancel -->
     <string name="im_voice_slide_up_cancel">Slide up to cancel</string>
     <string name="im_voice_release_to_cancel">Release to cancel</string>
-    <string name="im_voice_release_to_send">Release to send</string>
     <string name="im_attach_file">File</string>
     <string name="im_attach_location">Location</string>
     <string name="im_file_open_with">Open with</string>
@@ -241,6 +240,8 @@
     <string name="im_chat_images_empty">No photos in this chat yet</string>
     <string name="im_chat_search_hint">Search this chat</string>
     <string name="im_chat_search_empty">No matching messages</string>
+    <!-- Search result jump: target is not in the latest page and remote history is unavailable -->
+    <string name="im_chat_locate_failed">Could not locate this message</string>
 
     <string name="im_file_save_hint">Files are only cached inside the app. For your own copy, long-press the file and choose “Save to phone…”.</string>
     <string name="im_file_save_failed">Could not save</string>
@@ -449,15 +450,6 @@
         <item>Fri</item>
         <item>Sat</item>
         <item>Sun</item>
-    </string-array>
-    <string-array name="schedule_day_names_compact">
-        <item>Mo</item>
-        <item>Tu</item>
-        <item>We</item>
-        <item>Th</item>
-        <item>Fr</item>
-        <item>Sa</item>
-        <item>Su</item>
     </string-array>
 
     <!-- Course details -->

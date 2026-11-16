@@ -71,10 +71,15 @@
             android:textColor="?attr/colorOnSurfaceVariant"
             android:visibility="gone" />
 
+        <!--
+          进度圈默认 GONE（2026-11-16 用户报「一进搜索页就挂一个圆圈」）：搜索模式进来时
+          并没有在加载任何东西，只有真发起查询 / 拉文件列表时才 show()。
+        -->
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/progress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center" />
+            android:layout_gravity="center"
+            android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

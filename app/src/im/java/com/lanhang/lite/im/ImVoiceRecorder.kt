@@ -27,8 +27,6 @@ internal class ImVoiceRecorder(private val ctx: Context) {
     private var output: File? = null
     private var startedAt = 0L
 
-    val isRecording: Boolean get() = recorder != null
-
     /**
      * 开始录音。返回 false = 权限被拒 / 麦克风被占用 / 存储不可写（调用方提示）。
      *

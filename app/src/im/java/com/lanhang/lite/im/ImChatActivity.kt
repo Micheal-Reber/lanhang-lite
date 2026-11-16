@@ -62,10 +62,12 @@ import com.lanhang.lite.databinding.ItemImMessageBinding
 import io.rong.imlib.RongIMClient
 
 /**
- * 聊天页（IM 版专属，MVP 只收发文本）。
+ * 聊天页（IM 版专属）：文本 / 图片 / 视频 / 文件 / 位置 / 语音六种消息的收发。
  *
- * 进入时拉最近 40 条并清未读；发出去的文本先以「发送中」入列，SDK 回调成功/失败再改状态，
- * 失败不自动重发（避免网络抖动时重复投递），只把气泡下面标一行红字。
+ * 进入时拉最近 40 条并清未读；发出去的消息先以「发送中」入列，SDK 回调成功/失败再改状态，
+ * 失败不自动重发（避免网络抖动时重复投递），只把气泡下面标一行红字（带具体原因）。
+ *
+ * 输入条两态（文字 / 语音）与录音浮层的约定见 AGENTS.md §IM「输入条两态」。
  */
 class ImChatActivity : AppCompatActivity() {
 
@@ -78,6 +80,18 @@ class ImChatActivity : AppCompatActivity() {
 
     private var peerId: String = ""
     private var isGroup: Boolean = false
+
+    /**
+     * 从聊天记录搜索跳过来时要定位的消息 key（null = 没有定位任务，正常滚到底）。
+     * 定位完成 / 放弃后置空，见 [tryFocus]。
+     */
+    private var focusKey: String? = null
+
+    /** 目标消息的时间锚点（毫秒）：最近 40 条里没有它时，用它向服务端翻一页历史 */
+    private var focusTime = 0L
+
+    /** 已经为定位翻过一次历史（只翻一次，避免反复请求） */
+    private var focusAsked = false
 
     /** 刚展开面板、键盘还在收起动画里：这几帧的 `ime.bottom > 0` 不能当成「用户要键盘」 */
     private var panelOpening = false
@@ -233,6 +247,8 @@ class ImChatActivity : AppCompatActivity() {
 
         peerId = intent.getStringExtra(EXTRA_PEER).orEmpty()
         isGroup = intent.getBooleanExtra(EXTRA_GROUP, false)
+        focusKey = intent.getStringExtra(EXTRA_FOCUS_KEY)?.takeIf { it.isNotBlank() }
+        focusTime = intent.getLongExtra(EXTRA_FOCUS_TIME, 0L)
         binding.toolbar.title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         binding.toolbar.setNavigationOnClickListener { finish() }
         // NoActionBar 主题下菜单只能挂在布局上（app:menu），图标默认是黑色，按主题色染一次
@@ -634,8 +650,7 @@ class ImChatActivity : AppCompatActivity() {
     }
 
     private fun insertEmoji(emoji: String) {
-        // 语音模式下插表情 = 用户要发文字了：把输入框叫回来（不弹键盘，表情面板正占着键盘位）
-        if (voiceMode) setVoiceMode(false, popKeyboard = false)
+        // 只有文字模式能打开表情面板（语音模式下 btnEmoji 是 GONE），所以这里不需要再判 voiceMode
         val edit = binding.editText
         val start = edit.selectionStart.coerceAtLeast(0)
         val end = edit.selectionEnd.coerceAtLeast(0)
@@ -1279,12 +1294,75 @@ class ImChatActivity : AppCompatActivity() {
     private fun render() {
         val messages = ImClient.thread(peerId, isGroup).toList()
         val grew = adapter.submit(messages)
+        // 有定位任务时不滚到底：刚滚到目标又被拉回最新，等于白滚
+        if (focusKey != null) {
+            tryFocus()
+            return
+        }
         if (grew) binding.recycler.scrollToPosition(messages.lastIndex)
+    }
+
+    /**
+     * 定位到从搜索跳过来的那条消息。
+     *
+     * 两种来源：① 目标就在最近 40 条里 → 直接滚；② 不在 → 用 [focusTime] 作锚点向服务端
+     * 翻一页历史（只翻一次），翻到了再滚。都没有就提示一句「没找到」并放弃 ——
+     * 那句提示是有用的：否则用户只会看到一个停在最新消息的会话页，以为跳转没生效。
+     */
+    private fun tryFocus() {
+        val key = focusKey ?: return
+        // 首帧列表还没回来（loadRecent 是异步的）：这时候翻历史会跟它抢同一个线程列表 ——
+        // loadRecent 的写法是整体替换，先合并进来的历史会被它冲掉。等它回来再判断。
+        if (adapter.itemCount == 0 && !focusAsked) return
+        val index = adapter.indexOf(key)
+        if (index >= 0) {
+            focusKey = null
+            revealAt(index, key)
+            return
+        }
+        if (focusAsked || focusTime <= 0L) {
+            focusKey = null
+            toast(R.string.im_chat_locate_failed)
+            return
+        }
+        focusAsked = true
+        // +1s：服务端接口是「取 sentTime 之前（含）」，锚点抬一档才不会把目标自己排除掉
+        ImClient.loadHistoryBefore(peerId, isGroup, focusTime + 1_000L, HISTORY_PAGE) { ok ->
+            if (!ok) {
+                focusKey = null
+                toast(R.string.im_chat_locate_failed)
+            }
+            // 成功时 ImClient 会 notifyChanged → 再走一次 render/tryFocus
+        }
+    }
+
+    /**
+     * 滚到第 [index] 条并短暂高亮。
+     *
+     * 用 `scrollToPositionWithOffset` 把目标放在屏幕上方 1/3 处（而不是贴顶）：
+     * 上面留一点上下文，用户才能看出这条前后是什么话。
+     */
+    private fun revealAt(index: Int, key: String) {
+        val lm = binding.recycler.layoutManager as? LinearLayoutManager
+        binding.recycler.post {
+            lm?.scrollToPositionWithOffset(index, binding.recycler.height / 3)
+            adapter.highlightKey = key
+            adapter.notifyItemChanged(index)
+            mainHandler.postDelayed({
+                if (adapter.highlightKey == key) {
+                    adapter.highlightKey = null
+                    refreshBubble(key)
+                }
+            }, HIGHLIGHT_MS)
+        }
     }
 
     private inner class Adapter : RecyclerView.Adapter<Adapter.VH>() {
 
         private var items: List<ImMessage> = emptyList()
+
+        /** 定位后短暂高亮的那一条（聊天记录搜索跳转用）；null = 不高亮 */
+        var highlightKey: String? = null
 
         /**
          * 用 DiffUtil 增量更新（原来是 `notifyDataSetChanged()`）。
@@ -1338,6 +1416,18 @@ class ImChatActivity : AppCompatActivity() {
 
             fun bind(message: ImMessage) {
                 val ctx = b.root.context
+                // 搜索跳转定位：整行换个底色，滚过去才看得出是哪条（1.8s 后由 revealAt 清掉）。
+                // 每次 bind 都要重设，holder 复用时不重设就会把上一条的高亮带过来
+                if (message.key == highlightKey) {
+                    b.row.setBackgroundColor(
+                        MaterialColors.getColor(
+                            b.row,
+                            com.google.android.material.R.attr.colorSecondaryContainer
+                        )
+                    )
+                } else {
+                    b.row.background = null
+                }
                 val gravity = if (message.mine) Gravity.END else Gravity.START
                 val isVideo = message.kind == ImMessage.KIND_VIDEO
                 // 有媒体（图片 / 视频封面）和文字气泡二选一：同一个位置只能有一件东西在
@@ -1592,19 +1682,45 @@ class ImChatActivity : AppCompatActivity() {
         internal const val EXTRA_GROUP = "is_group"
         internal const val EXTRA_TITLE = "title"
 
+        /** 从聊天记录搜索跳过来时要定位的那条消息（key + 时间；时间用于判断要不要翻历史） */
+        private const val EXTRA_FOCUS_KEY = "focus_key"
+        private const val EXTRA_FOCUS_TIME = "focus_time"
+
+        /** 定位时向服务端补拉的消息条数（够覆盖一屏多一些，不用一次拉太多） */
+        private const val HISTORY_PAGE = 50
+
+        /** 定位后高亮多久（够看清楚是哪条，又不至于一直亮着） */
+        private const val HIGHLIGHT_MS = 1800L
+
         /** 点通知进会话用的 Intent（[ImNotify] 复用，避免两处各拼一份 extra 键名） */
         internal fun intentOf(
             context: Context,
             peerId: String,
             isGroup: Boolean,
             title: String,
+            focusKey: String? = null,
+            focusTime: Long = 0L,
         ): Intent = Intent(context, ImChatActivity::class.java)
             .putExtra(EXTRA_PEER, peerId)
             .putExtra(EXTRA_GROUP, isGroup)
             .putExtra(EXTRA_TITLE, title)
+            .putExtra(EXTRA_FOCUS_KEY, focusKey)
+            .putExtra(EXTRA_FOCUS_TIME, focusTime)
 
-        fun start(context: Context, peerId: String, isGroup: Boolean, title: String) {
-            context.startActivity(intentOf(context, peerId, isGroup, title))
+        /**
+         * @param focusKey 搜索结果里那一条的 key；给了就在进页面后滚到它并高亮
+         * @param focusTime 那一条的时间（毫秒）。最近 40 条里找不到它时，用它作为时间锚点
+         *   向服务端翻一页历史 —— 没有锚点就只能放弃定位
+         */
+        fun start(
+            context: Context,
+            peerId: String,
+            isGroup: Boolean,
+            title: String,
+            focusKey: String? = null,
+            focusTime: Long = 0L,
+        ) {
+            context.startActivity(intentOf(context, peerId, isGroup, title, focusKey, focusTime))
         }
 
         /**
