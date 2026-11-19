@@ -117,7 +117,7 @@ class MomentsFragment : Fragment() {
                 ImagePreviewActivity.start(requireContext(), urls, index)
             },
             onReply = { item, userId -> askComment(item, userId) },
-            onCommentsLongPress = { item -> showMyComments(item) },
+            onCommentLongPress = { item, comment -> onCommentLongPress(item, comment) },
             // 头像 / 昵称 → 个人资料页（官方把「点人」交给宿主，这里落我们自己的页面）
             onUser = { userId ->
                 context?.let { UserProfileActivity.start(it, userId) }
@@ -482,7 +482,24 @@ class MomentsFragment : Fragment() {
         }
     }
 
-    /** 长按评论区：列出自己发过的评论，可删除（DELETE /comment/{feed}/{comment}） */
+    /**
+     * 长按评论的分派：自己的删、别人的复制，长在评论区空白处才弹「我的评论」列表。
+     *
+     * 规则与 [MomentActions.onCommentLongPress] 完全一致；这一页单独实现只因为
+     * 删完还要重绘 FAB。**别只留删除分支** —— 评论区里别人的评论占绝大多数，
+     * 那样长按等于绝大多数时候没反应（2026-11-19 用户报的正是这个）。
+     */
+    private fun onCommentLongPress(item: MomentItem, comment: CommentEntry?) {
+        when {
+            comment == null -> showMyComments(item)
+            comment.user_id == Session.userId && !comment.comment_id.isNullOrEmpty() ->
+                confirmDeleteComment(item, comment)
+
+            else -> copyCommentText(requireContext(), comment.content)
+        }
+    }
+
+    /** 长按评论区空白处：列出自己发过的评论，可删除（DELETE /comment/{feed}/{comment}） */
     private fun showMyComments(item: MomentItem) {
         val mine = item.comments.filter {
             it.user_id == Session.userId && !it.comment_id.isNullOrEmpty()

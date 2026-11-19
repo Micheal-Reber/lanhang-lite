@@ -143,7 +143,7 @@ class MyMomentsActivity : AppCompatActivity() {
         onComment = { item -> askComment(item) },
         onImage = { urls, index -> ImagePreviewActivity.start(this, urls, index) },
         onReply = { item, userId -> askComment(item, userId) },
-        onCommentsLongPress = { item -> showMyComments(item) },
+        onCommentLongPress = { item, comment -> onCommentLongPress(item, comment) },
         // 这一页所有动态都是同一个人的，点他头像仍进资料页（自洽，也方便从贴文回资料）
         onUser = { uid -> UserProfileActivity.start(this, uid) },
         // 只有本人动态才显示「删除」；看别人的「个人动态」时由 MomentAdapter 自动隐藏
@@ -301,6 +301,17 @@ class MyMomentsActivity : AppCompatActivity() {
     private fun askComment(item: MomentItem, replyToUserId: String? = null) {
         MomentCommentSheet.show(this, item, replyToUserId) {
             item.feed.feed_id?.let { notifyFeedChanged(it) }
+        }
+    }
+
+    /** 长按评论：自己的删、别人的复制，评论区空白处才弹「我的评论」列表 */
+    private fun onCommentLongPress(item: MomentItem, comment: CommentEntry?) {
+        when {
+            comment == null -> showMyComments(item)
+            comment.user_id == Session.userId && !comment.comment_id.isNullOrEmpty() ->
+                confirmDeleteComment(item, comment)
+
+            else -> copyCommentText(this, comment.content)
         }
     }
 

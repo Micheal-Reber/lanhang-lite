@@ -99,7 +99,7 @@ class FilteredMomentsActivity : AppCompatActivity() {
             onComment = { item -> actions.askComment(item) },
             onImage = { urls, index -> ImagePreviewActivity.start(this, urls, index) },
             onReply = { item, userId -> actions.askComment(item, userId) },
-            onCommentsLongPress = { item -> actions.showMyComments(item) },
+            onCommentLongPress = { item, comment -> actions.onCommentLongPress(item, comment) },
             onUser = { userId -> UserProfileActivity.start(this, userId) },
             onRowClick = { item ->
                 item.feed.feed_id?.let { MomentDetailActivity.start(this, it) }

@@ -495,6 +495,8 @@
     <string name="moments_sent">Sent</string>
     <string name="moments_send_failed">Failed to send: %1$s</string>
     <string name="moments_no_deletable">No comments to delete</string>
+    <!-- Long-press someone else's comment = copy (Android 13+ shows its own clipboard toast) -->
+    <string name="moments_comment_copied">Comment copied</string>
     <string name="moments_delete_item">Delete: %1$s</string>
     <string name="moments_my_comments">My comments</string>
     <string name="moments_delete_confirm">Delete this comment?</string>

@@ -482,6 +482,8 @@
     <string name="moments_sent">已发送</string>
     <string name="moments_send_failed">发送失败：%1$s</string>
     <string name="moments_no_deletable">没有可删除的评论</string>
+    <!-- 长按别人的评论 = 复制（Android 13+ 系统自带剪贴板浮层，不再重复提示） -->
+    <string name="moments_comment_copied">已复制评论</string>
     <string name="moments_delete_item">删除：%1$s</string>
     <string name="moments_my_comments">我的评论</string>
     <string name="moments_delete_confirm">删除这条评论？</string>

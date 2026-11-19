@@ -67,12 +67,13 @@ class MomentAdapter(
     private val onImage: (List<String>, Int) -> Unit,
     private val onReply: (MomentItem, String) -> Unit,
     /**
-     * 长按评论区 →「我的评论」→ 选一条删除。
+     * 长按评论。第二个参数是**被长按的那一条**，`null` = 长按落在评论区的空白/内边距上。
      *
-     * 这是删除评论的**唯一入口**（2026-10-30 起）：每条评论正文下方的「删除」键已去掉，
-     * 评论行不再被一个次要按钮撑高，长按仍然精确到这条动态的评论区。
+     * 2026-11-19 之前这里只传动态本身，于是「长按别人的评论」也只能走删除流程，
+     * 结果永远弹「没有可删除的评论」—— 别人的评论占绝大多数，这个手势等于死路。
+     * 现在宿主拿到具体评论后可以分派：自己的删、别人的复制。
      */
-    private val onCommentsLongPress: (MomentItem) -> Unit,
+    private val onCommentLongPress: (MomentItem, CommentEntry?) -> Unit,
     /** 点头像 / 昵称进个人主页；为 null 时不注册点击（比如不想跳转的场景） */
     private val onUser: ((String) -> Unit)? = null,
     /** 整行点击（搜索页点结果进详情）；null = 不注册，行为与工作圈列表一致 */
@@ -270,7 +271,8 @@ class MomentAdapter(
                 commentsRow.visibility = View.VISIBLE
                 bindComments(item, visibleComments)
                 commentsRow.setOnLongClickListener {
-                    onCommentsLongPress(item)
+                    // 整块评论区的空白处：没有具体评论，交给宿主决定（通常是列出我的评论）
+                    onCommentLongPress(item, null)
                     true
                 }
             } else {
@@ -405,14 +407,15 @@ class MomentAdapter(
                 line.highlightColor = Color.TRANSPARENT
                 line.setOnClickListener { onReply(item, uid) }
                 line.setOnLongClickListener {
-                    onCommentsLongPress(item)
+                    onCommentLongPress(item, c)
                     true
                 }
 
                 row.setOnClickListener { onReply(item, uid) }
-                // 行本身 clickable 会吞掉触摸流，长按必须挂在行上；删除评论只有这一个入口
+                // 行本身 clickable 会吞掉触摸流，长按必须挂在行上；长按要带上这一条评论，
+                // 宿主才能区分「删自己的」和「复制别人的」
                 row.setOnLongClickListener {
-                    onCommentsLongPress(item)
+                    onCommentLongPress(item, c)
                     true
                 }
             }

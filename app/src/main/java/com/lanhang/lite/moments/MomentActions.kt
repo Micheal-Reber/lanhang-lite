@@ -1,6 +1,10 @@
 package com.lanhang.lite.moments
 
 import com.lanhang.lite.core.toast
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -61,10 +65,28 @@ class MomentActions(
     }
 
     /**
+     * 长按评论的统一分派（2026-11-19）。
+     *
+     * - 长按**别人的**评论 → 复制正文。之前这里不分对象，别人的评论长按过去只会得到
+     *   「没有可删除的评论」—— 而评论区里别人的评论是绝大多数，等于这个手势通常是死路。
+     * - 长按**自己的**评论（且服务端已生成 comment_id）→ 直接问删不删这一条。
+     * - 长按评论区空白处（[comment] == null）→ 仍弹「我的评论」列表，保留旧入口。
+     */
+    fun onCommentLongPress(item: MomentItem, comment: CommentEntry?) {
+        when {
+            comment == null -> showMyComments(item)
+            comment.user_id == Session.userId && !comment.comment_id.isNullOrEmpty() ->
+                confirmDeleteComment(item, comment)
+
+            else -> copyCommentText(activity, comment.content)
+        }
+    }
+
+    /**
      * 长按评论区：列出自己发过的评论，可删除（`DELETE /comment/{feed}/{comment}`）。
      *
-     * 这是删除评论的**唯一入口**（2026-10-30 去掉每条评论下方的「删除」键）：
      * 只有自己的、且服务端已生成 comment_id 的评论会出现在列表里。
+     * 现在它只服务「长按评论区空白处」；长按具体某条评论直接按 [onCommentLongPress] 分派。
      */
     fun showMyComments(item: MomentItem) {
         val mine = item.comments.filter {
@@ -142,5 +164,24 @@ class MomentActions(
 
     private fun toast(message: String) {
         activity.toast(message)
+    }
+}
+
+/**
+ * 复制一条评论的正文。
+ *
+ * 放在类外面是因为 [MomentsFragment] / [MyMomentsActivity] 有自己的评论实现（它们还要重绘 FAB、
+ * 走自己的 notifyFeedChanged），但「长按别人的评论 = 复制」这件事必须是同一个行为。
+ *
+ * Android 13+ 系统自带的剪贴板浮层已经会提示「已复制」，那之后不再自己再弹一个 toast，
+ * 否则同一个动作会连出两条提示。
+ */
+internal fun copyCommentText(context: Context, text: String?) {
+    val body = text.orEmpty().trim()
+    if (body.isEmpty()) return
+    val cm = context.getSystemService(ClipboardManager::class.java) ?: return
+    cm.setPrimaryClip(ClipData.newPlainText("comment", body))
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        context.toast(context.getString(R.string.moments_comment_copied))
     }
 }
