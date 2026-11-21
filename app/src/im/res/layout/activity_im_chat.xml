@@ -46,6 +46,44 @@
             android:paddingBottom="@dimen/space_sm"
             android:scrollbars="none" />
 
+        <!--
+          引用条：点「引用消息」后出现在输入条上方，发送或点 × 消失。
+          放在 inputBar 外面（不是里面）是因为它要占满整行宽度，而 inputBar 是横向排布。
+        -->
+        <LinearLayout
+            android:id="@+id/quoteBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/colorSurfaceContainerHigh"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/screen_padding_h"
+            android:paddingTop="@dimen/space_xs"
+            android:paddingEnd="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_xs"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvQuoteBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.Lanhang.BodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <ImageButton
+                android:id="@+id/btnQuoteClose"
+                android:layout_width="@dimen/touch_target_min"
+                android:layout_height="@dimen/touch_target_min"
+                android:background="@null"
+                android:contentDescription="@string/common_cancel"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_close"
+                app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/inputBar"
             android:layout_width="match_parent"

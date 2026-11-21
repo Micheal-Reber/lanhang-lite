@@ -21,10 +21,12 @@ import io.rong.message.HQVoiceMessage
 import io.rong.message.ImageMessage
 import io.rong.message.LocationMessage
 import io.rong.message.ReadReceiptMessage
+import io.rong.message.RecallNotificationMessage
 import io.rong.message.SightMessage
 import io.rong.message.TextMessage
 import io.rong.message.VoiceMessage
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -110,7 +112,25 @@ data class ImMessage(
      * 视频发不出去时尤其需要一句人话（见 `ImClient.describeSendError`）。
      */
     val errorText: String? = null,
+    /**
+     * 这条已经被撤回（自己撤的，或对方撤的）。
+     *
+     * 撤回后 SDK 会把库里这条的内容换成 [io.rong.message.RecallNotificationMessage]，
+     * 所以它同时决定了 [toImMessage] 的分支和气泡的显示（「你/对方撤回了一条消息」）。
+     */
+    val recalled: Boolean = false,
+    /**
+     * 引用：被引用的那条「谁说的 + 说了什么」。
+     *
+     * 融云 IMLib 2.9 没有 `ReferenceMessage`（只有 IMKit 那层有），所以引用信息塞在
+     * `TextMessage.extra` 里（JSON，键 `lq`）。**官方客户端不认这个约定**，它只会显示正文，
+     * 引用块会在官方 App 里丢掉 —— 双方都用本客户端时才是完整的。
+     */
+    val quote: Quote? = null,
 ) {
+
+    /** 引用块的内容：[sender] 是原作者显示名，[text] 是原文摘要 */
+    data class Quote(val sender: String, val text: String)
     val isImage: Boolean get() = kind == KIND_IMAGE
 
     companion object {
@@ -834,6 +854,28 @@ object ImClient {
                 respondMap: HashMap<String, Long>?,
             ) = Unit
         })
+
+        // 撤回（`RC:RcCmd`）：SDK 收到后会把**本地库**里那条的内容替换成
+        // `RecallNotificationMessage`，并回调这里告诉我们哪一条被撤了（给的是内部 messageId）。
+        // 我们按 id 反查 uId，再把内存里那份标成 recalled —— 不处理的话界面会一直显示原文，
+        // 直到下次重启重新读库才「突然变成已撤回」。
+        // 用旧版 `setRecallMessageListener`（给 int）而不是 `setOnRecallMessageListener`
+        // （给 Message、返回 boolean 表示是否拦截默认处理）：我们要的就是 SDK 那套默认替换，
+        // 自己去改库反而容易和它打架。
+        RongIMClient.setRecallMessageListener { messageId, _ ->
+            RongIMClient.getInstance().getMessage(
+                messageId,
+                object : RongIMClient.ResultCallback<Message>() {
+                    override fun onSuccess(message: Message?) {
+                        message?.uId?.let { uid -> main.post { markRecalled(uid) } }
+                    }
+
+                    override fun onError(e: RongIMClient.ErrorCode?) {
+                        Log.w(TAG, "recall lookup failed id=$messageId err=$e")
+                    }
+                }
+            )
+        }
     }
 
     /**
@@ -864,6 +906,317 @@ object ImClient {
             if (changed) notifyChanged()
         }
         refreshConversations()
+    }
+
+    // ---------------------------------------------------------------- 撤回
+
+    /** 撤回窗口（融云默认 2 分钟，服务端可配得更短）。客户端只用来提前把菜单项藏掉 */
+    const val RECALL_WINDOW_MS = 2L * 60L * 1000L
+
+    /** 引用信息塞进 `TextMessage.extra`：`{"lq":{"s":"张三","t":"原文摘要"}}` */
+    private fun encodeQuote(quote: ImMessage.Quote): String = JSONObject()
+        .put("lq", JSONObject().put("s", quote.sender).put("t", quote.text))
+        .toString()
+
+    /**
+     * 解析引用。不是我们写的 extra（官方客户端发的、或格式变了）一律当没有引用 ——
+     * 宁可少显示一个引用块，也不能因为一个畸形 JSON 让整条消息渲染失败。
+     */
+    private fun parseQuote(extra: String?): ImMessage.Quote? {
+        if (extra.isNullOrBlank()) return null
+        val obj = runCatching { JSONObject(extra) }.getOrNull() ?: return null
+        val lq = obj.optJSONObject("lq") ?: return null
+        val body = lq.optString("t")
+        if (body.isBlank()) return null
+        return ImMessage.Quote(sender = lq.optString("s").ifBlank { "…" }, text = body)
+    }
+
+    /**
+     * 找到这条消息在 SDK 里的 `Message` 对象（撤回、删除都要它）。
+     *
+     * 🔴 **不能只靠 `getMessageByUid`**（2026-11-21 用户报「刚发的消息撤回失败，找不到这条」）：
+     * 本地 `Message.obtain` 拿到的 uId 与真正入库后的不一定对得上，`getMessageByUid` 对刚发出去的
+     * 消息经常直接回 null。所以这里两级兜底：
+     * ① 先试 uid，命中就最准；
+     * ② 失败则在**最近 60 条**里按「我自己发的 + 时间窗 ±2 分钟 + 内容相符」找 ——
+     *    撤回和删除的对象都是刚发的消息，60 条足够覆盖。
+     */
+    private fun findSdkMessage(
+        peerId: String,
+        isGroup: Boolean,
+        target: ImMessage,
+        onFound: (Message?) -> Unit,
+    ) {
+        val type = if (isGroup) Conversation.ConversationType.GROUP
+        else Conversation.ConversationType.PRIVATE
+
+        fun scan() {
+            RongIMClient.getInstance().getLatestMessages(
+                type, peerId, 60,
+                object : RongIMClient.ResultCallback<List<Message>>() {
+                    override fun onSuccess(messages: List<Message>?) {
+                        val list = messages.orEmpty()
+                        val hit = list.firstOrNull { it.uId == target.key }
+                            ?: list.firstOrNull { m ->
+                                m.senderUserId == Session.userId &&
+                                    kotlin.math.abs(m.sentTime - target.time) <= 120_000L &&
+                                    sameContent(m, target)
+                            }
+                        if (hit == null) {
+                            Log.w(TAG, "find message miss kind=${target.kind} t=${target.time}")
+                        }
+                        main.post { onFound(hit) }
+                    }
+
+                    override fun onError(e: RongIMClient.ErrorCode?) {
+                        Log.w(TAG, "find message failed ${e?.name}")
+                        main.post { onFound(null) }
+                    }
+                }
+            )
+        }
+
+        RongIMClient.getInstance().getMessageByUid(
+            target.key,
+            object : RongIMClient.ResultCallback<Message>() {
+                override fun onSuccess(message: Message?) {
+                    if (message != null) main.post { onFound(message) } else scan()
+                }
+
+                override fun onError(e: RongIMClient.ErrorCode?) {
+                    scan()
+                }
+            }
+        )
+    }
+
+    /**
+     * 内容是否同一条：文字比正文、文件比文件名、位置比地名；媒体类只比类型
+     * （同一个 2 分钟窗口里，我自己发的同类媒体消息重复到分不清的概率可以忽略）。
+     */
+    private fun sameContent(message: Message, target: ImMessage): Boolean {
+        val c = message.content
+        return when (target.kind) {
+            ImMessage.KIND_TEXT -> (c as? TextMessage)?.content == target.text
+            ImMessage.KIND_FILE -> (c as? FileMessage)?.name == target.fileName
+            ImMessage.KIND_LOCATION -> (c as? LocationMessage)?.poi == target.poi
+            ImMessage.KIND_IMAGE -> c is ImageMessage
+            ImMessage.KIND_VOICE -> c is VoiceMessage || c is HQVoiceMessage
+            ImMessage.KIND_VIDEO -> c is SightMessage
+            else -> false
+        }
+    }
+
+    /**
+     * 删除一条消息（**只删本机**：融云的 `deleteMessages` 删的是本地库，服务端仍保留）。
+     * 微信的「删除消息」也是这个语义，所以确认框里要写清「对方仍能看到」。
+     */
+    fun deleteMessage(
+        peerId: String,
+        isGroup: Boolean,
+        target: ImMessage,
+        onDone: (Boolean) -> Unit,
+    ) {
+        findSdkMessage(peerId, isGroup, target) { message ->
+            if (message == null) {
+                // 库里没有也不影响把内存里那份摘掉 —— 用户看到的结果一样
+                removeFromThreads(target.key)
+                onDone(true)
+                return@findSdkMessage
+            }
+            RongIMClient.getInstance().deleteMessages(
+                intArrayOf(message.messageId),
+                object : RongIMClient.ResultCallback<Boolean>() {
+                    override fun onSuccess(ok: Boolean?) {
+                        removeFromThreads(target.key)
+                        refreshConversations()
+                        onDone(true)
+                    }
+
+                    override fun onError(e: RongIMClient.ErrorCode?) {
+                        Log.w(TAG, "delete message failed key=${target.key} err=$e")
+                        onDone(false)
+                    }
+                }
+            )
+        }
+    }
+
+    private fun removeFromThreads(uid: String) {
+        var changed = false
+        threads.values.forEach { list ->
+            if (list.removeAll { it.key == uid }) changed = true
+        }
+        if (changed) notifyChanged()
+    }
+
+    // ---------------------------------------------------------------- 转发
+
+    /**
+     * 转发一条消息到另一个会话。
+     *
+     * 富消息（图片/视频/文件/语音）的发送接口只吃**本地 uri**，所以先确保本地有文件：
+     * 已落盘的直接用，没有的走 [downloadFile]（复用源消息的 uid，和「点开文件时下载」
+     * 是同一条路径）下到 cache 再发。
+     *
+     * @param onDone 是否已发起 + 失败原因。富消息的最终成败仍看目标会话里的气泡状态
+     */
+    fun forward(
+        message: ImMessage,
+        peerId: String,
+        isGroup: Boolean,
+        onDone: (Boolean, String?) -> Unit,
+    ) {
+        if (peerId.isBlank() || status != Status.CONNECTED) {
+            onDone(false, text(R.string.im_forward_failed))
+            return
+        }
+        when (message.kind) {
+            ImMessage.KIND_TEXT -> {
+                sendText(peerId, isGroup, message.text)
+                onDone(true, null)
+            }
+
+            ImMessage.KIND_LOCATION -> {
+                sendLocation(peerId, isGroup, message.lat, message.lng, message.poi.orEmpty())
+                onDone(true, null)
+            }
+
+            else -> {
+                val local = localFileOf(message)
+                if (local != null) {
+                    sendRichForward(message, local, peerId, isGroup, onDone)
+                } else {
+                    downloadFile(
+                        uid = message.key,
+                        remoteUrl = message.mediaUrl,
+                        fileName = message.fileName ?: fallbackNameOf(message),
+                        fileSize = message.fileSize,
+                        onProgress = {},
+                        onResult = { path ->
+                            val file = path?.let { File(it) }?.takeIf { it.isFile }
+                            main.post {
+                                if (file == null) {
+                                    onDone(false, text(R.string.im_forward_failed))
+                                } else {
+                                    sendRichForward(message, file, peerId, isGroup, onDone)
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    /** 已经是本地文件的才返回（`file://` 或裸路径且真在盘上），远端地址一律返回 null */
+    private fun localFileOf(message: ImMessage): File? {
+        val path = message.mediaUrl ?: return null
+        val raw = when {
+            path.startsWith("file://") -> android.net.Uri.parse(path).path
+            path.startsWith("/") -> path
+            else -> null
+        } ?: return null
+        return File(raw).takeIf { it.isFile }
+    }
+
+    /** 转发时给个兜底文件名（对端保存时用它，没有原名总比一串时间戳好） */
+    private fun fallbackNameOf(message: ImMessage): String = when (message.kind) {
+        ImMessage.KIND_IMAGE -> "image_${message.time}.jpg"
+        ImMessage.KIND_VIDEO -> "video_${message.time}.mp4"
+        ImMessage.KIND_VOICE -> "voice_${message.time}.amr"
+        else -> "file_${message.time}"
+    }
+
+    private fun sendRichForward(
+        message: ImMessage,
+        file: File,
+        peerId: String,
+        isGroup: Boolean,
+        onDone: (Boolean, String?) -> Unit,
+    ) {
+        val uri = android.net.Uri.fromFile(file)
+        when (message.kind) {
+            ImMessage.KIND_IMAGE -> sendImage(peerId, isGroup, uri)
+            // 视频没有随行封面：转发的这条在对方那边是占位块，点开仍能播（封面不是必需品）
+            ImMessage.KIND_VIDEO -> sendVideo(peerId, isGroup, uri, null, message.duration)
+            ImMessage.KIND_VOICE -> sendVoice(peerId, isGroup, file, message.duration)
+            ImMessage.KIND_FILE -> sendFile(
+                peerId, isGroup, uri, message.fileName.orEmpty(), message.fileSize
+            )
+
+            else -> {
+                onDone(false, text(R.string.im_forward_failed))
+                return
+            }
+        }
+        onDone(true, null)
+    }
+
+    /**
+     * 撤回一条**自己发的**消息（`recallMessage` → 服务端下发 `RC:RcCmd`）。
+     *
+     * 真正的约束全在服务端：只能撤自己的、只在窗口内、且学校私有云要开通这个能力。
+     * 客户端这几行只是把「点了没反应」变成一句人话。
+     *
+     * @param onDone 是否成功 + 失败原因（成功时原因为 null）
+     */
+    fun recall(
+        peerId: String,
+        isGroup: Boolean,
+        target: ImMessage,
+        onDone: (Boolean, String?) -> Unit,
+    ) {
+        if (status != Status.CONNECTED) {
+            onDone(false, text(R.string.im_err_not_connected))
+            return
+        }
+        findSdkMessage(peerId, isGroup, target) { message ->
+            if (message == null) {
+                // 60 条里都找不到：清过记录、或者根本不是这个会话的消息。撤不回来，只能直说
+                onDone(false, text(R.string.im_recall_no_message))
+                return@findSdkMessage
+            }
+            runCatching {
+                RongIMClient.getInstance().recallMessage(
+                    message, "",
+                    object : RongIMClient.ResultCallback<RecallNotificationMessage>() {
+                        override fun onSuccess(result: RecallNotificationMessage?) {
+                            // 成功时 SDK 会自己改库并回调 recall listener；这里再标一次是保险 ——
+                            // listener 晚到时用户会看到「点了撤回原文还在」，那是最难解释的一种表现
+                            markRecalled(target.key)
+                            onDone(true, null)
+                        }
+
+                        override fun onError(e: RongIMClient.ErrorCode?) {
+                            Log.w(TAG, "recall failed key=${target.key} err=$e")
+                            onDone(false, e?.name)
+                        }
+                    }
+                )
+            }.onFailure {
+                Log.w(TAG, "recall threw key=${target.key}", it)
+                onDone(false, it.javaClass.simpleName)
+            }
+        }
+    }
+
+    /**
+     * 把内存里的某条标成已撤回（正文一并清掉，撤回气泡不显示原文）。
+     *
+     * 找不到是正常的：消息可能已被清记录、或者根本不在当前缓存的会话里。
+     */
+    private fun markRecalled(uid: String) {
+        var changed = false
+        threads.values.forEach { list ->
+            val i = list.indexOfFirst { it.key == uid }
+            if (i >= 0 && !list[i].recalled) {
+                // 引用块也要清掉：撤回后上面还挂着「引用 张三：……」会很怪
+                list[i] = list[i].copy(recalled = true, text = "", quote = null)
+                changed = true
+            }
+        }
+        if (changed) notifyChanged()
     }
 
     /**
@@ -1095,7 +1448,11 @@ object ImClient {
             read = message.sentStatus == Message.SentStatus.READ,
         )
         return when (content) {
-            is TextMessage -> base.copy(kind = ImMessage.KIND_TEXT, text = content.content.orEmpty())
+            is TextMessage -> base.copy(
+                kind = ImMessage.KIND_TEXT,
+                text = content.content.orEmpty(),
+                quote = parseQuote(content.extra),
+            )
             is ImageMessage -> {
                 val thumb = thumbSourceOf(content)
                 val full = fullSourceOf(content) ?: thumb
@@ -1163,6 +1520,12 @@ object ImClient {
                 mediaUrl = pick(content.localPath?.toString(), content.mediaUrl?.toString()),
                 text = "",
             )
+            // 撤回通知（`RC:RcCmd`）：SDK 把本地库里原消息的内容整个换成了这个，
+            // 重启后从库里读到的也是它。必须显式认 —— 走 else 会被丢掉，
+            // 结果是「撤回的那条凭空消失」或「重启后又冒出来」。
+            // 左右位置仍按原消息的 senderUserId（base 已算），不去看撤回操作者：
+            // 单聊里撤回操作者必然是作者本人，群管理员撤回他人消息的情况这里按作者显示更自然。
+            is RecallNotificationMessage -> base.copy(recalled = true, text = "")
             else -> return null
         }
     }
@@ -1596,7 +1959,12 @@ object ImClient {
         }
     }
 
-    fun sendText(peerId: String, isGroup: Boolean, body: String) {
+    fun sendText(
+        peerId: String,
+        isGroup: Boolean,
+        body: String,
+        quote: ImMessage.Quote? = null,
+    ) {
         val text = body.trim()
         if (text.isEmpty() || peerId.isBlank()) return
         if (status != Status.CONNECTED) {
@@ -1606,7 +1974,9 @@ object ImClient {
         }
         val type = if (isGroup) Conversation.ConversationType.GROUP
         else Conversation.ConversationType.PRIVATE
-        val message = Message.obtain(peerId, type, TextMessage.obtain(text))
+        val content = TextMessage.obtain(text)
+        quote?.let { content.extra = encodeQuote(it) }
+        val message = Message.obtain(peerId, type, content)
         val key = message.uId ?: System.currentTimeMillis().toString()
         val list = threads.getOrPut(threadKey(peerId, isGroup)) { mutableListOf() }
         list += ImMessage(
@@ -1616,6 +1986,7 @@ object ImClient {
             time = System.currentTimeMillis(),
             state = ImMessage.STATE_SENDING,
             senderId = Session.userId,
+            quote = quote,
         )
         notifyChanged()
         RongIMClient.getInstance().sendMessage(

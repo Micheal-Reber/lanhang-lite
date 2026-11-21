@@ -242,6 +242,30 @@
     <string name="im_chat_search_empty">No matching messages</string>
     <!-- Search result jump: target is not in the latest page and remote history is unavailable -->
     <string name="im_chat_locate_failed">Could not locate this message</string>
+    <!-- Recall (long-press your own message): 2-minute window, server has the final say -->
+    <string name="im_message">Message</string>
+    <string name="im_recall">Recall</string>
+    <string name="im_recall_confirm">The other side will see “A message was recalled”. Recall it?</string>
+    <string name="im_recall_no_message">Message not found</string>
+    <string name="im_recall_failed">Could not recall (%1$s)</string>
+    <string name="im_msg_recalled_self">You recalled a message</string>
+    <string name="im_msg_recalled_other">The other side recalled a message</string>
+    <!-- Long-press menu: copy / quote / forward / delete -->
+    <string name="im_copy_message">Copy</string>
+    <string name="im_copy_done">Copied</string>
+    <string name="im_quote_message">Quote</string>
+    <string name="im_forward_message">Forward</string>
+    <string name="im_delete_message">Delete</string>
+    <string name="im_delete_message_confirm">Only removes it on this device; the other side still has it.</string>
+    <string name="im_delete_message_done">Deleted</string>
+    <string name="im_delete_message_failed">Could not delete</string>
+    <string name="im_quote_me">me</string>
+    <string name="im_quote_other">the other side</string>
+    <string name="im_forward_to">Forward to</string>
+    <string name="im_forward_done">Forwarded</string>
+    <string name="im_forward_failed">Could not forward</string>
+    <string name="im_forward_no_target">No conversation to forward to</string>
+    <string name="im_quote_bar">Quoting %1$s</string>
 
     <string name="im_file_save_hint">Files are only cached inside the app. For your own copy, long-press the file and choose “Save to phone…”.</string>
     <string name="im_file_save_failed">Could not save</string>

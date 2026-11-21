@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  气泡上方的引用块：中性容器色 + 圆角，比正文小一号。
+  不做左边竖线那种装饰 —— 一竖线要在左右两侧（自己的气泡靠右、对方的靠左）各画一份，
+  这里用「整块浅底」区分就够，也省一个 drawable。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="6dp" />
+    <solid android:color="?attr/colorSurfaceContainerHigh" />
+</shape>

@@ -240,6 +240,31 @@
     <string name="im_chat_search_empty">没有找到相关消息</string>
     <!-- 搜索结果跳转定位：目标不在最近一页里、云端历史也拉不到时提示一句 -->
     <string name="im_chat_locate_failed">没找到这条消息，可能已被清理</string>
+    <!-- 撤回（长按自己的消息）：窗口 2 分钟，超时由服务端最终决定 -->
+    <string name="im_message">消息</string>
+    <string name="im_recall">撤回</string>
+    <string name="im_recall_confirm">撤回后对方会看到「对方撤回了一条消息」，确定撤回？</string>
+    <string name="im_recall_no_message">找不到这条消息</string>
+    <string name="im_recall_failed">撤回失败（%1$s）</string>
+    <string name="im_msg_recalled_self">你撤回了一条消息</string>
+    <string name="im_msg_recalled_other">对方撤回了一条消息</string>
+    <!-- 长按菜单：复制 / 引用 / 转发 / 删除 -->
+    <string name="im_copy_message">复制消息</string>
+    <string name="im_copy_done">已复制</string>
+    <string name="im_quote_message">引用消息</string>
+    <string name="im_forward_message">转发消息</string>
+    <string name="im_delete_message">删除消息</string>
+    <string name="im_delete_message_confirm">只删除本机的这条记录，对方仍能看到。</string>
+    <string name="im_delete_message_done">已删除</string>
+    <string name="im_delete_message_failed">删除失败</string>
+    <string name="im_quote_me">我</string>
+    <string name="im_quote_other">对方</string>
+    <string name="im_forward_to">转发到</string>
+    <string name="im_forward_done">已转发</string>
+    <string name="im_forward_failed">转发失败</string>
+    <string name="im_forward_no_target">还没有可转发的会话</string>
+    <!-- 输入条上方的引用条：「引用 张三」 -->
+    <string name="im_quote_bar">引用 %1$s</string>
 
     <string name="im_file_save_hint">文件只缓存在应用内；想要自己的副本，长按文件选「保存到手机…」</string>
     <string name="im_file_save_failed">保存失败</string>

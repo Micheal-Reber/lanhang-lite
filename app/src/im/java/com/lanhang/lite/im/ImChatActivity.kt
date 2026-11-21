@@ -81,6 +81,9 @@ class ImChatActivity : AppCompatActivity() {
     private var peerId: String = ""
     private var isGroup: Boolean = false
 
+    /** 正在引用的那条消息（输入条上方显示引用条）；发出、或点 × 之后置空 */
+    private var quoted: ImMessage? = null
+
     /**
      * 从聊天记录搜索跳过来时要定位的消息 key（null = 没有定位任务，正常滚到底）。
      * 定位完成 / 放弃后置空，见 [tryFocus]。
@@ -340,6 +343,7 @@ class ImChatActivity : AppCompatActivity() {
         binding.btnHold.setOnTouchListener { _, event -> onVoiceTouch(event) }
 
         binding.btnSend.setOnClickListener { send() }
+        binding.btnQuoteClose.setOnClickListener { clearQuote() }
         binding.editText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 send()
@@ -1094,20 +1098,67 @@ class ImChatActivity : AppCompatActivity() {
     }
 
     /** 长按文件气泡：打开 / 保存到本地 */
-    private fun showFileMenu(message: ImMessage) {
+    /**
+     * 长按消息的菜单，顺序照微信：**复制 / 引用 / 转发 / 撤回 / 删除**。
+     *
+     * - 复制、引用只对**文字消息**给：图片/语音没有正文可复制，引用它们也只能得到一句
+     *   「[图片]」，与其给一个点了没内容的项，不如不显示。
+     * - 转发对所有类型都给，按类型重发（富消息先确保本地文件，见 `ImClient.forward`）。
+     * - 撤回只在 2 分钟内、自己的、已发出的消息上出现；超时由服务端最终决定。
+     * - 删除是**只删本机**（融云 deleteMessages 的语义），所以确认框里写清「对方仍能看到」。
+     * - 文件另外补「打开 / 保存到手机 / 用其他应用打开」三项，这是文件才有的动作。
+     */
+    private fun showMessageMenu(message: ImMessage) {
+        val labels = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+
+        if (message.kind == ImMessage.KIND_TEXT && message.text.isNotBlank()) {
+            labels += getString(R.string.im_copy_message)
+            actions += { copyMessage(message) }
+            labels += getString(R.string.im_quote_message)
+            actions += { startQuote(message) }
+        }
+        labels += getString(R.string.im_forward_message)
+        actions += { forwardMessage(message) }
+        if (canRecall(message)) {
+            labels += getString(R.string.im_recall)
+            actions += { confirmRecall(message) }
+        }
+        labels += getString(R.string.im_delete_message)
+        actions += { confirmDeleteMessage(message) }
+        if (message.kind == ImMessage.KIND_FILE) {
+            labels += getString(R.string.im_file_open)
+            actions += { openFile(message) }
+            labels += getString(R.string.im_file_save)
+            actions += { saveFile(message) }
+            labels += getString(R.string.im_file_open_with)
+            actions += { openFileWith(message) }
+        }
+
         MaterialAlertDialogBuilder(this)
-            .setTitle(safeFileName(message.fileName.orEmpty()))
-            .setItems(
-                arrayOf(
-                    getString(R.string.im_file_open),
-                    getString(R.string.im_file_save),
-                    getString(R.string.im_file_open_with),
-                )
-            ) { _, which ->
-                when (which) {
-                    0 -> openFile(message)
-                    1 -> saveFile(message)
-                    2 -> openFileWith(message)
+            .setTitle(
+                if (message.kind == ImMessage.KIND_FILE) safeFileName(message.fileName.orEmpty())
+                else getString(R.string.im_message)
+            )
+            .setItems(labels.toTypedArray()) { _, which -> actions[which]() }
+            .show()
+    }
+
+    /** 撤回条件：自己的、已发出、没撤过、还在窗口内（服务端另有更严格的限制） */
+    private fun canRecall(message: ImMessage): Boolean =
+        message.mine && !message.recalled &&
+            message.state != ImMessage.STATE_FAILED &&
+            message.state != ImMessage.STATE_SENDING &&
+            (System.currentTimeMillis() - message.time) in 0..ImClient.RECALL_WINDOW_MS
+
+    private fun confirmRecall(message: ImMessage) {
+        MaterialAlertDialogBuilder(this)
+            .setMessage(R.string.im_recall_confirm)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.im_recall) { _, _ ->
+                ImClient.recall(peerId, isGroup, message) { ok, reason ->
+                    if (isFinishing || isDestroyed) return@recall
+                    if (!ok) toast(getString(R.string.im_recall_failed, reason.orEmpty()))
                 }
             }
             .show()
@@ -1279,8 +1330,102 @@ class ImChatActivity : AppCompatActivity() {
     private fun send() {
         val text = binding.editText.text?.toString().orEmpty()
         if (text.isBlank()) return
-        ImClient.sendText(peerId, isGroup, text)
+        // 引用只在这次发送里有效：发完就清掉，否则下一条会莫名其妙还带着引用
+        val quote = quoted?.let { quoteOf(it) }
+        ImClient.sendText(peerId, isGroup, text, quote)
+        clearQuote()
         binding.editText.setText("")
+    }
+
+    // ---------------------------------------------------------------- 长按菜单用的动作
+
+    /** 引用块里的「谁」：自己发的写「我」，别人的取缓存里的姓名，取不到写「对方」 */
+    private fun displayNameOf(message: ImMessage): String {
+        if (message.mine) return getString(R.string.im_quote_me)
+        return com.lanhang.lite.moments.UserInfoCache.nameOf(message.senderId)
+            ?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.im_quote_other)
+    }
+
+    /**
+     * 把一条消息压成引用块。
+     *
+     * 摘要按**类型**给：图片/语音/视频没有正文，直接取 `text` 会得到空字符串，
+     * 引用块就变成「引用 张三：」这种半截话。
+     */
+    private fun quoteOf(message: ImMessage): ImMessage.Quote {
+        val body = when (message.kind) {
+            ImMessage.KIND_TEXT -> message.text
+            ImMessage.KIND_IMAGE -> getString(R.string.im_preview_image)
+            ImMessage.KIND_VIDEO -> getString(R.string.im_preview_video)
+            ImMessage.KIND_VOICE -> getString(R.string.im_preview_voice)
+            ImMessage.KIND_FILE -> message.fileName.orEmpty()
+            ImMessage.KIND_LOCATION -> message.poi.orEmpty()
+            else -> message.text
+        }.take(80)
+        return ImMessage.Quote(sender = displayNameOf(message), text = body)
+    }
+
+    private fun startQuote(message: ImMessage) {
+        // 引用只能配文字发出去：语音模式下先把输入框叫回来（不弹键盘，下面统一弹）
+        if (voiceMode) setVoiceMode(false, popKeyboard = false)
+        quoted = message
+        binding.tvQuoteBar.text = getString(R.string.im_quote_bar, displayNameOf(message))
+        binding.quoteBar.isVisible = true
+        binding.editText.requestFocus()
+        binding.editText.post { showKeyboard() }
+    }
+
+    private fun clearQuote() {
+        quoted = null
+        if (::binding.isInitialized) binding.quoteBar.isVisible = false
+    }
+
+    private fun copyMessage(message: ImMessage) {
+        val body = message.text
+        if (body.isBlank()) return
+        val cm = getSystemService(android.content.ClipboardManager::class.java) ?: return
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("message", body))
+        // Android 13+ 系统自己有「已复制」浮层，不再重复提示
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            toast(R.string.im_copy_done)
+        }
+    }
+
+    /** 转发：先选会话。排除当前会话 —— 转给自己正在看的这个没有任何意义 */
+    private fun forwardMessage(message: ImMessage) {
+        val targets = ImClient.conversations.filterNot {
+            it.peerId == peerId && it.isGroup == isGroup
+        }
+        if (targets.isEmpty()) {
+            toast(R.string.im_forward_no_target)
+            return
+        }
+        val labels = targets.map { if (it.isGroup) "👥 ${it.title}" else it.title }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.im_forward_to)
+            .setItems(labels) { _, which ->
+                val target = targets[which]
+                ImClient.forward(message, target.peerId, target.isGroup) { ok, _ ->
+                    if (isFinishing || isDestroyed) return@forward
+                    toast(if (ok) R.string.im_forward_done else R.string.im_forward_failed)
+                }
+            }
+            .setNegativeButton(R.string.common_cancel, null)
+            .show()
+    }
+
+    private fun confirmDeleteMessage(message: ImMessage) {
+        MaterialAlertDialogBuilder(this)
+            .setMessage(R.string.im_delete_message_confirm)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.im_delete_message) { _, _ ->
+                ImClient.deleteMessage(peerId, isGroup, message) { ok ->
+                    if (isFinishing || isDestroyed) return@deleteMessage
+                    toast(if (ok) R.string.im_delete_message_done else R.string.im_delete_message_failed)
+                }
+            }
+            .show()
     }
 
     /**
@@ -1429,6 +1574,14 @@ class ImChatActivity : AppCompatActivity() {
                     b.row.background = null
                 }
                 val gravity = if (message.mine) Gravity.END else Gravity.START
+                // 引用块：有 quote 才显示。复用 holder 必须显式设 GONE，否则上一条的引用会串过来
+                val quote = message.quote
+                b.tvQuote.isVisible = quote != null
+                if (quote != null) {
+                    b.tvQuote.text = "${quote.sender}：${quote.text}"
+                    b.tvQuote.maxWidth =
+                        (ctx.resources.displayMetrics.widthPixels * 0.72f).toInt()
+                }
                 val isVideo = message.kind == ImMessage.KIND_VIDEO
                 // 有媒体（图片 / 视频封面）和文字气泡二选一：同一个位置只能有一件东西在
                 val hasMedia = message.isImage || isVideo
@@ -1496,6 +1649,11 @@ class ImChatActivity : AppCompatActivity() {
 
             private fun bindText(message: ImMessage) {
                 val ctx = b.root.context
+                // 已撤回：只留一句占位，不显示原文、不可复制、不可点（撤回后气泡不该再能操作）
+                if (message.recalled) {
+                    bindRecalled(message)
+                    return
+                }
                 // 🔴 语音气泡必须关掉文本选择（2026-11-16 用户反馈「只能点播放按钮，点气泡没反应」）：
                 // `textIsSelectable=true` 的 TextView 把单击当「开始选字」吞掉，OnClickListener 不触发。
                 // 文字/文件/位置仍然保留可选中复制 —— 只有语音整块是「点击即播放」的按钮。
@@ -1544,19 +1702,21 @@ class ImChatActivity : AppCompatActivity() {
                     else R.drawable.bg_im_bubble_other
                 )
 
-                // 文件：点一下打开（本地没有就先下载），长按出「打开 / 保存到本地」
+                // 文件：点一下打开（本地没有就先下载）
                 if (message.kind == ImMessage.KIND_FILE) {
                     b.tvBubble.setOnClickListener { openFile(message) }
-                    b.tvBubble.setOnLongClickListener {
-                        showFileMenu(message)
-                        true
-                    }
                 } else if (message.kind == ImMessage.KIND_LOCATION) {
                     // 位置：点一下交给地图 App（坐标在里面转 GCJ02，否则会偏几百米）
                     b.tvBubble.setOnClickListener { openLocation(message) }
                 } else if (message.kind == ImMessage.KIND_VOICE) {
                     // 语音：点一下播放、再点停止（普通语音是 base64 内联落盘的，没有下载环节）
                     b.tvBubble.setOnClickListener { toggleVoice(message) }
+                }
+                // 长按统一出菜单：自己的消息有「撤回」，文件还有「打开 / 保存 / 用其他应用打开」。
+                // 对方的消息在 showMessageMenu 里直接返回，不出空菜单
+                b.tvBubble.setOnLongClickListener {
+                    showMessageMenu(message)
+                    true
                 }
 
                 if (message.kind == ImMessage.KIND_VOICE) {
@@ -1577,6 +1737,37 @@ class ImChatActivity : AppCompatActivity() {
             }
 
             /**
+             * 已撤回的消息：只留一句占位。
+             *
+             * 原文**一定要清掉**（`ImClient.markRecalled` / `toImMessage` 都清了），否则「撤回」
+             * 只是加了个标签，内容还挂在屏幕上。颜色用 onSurfaceVariant + 常规字重，
+             * 和正文区分开；不挂任何点击，也就不会有人去点开一条已撤回的语音/文件。
+             */
+            private fun bindRecalled(message: ImMessage) {
+                val ctx = b.root.context
+                b.tvBubble.setTextIsSelectable(false)
+                b.tvBubble.setOnClickListener(null)
+                b.tvBubble.setOnLongClickListener(null)
+                b.tvBubble.minWidth = 0
+                b.tvBubble.setTypeface(null, Typeface.NORMAL)
+                b.tvBubble.maxWidth = (ctx.resources.displayMetrics.widthPixels * 0.78f).toInt()
+                b.tvBubble.text = ctx.getString(
+                    if (message.mine) R.string.im_msg_recalled_self
+                    else R.string.im_msg_recalled_other
+                )
+                b.tvBubble.setTextColor(
+                    MaterialColors.getColor(
+                        b.tvBubble,
+                        com.google.android.material.R.attr.colorOnSurfaceVariant
+                    )
+                )
+                b.tvBubble.setBackgroundResource(
+                    if (message.mine) R.drawable.bg_im_bubble_mine
+                    else R.drawable.bg_im_bubble_other
+                )
+            }
+
+            /**
              * 媒体消息（图片 / 视频封面）：宽度上限 66% 屏宽、高度上限 40% 屏高，等比缩放。
              *
              * 地址为空说明图还没落盘（刚收到、或本地缓存被清），此时给一块底色占位，
@@ -1589,6 +1780,12 @@ class ImChatActivity : AppCompatActivity() {
             ) {
                 b.ivImage.maxWidth = (metrics.widthPixels * 0.66f).toInt()
                 b.ivImage.maxHeight = (metrics.heightPixels * 0.40f).toInt()
+                // 长按图片 / 视频 → 同一个菜单（自己的消息能撤回）。挂在这里是因为它有
+                // 两处 return（无地址的占位块 / 正常图），统一在入口设一次不会漏
+                b.mediaBox.setOnLongClickListener {
+                    showMessageMenu(message)
+                    true
+                }
                 val url = message.imageUrl
                 val lp = b.ivImage.layoutParams
                 if (url.isNullOrBlank()) {
