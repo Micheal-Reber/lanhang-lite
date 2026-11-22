@@ -118,15 +118,27 @@ class ImForwardActivity : AppCompatActivity() {
             // 当前会话排除：转发给自己正在看的这个没有意义
             if (c.isGroup == excludeGroup && c.peerId == excludePeer) return@forEach
             if (!seen.add(key(c.peerId, c.isGroup))) return@forEach
+            // 🔴 单聊的 `ImConversation.title` 常常是空的：SDK 的 conversationTitle 只有群聊才有，
+            // 单聊要靠 UserInfoCache 反查姓名 —— 不补就是一行空白（2026-11-22 用户截图里那三个
+            // 只有「最近会话」副标题、没名字的空卡片）。会话列表页的 `titleOf` 是同一套规则。
+            val brief = if (c.isGroup) null else com.lanhang.lite.moments.UserInfoCache.get(c.peerId)
+            val name = if (c.isGroup) {
+                c.title.takeIf { it.isNotBlank() }
+                    ?: "${getString(R.string.im_group_suffix)} · ${c.peerId.takeLast(4)}"
+            } else {
+                brief?.name?.takeIf { it.isNotBlank() }
+                    ?: c.title.takeIf { it.isNotBlank() }
+                    ?: c.peerId
+            }
             targets += Target(
                 peerId = c.peerId,
                 isGroup = c.isGroup,
-                name = c.title,
+                name = name,
                 subtitle = getString(
                     if (c.isGroup) R.string.im_forward_kind_group
                     else R.string.im_forward_kind_recent
                 ),
-                portrait = c.portrait,
+                portrait = c.portrait ?: brief?.bestPortrait,
             )
         }
         render(targets)

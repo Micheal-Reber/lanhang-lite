@@ -236,7 +236,8 @@ class ImConversationsActivity : AppCompatActivity() {
             ),
             Triple(R.drawable.ic_credit_card, R.string.im_campus_card_pay, { openCampusCardPay() }),
             Triple(R.drawable.ic_person, R.string.im_new_friends, { ImNewFriendsActivity.start(this) }),
-            Triple(R.drawable.ic_group, R.string.im_join_group, { showJoinGroupDialog() }),
+            // 好友不该只以「会话」形式存在：没聊过的人以前在任何列表里都看不到
+            Triple(R.drawable.ic_contacts, R.string.im_my_friends, { ImFriendsActivity.start(this) }),
         )
         for ((icon, label, action) in items) {
             val row = LayoutInflater.from(this)
@@ -304,77 +305,6 @@ class ImConversationsActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 加入群聊：只做「加入已知群号」。
-     *
-     * 建群走另一条路（顶栏「+ → 发起群聊」，学校 `POST /groups`，见 [ImCreateGroupActivity]）——
-     * IMLib 2.9 的客户端 API 本身没有 `createGroup`，但不需要它：群由学校服务端创建。
-     * 这里保留「按群号加群」是给「别人把群号发给我」的场景用的。
-     * 群名优先由学校 `GET /groups/{id}` 换出来，用户填的只作兜底（见 [ImClient.joinGroup]）。
-     */
-    private fun showJoinGroupDialog() {
-        val density = resources.displayMetrics.density
-        val pad = (20 * density).toInt()
-        val container = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(pad, (8 * density).toInt(), pad, 0)
-        }
-        val inputId = com.google.android.material.textfield.TextInputLayout(this).apply {
-            hint = getString(R.string.im_join_group_id)
-        }
-        val editId = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-            maxLines = 1
-        }
-        inputId.addView(editId)
-        val inputName = com.google.android.material.textfield.TextInputLayout(this).apply {
-            hint = getString(R.string.im_join_group_name)
-        }
-        val editName = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-            maxLines = 1
-        }
-        inputName.addView(editName)
-        container.addView(inputId)
-        container.addView(
-            inputName,
-            android.widget.LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (12 * density).toInt() }
-        )
-
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.im_join_group)
-            .setView(container)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.im_join_group) { _, _ ->
-                val id = editId.text?.toString().orEmpty().trim()
-                if (id.isBlank()) return@setPositiveButton
-                ImClient.joinGroup(id, editName.text?.toString().orEmpty()) { ok, info ->
-                    if (ok) {
-                        toast(
-                            if (info.isNotBlank()) {
-                                getString(R.string.im_join_group_ok, info)
-                            } else {
-                                getString(R.string.im_join_group_ok_unnamed)
-                            }
-                        )
-                        render()
-                    } else {
-                        toast(joinErrorText(info))
-                    }
-                }
-            }
-            .show()
-    }
-
-    /** 把 [ImClient.joinGroup] 回的原因码翻成文案（码里不带中文，避免 i18n 漏翻） */
-    private fun joinErrorText(code: String): String = when (code) {
-        ImClient.RESULT_EMPTY_ID -> getString(R.string.im_join_group_id_required)
-        ImClient.RESULT_OFFLINE -> getString(R.string.im_join_group_offline)
-        else -> getString(R.string.im_join_group_failed, code)
-    }
 
     /** 失败原因可能是空串（比如 SDK 只回了错误码），空就不弹，避免一个空气泡 */
     private fun toast(text: String) {

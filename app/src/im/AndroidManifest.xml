@@ -94,6 +94,13 @@
             android:exported="false"
             android:label="@string/im_new_friends" />
 
+        <!-- 我的好友：私信列表顶栏「＋」；点一行直接进聊天 -->
+        <activity
+            android:name=".im.ImFriendsActivity"
+            android:exported="false"
+            android:label="@string/im_my_friends"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- 转发目标选择：聊天页长按 →「转发消息」；要弹输入法搜索 -->
         <activity
             android:name=".im.ImForwardActivity"

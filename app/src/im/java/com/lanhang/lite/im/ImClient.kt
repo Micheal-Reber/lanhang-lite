@@ -2007,10 +2007,6 @@ object ImClient {
         )
     }
 
-    /** [joinGroup] 的失败原因码：**只回码，文案由界面用自己的字符串资源拼**（i18n） */
-    const val RESULT_EMPTY_ID = "EMPTY_ID"
-    const val RESULT_OFFLINE = "OFFLINE"
-    const val RESULT_UNKNOWN = "UNKNOWN"
 
     // ---------------------------------------------------------------- 富消息（2026-10-31）
 
@@ -2763,83 +2759,13 @@ object ImClient {
         )
     }
 
-    // ---------------------------------------------------------------- 群聊
-
-    /**
-     * 加入一个已有群聊。
-     *
-     * ⚠️ IMLib 2.9 的客户端 API **没有** `createGroup`（建群是融云服务端 / Server API 的活，
-     * 要 app secret），所以这里只做「加入已知群 id」。
-     *
-     * 群名的坑：`joinGroup(id, name)` 的第二个参数会被 SDK 当成群名写进本地库，
-     * 拿真名之前**不要传占位名**。顺序：先问学校 `GET /groups/{id}` → 用户填的名字 → 空。
-     *
-     * @param onResult 主线程回调（成功带群名，失败带错误码）
-     */
-    fun joinGroup(
-        groupId: String,
-        typedName: String,
-        onResult: (Boolean, String) -> Unit,
-    ) {
-        val id = groupId.trim()
-        if (id.isBlank()) {
-            onResult(false, RESULT_EMPTY_ID)
-            return
-        }
-        if (status != Status.CONNECTED) {
-            onResult(false, RESULT_OFFLINE)
-            return
-        }
-        io.launch {
-            val serverName = try {
-                RceApi.groupInfo(id)?.name?.trim().orEmpty()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                Log.w(TAG, "groupInfo failed: ${e.javaClass.simpleName}")
-                ""
-            }
-            val name = serverName.ifBlank { typedName.trim() }
-            main.post { doJoinGroup(id, name, onResult) }
-        }
-    }
-
-    private fun doJoinGroup(id: String, name: String, onResult: (Boolean, String) -> Unit) {
-        RongIMClient.getInstance().joinGroup(
-            id,
-            name,
-            object : RongIMClient.OperationCallback() {
-                override fun onSuccess() {
-                    Log.i(TAG, "joinGroup ok id=$id name=$name")
-                    // 把群名写进本地库：之后 conversationTitle 才不是空的
-                    runCatching {
-                        RongIMClient.getInstance().syncGroup(
-                            listOf(Group(id, name, null)),
-                            object : RongIMClient.OperationCallback() {
-                                override fun onSuccess() = refreshConversations()
-                                override fun onError(e: RongIMClient.ErrorCode?) =
-                                    refreshConversations()
-                            }
-                        )
-                    }
-                    refreshConversations()
-                    onResult(true, name)
-                }
-
-                override fun onError(e: RongIMClient.ErrorCode?) {
-                    Log.w(TAG, "joinGroup error=$e id=$id")
-                    onResult(false, e?.name ?: RESULT_UNKNOWN)
-                }
-            }
-        )
-    }
 
     /**
      * 建群成功后的本机登记（学校 `POST /groups` 已经把群建好了，这里只让本机认得它）。
      *
      * 为什么必须有这一步：融云的会话列表是**本地 sqlite**，新群在里面既没有会话记录、
      * 也没有群资料；而 `syncGroup` 只有在已连接时才会把群名写进本地库。两件事都做了，
-     * 聊天页标题和列表里的群名才不会是空的（同 [joinGroup] 的坑）。
+     * 聊天页标题和列表里的群名才不会是空的（与 `joinGroup` 那个坑同源）。
      *
      * `time = 0` 表示还没有消息，排序时会落到有消息的会话后面（与「我加入的群」一致）。
      */

@@ -19,7 +19,7 @@ fun Context.toast(text: CharSequence, long: Boolean = false) {
     Toast.makeText(this, text, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
 }
 
-/** 带格式化的资源版本：`toast(R.string.im_join_group_ok, name)` 等价 `getString(res, name)` */
+/** 带格式化的资源版本：`toast(R.string.im_recall_failed, reason)` 等价 `getString(res, reason)` */
 fun Context.toast(@StringRes resId: Int, vararg args: Any) {
     toast(getString(resId, *args))
 }

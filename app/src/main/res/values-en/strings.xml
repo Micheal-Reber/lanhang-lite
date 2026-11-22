@@ -265,6 +265,8 @@
     <string name="im_forward_done">Forwarded</string>
     <string name="im_forward_failed">Could not forward</string>
     <string name="im_forward_no_target">Nothing to forward to</string>
+    <string name="im_my_friends">My friends</string>
+    <string name="im_friend_removed">Friend removed</string>
     <string name="im_forward_search_hint">Search friends or groups</string>
     <string name="im_forward_kind_group">Group</string>
     <string name="im_forward_kind_friend">Friend</string>
@@ -284,14 +286,6 @@
     <string name="im_attach_failed">Could not read the selected file</string>
     <string name="im_location_denied">No location permission</string>
     <string name="im_location_unavailable">Location unavailable right now</string>
-    <string name="im_join_group">Join group</string>
-    <string name="im_join_group_id">Group ID</string>
-    <string name="im_join_group_name">Group name (optional)</string>
-    <string name="im_join_group_ok">Joined “%1$s”</string>
-    <string name="im_join_group_ok_unnamed">Joined the group</string>
-    <string name="im_join_group_id_required">Enter a group ID</string>
-    <string name="im_join_group_offline">Not connected, cannot join right now</string>
-    <string name="im_join_group_failed">Could not join the group (%1$s)</string>
     <!-- The “+” dropdown menu: matches the official top bar (new group / add friends / campus card / new friends / join group) -->
     <string name="im_menu_add">Add</string>
     <string name="im_create_group">New group</string>

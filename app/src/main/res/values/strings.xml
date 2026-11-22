@@ -263,6 +263,8 @@
     <string name="im_forward_done">已转发</string>
     <string name="im_forward_failed">转发失败</string>
     <string name="im_forward_no_target">没有可转发的会话</string>
+    <string name="im_my_friends">我的好友</string>
+    <string name="im_friend_removed">已删除好友</string>
     <string name="im_forward_search_hint">搜索好友或群聊</string>
     <string name="im_forward_kind_group">群聊</string>
     <string name="im_forward_kind_friend">好友</string>
@@ -283,14 +285,6 @@
     <string name="im_attach_failed">读取所选文件失败</string>
     <string name="im_location_denied">没有定位权限，无法分享位置</string>
     <string name="im_location_unavailable">暂时拿不到位置，请到室外或开启定位后再试</string>
-    <string name="im_join_group">加入群聊</string>
-    <string name="im_join_group_id">群号</string>
-    <string name="im_join_group_name">群名（可留空）</string>
-    <string name="im_join_group_ok">已加入群聊「%1$s」</string>
-    <string name="im_join_group_ok_unnamed">已加入群聊</string>
-    <string name="im_join_group_id_required">请填写群号</string>
-    <string name="im_join_group_offline">私信未连接，暂时不能加入群聊</string>
-    <string name="im_join_group_failed">加入群聊失败（%1$s）</string>
     <!-- 「+」下拉菜单：对齐官方顶栏加号（发起群聊 / 添加好友 / 校园卡支付 / 新朋友 / 加入群聊） -->
     <string name="im_menu_add">添加</string>
     <string name="im_create_group">发起群聊</string>
