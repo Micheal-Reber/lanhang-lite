@@ -85,6 +85,27 @@ class ImChatActivity : AppCompatActivity() {
     private var quoted: ImMessage? = null
 
     /**
+     * 点「转发消息」后暂存的那条，等用户在 [ImForwardActivity] 里选完目标再用。
+     * 只传目标、不传消息本身：`ImMessage` 不是 Parcelable，为转发去实现一遍序列化不值得。
+     */
+    private var forwarding: ImMessage? = null
+
+    private val forwardLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val pending = forwarding
+        forwarding = null
+        if (pending == null || result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val targetPeer = result.data?.getStringExtra(ImForwardActivity.RESULT_PEER).orEmpty()
+        val targetGroup = result.data?.getBooleanExtra(ImForwardActivity.RESULT_GROUP, false) == true
+        if (targetPeer.isBlank()) return@registerForActivityResult
+        ImClient.forward(pending, targetPeer, targetGroup) { ok, _ ->
+            if (isFinishing || isDestroyed) return@forward
+            toast(if (ok) R.string.im_forward_done else R.string.im_forward_failed)
+        }
+    }
+
+    /**
      * 从聊天记录搜索跳过来时要定位的消息 key（null = 没有定位任务，正常滚到底）。
      * 定位完成 / 放弃后置空，见 [tryFocus]。
      */
@@ -1392,27 +1413,16 @@ class ImChatActivity : AppCompatActivity() {
         }
     }
 
-    /** 转发：先选会话。排除当前会话 —— 转给自己正在看的这个没有任何意义 */
+    /**
+     * 转发：进选择页挑目标，回传 peerId / isGroup 后再真正发。
+     *
+     * 原来是在这里弹 `AlertDialog` 从「最近会话」里选，结果**只能选到群**：
+     * 单聊会话只有聊过才在列表里，当前会话又被排除，好友一个不剩。
+     * 现在选择页把「最近会话 + 好友」合并，覆盖没聊过的人。
+     */
     private fun forwardMessage(message: ImMessage) {
-        val targets = ImClient.conversations.filterNot {
-            it.peerId == peerId && it.isGroup == isGroup
-        }
-        if (targets.isEmpty()) {
-            toast(R.string.im_forward_no_target)
-            return
-        }
-        val labels = targets.map { if (it.isGroup) "👥 ${it.title}" else it.title }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.im_forward_to)
-            .setItems(labels) { _, which ->
-                val target = targets[which]
-                ImClient.forward(message, target.peerId, target.isGroup) { ok, _ ->
-                    if (isFinishing || isDestroyed) return@forward
-                    toast(if (ok) R.string.im_forward_done else R.string.im_forward_failed)
-                }
-            }
-            .setNegativeButton(R.string.common_cancel, null)
-            .show()
+        forwarding = message
+        forwardLauncher.launch(ImForwardActivity.intentOf(this, peerId, isGroup))
     }
 
     private fun confirmDeleteMessage(message: ImMessage) {

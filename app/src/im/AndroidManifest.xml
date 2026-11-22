@@ -94,6 +94,13 @@
             android:exported="false"
             android:label="@string/im_new_friends" />
 
+        <!-- 转发目标选择：聊天页长按 →「转发消息」；要弹输入法搜索 -->
+        <activity
+            android:name=".im.ImForwardActivity"
+            android:exported="false"
+            android:label="@string/im_forward_to"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- 发起群聊（成员多选 → 填群名建群）：入口在私信列表顶栏「+」；要弹输入法填群名 -->
         <activity
             android:name=".im.ImCreateGroupActivity"

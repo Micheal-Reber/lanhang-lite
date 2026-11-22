@@ -262,7 +262,11 @@
     <string name="im_forward_to">转发到</string>
     <string name="im_forward_done">已转发</string>
     <string name="im_forward_failed">转发失败</string>
-    <string name="im_forward_no_target">还没有可转发的会话</string>
+    <string name="im_forward_no_target">没有可转发的会话</string>
+    <string name="im_forward_search_hint">搜索好友或群聊</string>
+    <string name="im_forward_kind_group">群聊</string>
+    <string name="im_forward_kind_friend">好友</string>
+    <string name="im_forward_kind_recent">最近会话</string>
     <!-- 输入条上方的引用条：「引用 张三」 -->
     <string name="im_quote_bar">引用 %1$s</string>
 

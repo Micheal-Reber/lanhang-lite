@@ -264,7 +264,11 @@
     <string name="im_forward_to">Forward to</string>
     <string name="im_forward_done">Forwarded</string>
     <string name="im_forward_failed">Could not forward</string>
-    <string name="im_forward_no_target">No conversation to forward to</string>
+    <string name="im_forward_no_target">Nothing to forward to</string>
+    <string name="im_forward_search_hint">Search friends or groups</string>
+    <string name="im_forward_kind_group">Group</string>
+    <string name="im_forward_kind_friend">Friend</string>
+    <string name="im_forward_kind_recent">Recent</string>
     <string name="im_quote_bar">Quoting %1$s</string>
 
     <string name="im_file_save_hint">Files are only cached inside the app. For your own copy, long-press the file and choose “Save to phone…”.</string>
