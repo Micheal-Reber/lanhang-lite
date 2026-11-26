@@ -92,6 +92,14 @@
     <string name="settings_password_modify">Change password</string>
     <string name="settings_phone_modify">Change phone number</string>
     <string name="settings_permission_control">Privacy controls</string>
+    <string name="settings_exam_calendar">Sync exams to calendar</string>
+    <string name="settings_exam_calendar_summary">Write exams into the system calendar with a 1-hour reminder</string>
+    <string name="settings_exam_calendar_no_permission">No calendar permission, cannot sync</string>
+    <string name="settings_exam_calendar_write_failed">Could not write to the calendar. It may be read-only</string>
+    <string name="settings_exam_calendar_no_calendar">No writable calendar found. Add an account in your calendar app first</string>
+    <string name="settings_exam_calendar_synced">Synced to the system calendar</string>
+    <string name="local_exam_calendar_title">Exam · %1$s</string>
+    <string name="local_exam_calendar_tag">From Lanhang Lite “My exams”</string>
     <string name="settings_general">General</string>
     <!-- Privacy controls page (native, reads and writes /user/getUserStatus) -->
     <string name="permission_intro">These settings decide what others can see on your profile and how they can reach you. They take effect for everyone as soon as you save.</string>
@@ -377,6 +385,10 @@
     <string name="schedule_export_syncing">Syncing week %1$d\n%2$d of %3$d done</string>
     <string name="schedule_export_cancel">Cancel</string>
     <string name="schedule_export_start_sync">Start sync</string>
+    <string name="schedule_export_exam_tag">Exam</string>
+    <string name="schedule_export_exam_summary">Exam · %1$s</string>
+    <string name="schedule_export_exams_header">Exams</string>
+    <string name="schedule_export_exam_line">%1$s %2$s %3$s</string>
     <string name="schedule_export_file_prefix">LanhangLite_schedule</string>
     <string name="schedule_export_summary">Weeks %1$d–%2$d · %3$d courses</string>
     <string name="schedule_export_week_header">Week %1$d (%2$s – %3$s)</string>
@@ -929,6 +941,40 @@
     <string name="local_course_save">Save</string>
     <string name="local_course_delete">Delete</string>
     <string name="local_course_tag">Custom</string>
+    <!-- Manually added exams (2026-11-26) -->
+    <string name="schedule_add_course">Add course</string>
+    <string name="schedule_add_exam">Add exam</string>
+    <string name="schedule_exam_tag">EXAM</string>
+    <string name="schedule_exam_title">Exam · %1$s</string>
+    <string name="schedule_exam_time_label">Exam %1$s</string>
+    <string name="local_exam_add_title">Add exam</string>
+    <string name="local_exam_edit_title">Edit exam</string>
+    <string name="local_exam_subject">Subject</string>
+    <string name="local_exam_date">Date</string>
+    <string name="local_exam_start_time">Start time</string>
+    <string name="local_exam_end_time">End time</string>
+    <string name="local_exam_location">Location (optional)</string>
+    <string name="local_exam_seat">Seat (optional)</string>
+    <string name="local_exam_note">Note (optional)</string>
+    <string name="local_exam_save">Save</string>
+    <string name="local_exam_saved">Saved</string>
+    <string name="local_exam_save_failed">Could not save</string>
+    <string name="local_exam_delete">Delete this exam</string>
+    <string name="local_exam_delete_confirm">Delete “%1$s”?</string>
+    <string name="local_exam_deleted">Deleted</string>
+    <string name="local_exam_delete_failed">Could not delete</string>
+    <string name="local_exam_subject_required">Subject is required</string>
+    <string name="local_exam_time_invalid">End time must be after start time</string>
+    <string name="local_exam_entry_summary">%1$d upcoming</string>
+    <string name="local_exam_entry_none">No exams yet</string>
+    <string name="local_exam_list_title">My exams</string>
+    <string name="local_exam_empty">No exams yet. Tap the button below to add one</string>
+    <string name="local_exam_add">Add exam</string>
+    <string name="local_exam_days_left">%1$d days left</string>
+    <string name="local_exam_today">Today</string>
+    <string name="local_exam_tomorrow">Tomorrow</string>
+    <string name="local_exam_past">Finished</string>
+    <string name="local_exam_seat_value">Seat %1$s</string>
     <string name="local_course_name_required">Course name is required</string>
     <string name="local_course_period_invalid">End period must not be earlier than start</string>
     <string name="local_course_saved">Saved</string>
@@ -1127,6 +1173,13 @@
     <string name="notif_channel_daily_desc">Push today or tomorrow course summary at the set time every day</string>
     <string name="notif_channel_before_class">Before-class reminders</string>
     <string name="notif_channel_before_class_desc">Push the next class info before each class starts</string>
+    <!-- Exam reminders (2026-11-26) -->
+    <string name="notif_channel_exam">Exam reminders</string>
+    <string name="notif_channel_exam_desc">Morning of the exam and one hour before it starts</string>
+    <string name="notif_exam_morning_title">Exam today: %1$s</string>
+    <string name="notif_exam_morning_body">Starts at %1$s — bring your ID</string>
+    <string name="notif_exam_before_title">In one hour: %1$s</string>
+    <string name="notif_exam_before_body">Starts at %1$s</string>
     <string name="notif_channel_fluid">Fluid cloud / Super island</string>
     <string name="notif_channel_fluid_desc">Show an expandable live course card before class</string>
     <!-- Mirrors Sleepy 1.0.61 wording (day-of-month + class count). -->

@@ -10,6 +10,7 @@ import com.lanhang.lite.net.ApiClient
 import com.lanhang.lite.oa.OaCache
 import com.lanhang.lite.net.MomentsApi
 import com.lanhang.lite.schedule.LocalCourseStore
+import com.lanhang.lite.schedule.LocalExamStore
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.grades.GradesRepository
 import com.lanhang.lite.widget.ScheduleWidgetUpdater
@@ -65,6 +66,7 @@ object Logout {
         runCatching { ScheduleRepository.clearCache() }
         runCatching { GradesRepository.clearCache() }
         runCatching { LocalCourseStore.clear() }
+        runCatching { LocalExamStore.clear() }
         runCatching { OaCache.clear() }
         runCatching { MomentsCache.clear() }
         // 通讯录缓存是 suspend 的（IO 线程逐个删文件），低频操作，起个后台任务即可

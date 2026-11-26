@@ -88,6 +88,14 @@
     <string name="settings_password_modify">账号密码修改</string>
     <string name="settings_phone_modify">手机号修改</string>
     <string name="settings_permission_control">权限控制</string>
+    <string name="settings_exam_calendar">同步考试到系统日历</string>
+    <string name="settings_exam_calendar_summary">把「我的考试」写进系统日历，带提前 1 小时提醒</string>
+    <string name="settings_exam_calendar_no_permission">没有日历权限，无法同步</string>
+    <string name="settings_exam_calendar_write_failed">写入系统日历失败，日历可能只读</string>
+    <string name="settings_exam_calendar_no_calendar">系统里没有可写的日历，请先在日历 App 里添加账户</string>
+    <string name="settings_exam_calendar_synced">已同步到系统日历</string>
+    <string name="local_exam_calendar_title">考试 · %1$s</string>
+    <string name="local_exam_calendar_tag">来自蓝航 Lite「我的考试」</string>
     <string name="settings_general">通用</string>
     <!-- 权限控制页（原生，读写 /user/getUserStatus）：每一项决定别人在你的个人主页能看到什么、能怎么联系你 -->
     <string name="permission_intro">这些设置决定别人在你的个人主页能看到什么、能怎么联系你，保存后立即对其他人生效。</string>
@@ -363,6 +371,10 @@
     <string name="schedule_export_syncing">正在同步第 %1$d 周\n已完成 %2$d/%3$d</string>
     <string name="schedule_export_cancel">取消</string>
     <string name="schedule_export_start_sync">开始同步</string>
+    <string name="schedule_export_exam_tag">考试</string>
+    <string name="schedule_export_exam_summary">考试 · %1$s</string>
+    <string name="schedule_export_exams_header">考试安排</string>
+    <string name="schedule_export_exam_line">%1$s %2$s %3$s</string>
     <string name="schedule_export_file_prefix">蓝航Lite课表</string>
     <string name="schedule_export_summary">第 %1$d-%2$d 周 · 共 %3$d 门课程</string>
     <string name="schedule_export_week_header">第 %1$d 周（%2$s - %3$s）</string>
@@ -938,6 +950,40 @@
     <string name="local_course_save">保存</string>
     <string name="local_course_delete">删除</string>
     <string name="local_course_tag">自建</string>
+    <!-- 自建考试（2026-11-26） -->
+    <string name="schedule_add_course">添加课程</string>
+    <string name="schedule_add_exam">添加考试</string>
+    <string name="schedule_exam_tag">考试</string>
+    <string name="schedule_exam_title">考试 · %1$s</string>
+    <string name="schedule_exam_time_label">考试 %1$s</string>
+    <string name="local_exam_add_title">添加考试</string>
+    <string name="local_exam_edit_title">编辑考试</string>
+    <string name="local_exam_subject">科目</string>
+    <string name="local_exam_date">日期</string>
+    <string name="local_exam_start_time">开始时间</string>
+    <string name="local_exam_end_time">结束时间</string>
+    <string name="local_exam_location">地点（可选）</string>
+    <string name="local_exam_seat">座位号（可选）</string>
+    <string name="local_exam_note">备注（可选）</string>
+    <string name="local_exam_save">保存</string>
+    <string name="local_exam_saved">已保存</string>
+    <string name="local_exam_save_failed">保存失败</string>
+    <string name="local_exam_delete">删除这场考试</string>
+    <string name="local_exam_delete_confirm">删除「%1$s」这场考试？</string>
+    <string name="local_exam_deleted">已删除</string>
+    <string name="local_exam_delete_failed">删除失败</string>
+    <string name="local_exam_subject_required">请填写科目</string>
+    <string name="local_exam_time_invalid">结束时间要晚于开始时间</string>
+    <string name="local_exam_entry_summary">还有 %1$d 场考试</string>
+    <string name="local_exam_entry_none">还没有添加考试</string>
+    <string name="local_exam_list_title">我的考试</string>
+    <string name="local_exam_empty">还没有添加考试，点右下角添加</string>
+    <string name="local_exam_add">添加考试</string>
+    <string name="local_exam_days_left">还有 %1$d 天</string>
+    <string name="local_exam_today">今天</string>
+    <string name="local_exam_tomorrow">明天</string>
+    <string name="local_exam_past">已结束</string>
+    <string name="local_exam_seat_value">座位 %1$s</string>
     <string name="local_course_name_required">请填写课程名称</string>
     <string name="local_course_period_invalid">结束节次不能早于开始节次</string>
     <string name="local_course_saved">已保存</string>
@@ -1136,6 +1182,13 @@
     <string name="notif_channel_daily_desc">每天在指定时间推送当天或明日课程摘要</string>
     <string name="notif_channel_before_class">课前提醒</string>
     <string name="notif_channel_before_class_desc">每节课开始前推送下节课信息</string>
+    <!-- 考试提醒（2026-11-26）：独立渠道，重要性 HIGH -->
+    <string name="notif_channel_exam">考试提醒</string>
+    <string name="notif_channel_exam_desc">考试当天早上与考前 1 小时的提醒</string>
+    <string name="notif_exam_morning_title">今天考试：%1$s</string>
+    <string name="notif_exam_morning_body">%1$s 开考，记得带证件</string>
+    <string name="notif_exam_before_title">还有 1 小时：%1$s</string>
+    <string name="notif_exam_before_body">%1$s 开考</string>
     <string name="notif_channel_fluid">流体云 / 超级岛</string>
     <string name="notif_channel_fluid_desc">课前显示可展开的课程实时卡片</string>
     <!-- 每日摘要文案对齐 Sleepy 1.0.61：「今日 8 号，您有 1 节课」/「第一节课 台球文化与运动 于 14:00 在 台球馆 上课」 -->

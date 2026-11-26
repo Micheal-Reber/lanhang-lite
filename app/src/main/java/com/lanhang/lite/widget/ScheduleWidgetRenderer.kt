@@ -233,8 +233,14 @@ object ScheduleWidgetRenderer {
         name: String,
         isDark: Boolean,
         alpha: Int = 255,
-        behind: Int = Color.WHITE
+        behind: Int = Color.WHITE,
+        isExam: Boolean = false
     ): Int {
+        // 考试固定红（2026-11-26）：小部件里没有别的红色来源，一眼能认出来
+        if (isExam) {
+            val base = if (isDark) 0xFF8C1D18.toInt() else 0xFFD32F2F.toInt()
+            return deepenForWhiteText(base, alpha, behind)
+        }
         val hue = ((name.hashCode() * 137.508f % 360f) + 360f) % 360f
         val base = if (isDark) {
             ColorUtils.HSLToColor(floatArrayOf(hue, 0.40f, 0.28f))
@@ -438,7 +444,7 @@ object ScheduleWidgetRenderer {
         private fun drawRow(course: CourseBlock, top: Float, rowH: Float, countdown: Int?) {
             paint.style = Paint.Style.FILL
             paint.alpha = 255
-            val cardColor = courseColorFor(course.name, palette.isDark)
+            val cardColor = courseColorFor(course.name, palette.isDark, isExam = course.isExam)
             paint.color = cardColor
             canvas.drawRoundRect(
                 RectF(outerPad, top, width - outerPad, top + rowH),
@@ -958,8 +964,17 @@ object ScheduleWidgetRenderer {
         private fun drawCourses(layouts: List<CourseLayout>) {
             if (layouts.isEmpty()) return
             for (layout in layouts) {
-                // 与课表页同一套 M3 tonal 配色（低饱和容器 + 同色相文字），不再是高饱和底 + 白字
-                val tone = ScheduleStyle.courseColors(layout.course.name, palette.isDark)
+                // 与课表页同一套 M3 tonal 配色（低饱和容器 + 同色相文字），不再是高饱和底 + 白字。
+                // 考试固定用错误色系（淡红底 + 深红字 / 暗色反转），和课表页的考试块一致
+                val tone = if (layout.course.isExam) {
+                    if (palette.isDark) {
+                        ScheduleStyle.CourseColors(0xFF5C1A17.toInt(), 0xFFFFDAD6.toInt())
+                    } else {
+                        ScheduleStyle.CourseColors(0xFFFFDAD6.toInt(), 0xFF8C1D18.toInt())
+                    }
+                } else {
+                    ScheduleStyle.courseColors(layout.course.name, palette.isDark)
+                }
                 val radius = minOf(dp(8f), minOf(layout.width, layout.height) / 2f)
                 paint.style = Paint.Style.FILL
                 paint.color = tone.container

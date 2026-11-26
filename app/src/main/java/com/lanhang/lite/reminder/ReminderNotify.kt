@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.android.material.color.MaterialColors
 import com.lanhang.lite.R
+import com.lanhang.lite.schedule.LocalExam
 import com.lanhang.lite.core.LocaleHelper
 import com.lanhang.lite.ui.MainActivity
 import java.time.LocalDate
@@ -29,11 +30,17 @@ object ReminderNotify {
     const val CHANNEL_BEFORE_CLASS = "lanhang_before_class"
     const val CHANNEL_FLUID = "lanhang_fluid_v2"
 
+    /** 考试提醒（2026-11-26）：考前 1 小时 + 当天早上。独立渠道，用户可单独静音考试 */
+    const val CHANNEL_EXAM = "lanhang_exam"
+
     const val NOTIFY_DAILY = 1001
     const val NOTIFY_TOMORROW_DAILY = 1002
 
     /** 课前提醒固定用这个 id（多条会互相替换）——这是 Sleepy 的行为，不要改成每课不同 id。 */
     const val NOTIFY_BEFORE_CLASS = 2000
+
+    /** 考试提醒固定 id：同一场考试的「当天早上」和「考前 1 小时」互相替换，不堆一屏 */
+    const val NOTIFY_EXAM = 3000
 
     fun ensureChannels(context: Context) {
         val app = context.applicationContext
@@ -60,6 +67,48 @@ object ReminderNotify {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply { description = res.getString(R.string.notif_channel_fluid_desc) }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_EXAM,
+                res.getString(R.string.notif_channel_exam),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = res.getString(R.string.notif_channel_exam_desc) }
+        )
+    }
+
+    /**
+     * 考试提醒（2026-11-26）。
+     *
+     * @param before true = 考前 1 小时那条（语气紧一点），false = 当天早上那条
+     */
+    fun showExam(context: Context, exam: LocalExam, before: Boolean) {
+        val app = context.applicationContext
+        val res = LocaleHelper.wrap(app)
+        val nm = app.getSystemService(NotificationManager::class.java) ?: return
+        val time = exam.startTime()?.toString().orEmpty()
+        val place = exam.location.takeIf { it.isNotBlank() }
+        val body = listOfNotNull(
+            res.getString(if (before) R.string.notif_exam_before_body else R.string.notif_exam_morning_body, time),
+            place,
+            exam.seat.takeIf { it.isNotBlank() }?.let { res.getString(R.string.local_exam_seat_value, it) }
+        ).joinToString(" · ")
+
+        val builder = NotificationCompat.Builder(app, CHANNEL_EXAM)
+            .setSmallIcon(R.drawable.ic_notification_time)
+            .setColor(accentColor(app))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentTitle(
+                res.getString(
+                    if (before) R.string.notif_exam_before_title else R.string.notif_exam_morning_title,
+                    exam.subject
+                )
+            )
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(openAppIntent(app))
+            .setAutoCancel(true)
+            .build()
+        runCatching { nm.notify(NOTIFY_EXAM, builder) }
     }
 
     /** 主题主色（通知 `setColor` / 厂商卡片进度色）。与全 App 一样取 Material 属性，不写死 hex。 */

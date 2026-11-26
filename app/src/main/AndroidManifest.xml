@@ -36,6 +36,14 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
+      考试同步到系统日历（2026-11-26，设置 → 通用里可开关）：
+      用的是 CalendarContract 的写入接口，不需要任何第三方日历 SDK。
+      读权限用于挑选「可写的日历账户」，没有它 pickCalendar 拿不到列表。
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+
+    <!--
         Android 16「实时动态通知」（Live Updates）：让课前提醒被系统提升成状态栏芯片
         （小米叫超级岛、原生叫实时活动）。这是**普通权限**，安装即授予；
         系统不支持或用户关掉「实时活动」时，同一个 flag 只是被忽略，通知照常显示。
@@ -240,6 +248,12 @@
             android:exported="false"
             android:label="@string/schedule_bg_title" />
 
+        <!-- 我的考试（2026-11-26）：手录考试的列表，入口在「设置 → 工具」与课表长按菜单 -->
+        <activity
+            android:name=".schedule.ExamListActivity"
+            android:exported="false"
+            android:label="@string/local_exam_list_title" />
+
         <activity
             android:name=".moments.MyMomentsActivity"
             android:exported="false"
@@ -389,6 +403,11 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!-- 考试提醒投递端（2026-11-26）：闹钟由 ExamReminderScheduler 排，不被外部唤起 -->
+        <receiver
+            android:name=".reminder.ExamReminderReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

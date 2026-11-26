@@ -29,6 +29,7 @@ class App : Application(), coil.ImageLoaderFactory {
         AppContext.init(this)
         ScheduleRepository.init(this)
         com.lanhang.lite.schedule.LocalCourseStore.init(this)
+        com.lanhang.lite.schedule.LocalExamStore.init(this)
         GradesRepository.init(this)
         // 校园网账号（密码用 Keystore 加密存）——只读 SP，不走网络
         com.lanhang.lite.campusnet.CampusNetStore.init(this)

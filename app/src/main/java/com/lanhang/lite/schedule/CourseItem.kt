@@ -13,5 +13,19 @@ data class CourseItem(
     /** true = 用户自己添加的课（自建层），渲染时会加一圈中性描边区分 */
     val isLocal: Boolean = false,
     /** 自建课主键；学校课为 null。点击自建卡直接进编辑页 */
-    val localId: String? = null
+    val localId: String? = null,
+    /**
+     * 自建考试主键；null = 普通课程。
+     *
+     * 考试复用同一条渲染链路（网格/列表都走 [ScheduleFragment.getCoursesForDay]），
+     * 只是配色和点击行为不同：examId 非空时画成醒目的考试色、点开进考试编辑页。
+     */
+    val examId: String? = null,
+    /**
+     * 考试的时间文案（`09:00-11:00`），仅 [examId] 非空时有值。
+     *
+     * 不在这里回查 [LocalExamStore]：网格/列表每次布局都查一遍文件太浪费，
+     * 构建 [CourseItem] 时顺手格式化好传下来。
+     */
+    val examTimeLabel: String? = null
 )

@@ -764,23 +764,47 @@ class ScheduleFragment : Fragment() {
     private fun addLessonRow(parent: LinearLayout, ci: CourseItem) {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_lesson_row, parent, false) as MaterialCardView
-        // M3 tonal 卡：容器色 + 成对的 onContainer 文字色（不再白字压在饱和色上）
-        val tone = style.courseTone(ci.course.name ?: "?")
-        view.setCardBackgroundColor(tone.container)
-        val textColor = tone.onContainer
+        val isExam = ci.examId != null
+        // 考试用错误色容器（淡红）：「哪天有考试」必须一眼看出来，不能和课程同一套色板
+        val container = if (isExam) {
+            com.google.android.material.color.MaterialColors.getColor(
+                view, com.google.android.material.R.attr.colorErrorContainer
+            )
+        } else {
+            style.courseTone(ci.course.name ?: "?").container
+        }
+        val textColor = if (isExam) {
+            com.google.android.material.color.MaterialColors.getColor(
+                view, com.google.android.material.R.attr.colorOnErrorContainer
+            )
+        } else {
+            style.courseTone(ci.course.name ?: "?").onContainer
+        }
+        view.setCardBackgroundColor(container)
 
-        val periodLabel = if (ci.periodStart == ci.periodEnd) {
+        // 考试没有节次概念，时间行直接写钟点（09:00-11:00），比「第 1-3 节」有用
+        val periodLabel = if (isExam) {
+            ci.examTimeLabel.orEmpty()
+        } else if (ci.periodStart == ci.periodEnd) {
             getString(R.string.schedule_period_single, ci.periodStart)
         } else {
             getString(R.string.schedule_period_range, ci.periodStart, ci.periodEnd)
         }
         view.findViewById<TextView>(R.id.tvTimeLabel).apply {
-            text = periodLabel
+            text = if (isExam && periodLabel.isNotBlank()) {
+                getString(R.string.schedule_exam_time_label, periodLabel)
+            } else {
+                periodLabel
+            }
             setTextColor(textColor)
         }
         view.findViewById<TextView>(R.id.tvName).apply {
             text = ci.course.name ?: ""
             setTextColor(textColor)
+            // 考试科目前面挂一个「考试」标记，和同色的课程区分开
+            if (isExam) {
+                text = getString(R.string.schedule_exam_title, ci.course.name.orEmpty())
+            }
         }
         view.findViewById<TextView>(R.id.tvMeta).apply {
             text = ci.course.room.orEmpty()
@@ -788,7 +812,7 @@ class ScheduleFragment : Fragment() {
             visibility = if (text.isNullOrBlank()) View.GONE else View.VISIBLE
         }
 
-        view.setOnClickListener { showCourseDetail(ci) }
+        view.setOnClickListener { openItem(ci) }
         parent.addView(view)
     }
 
@@ -830,6 +854,56 @@ class ScheduleFragment : Fragment() {
     /** 点击自建课 → 编辑弹层（学校课仍是详情弹窗） */
     private fun openLocalEditor(id: String) {
         LocalCourseEditSheet.newEdit(id).show(parentFragmentManager, LocalCourseEditSheet.TAG)
+    }
+
+    /**
+     * 长按空白格后的选择：加课程还是加考试。
+     *
+     * 以前长按直接弹「新建课程」——考试没有入口。两种内容共用同一张网格，
+     * 这里是它唯一自然的位置（多一次点击，换一个能被发现的功能）。
+     */
+    private fun showCellMenu(day: Int, period: Int, week: Int) {
+        val data = dataForWeek(week)
+        val date = ScheduleWeek.dateOf(
+            week,
+            day,
+            data?.weekInfo?.currentWeek?.trim()?.toIntOrNull() ?: 0
+        )
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setItems(
+                arrayOf(
+                    getString(R.string.schedule_add_course),
+                    getString(R.string.schedule_add_exam)
+                )
+            ) { _, which ->
+                if (which == 0) {
+                    LocalCourseEditSheet.newAdd(day, period, week)
+                        .show(parentFragmentManager, LocalCourseEditSheet.TAG)
+                } else {
+                    LocalExamEditSheet.newAdd(date)
+                        .show(parentFragmentManager, LocalExamEditSheet.TAG)
+                }
+            }
+            .show()
+    }
+
+    /** 点击自建考试 → 考试编辑弹层（删除也在里面） */
+    private fun openExamEditor(id: String) {
+        LocalExamEditSheet.newEdit(id).show(parentFragmentManager, LocalExamEditSheet.TAG)
+    }
+
+    /**
+     * 点开一条课表项。三种来源走三条路：
+     * 考试（examId）→ 考试编辑；自建课（localId）→ 课程编辑；学校课 → 只读详情。
+     */
+    private fun openItem(ci: CourseItem) {
+        val exam = ci.examId
+        val local = ci.localId
+        when {
+            exam != null -> openExamEditor(exam)
+            local != null -> openLocalEditor(local)
+            else -> showCourseDetail(ci)
+        }
     }
 
     // ==================== 网格视图 ====================
@@ -1129,11 +1203,7 @@ class ScheduleFragment : Fragment() {
                     )
                     lp.leftMargin = xInCols(d0) + blockInsetX
                     lp.topMargin = yTopOfRow(ci.periodStart) + blockInsetY
-                    block.setOnClickListener {
-                        // 自建课点一下就进编辑；学校课仍看详情
-                        val id = ci.localId
-                        if (id != null) openLocalEditor(id) else showCourseDetail(ci)
-                    }
+                    block.setOnClickListener { openItem(ci) }
                     cols.addView(block, lp)
                     return@forEach
                 }
@@ -1182,9 +1252,7 @@ class ScheduleFragment : Fragment() {
                         }.start()
                 }
                 container.setOnLongClickListener {
-                    val shown = group[active]
-                    val id = shown.localId
-                    if (id != null) openLocalEditor(id) else showCourseDetail(shown)
+                    openItem(group[active])
                     true
                 }
                 cols.addView(
@@ -1223,8 +1291,7 @@ class ScheduleFragment : Fragment() {
                 }
             }
             if (period < 0) return@setOnLongClickListener false
-            LocalCourseEditSheet.newAdd(day, period, week)
-                .show(parentFragmentManager, LocalCourseEditSheet.TAG)
+            showCellMenu(day, period, week)
             true
         }
 
@@ -1263,9 +1330,30 @@ class ScheduleFragment : Fragment() {
         highlighted: Boolean,
         isLocal: Boolean = false
     ): MaterialCardView {
+        val isExam = ci.examId != null
         val tone = s.courseTone(ci.course.name ?: "?")
-        val blockText = tone.onContainer
-        // 描边优先级：冲突（主题色 2dp）> 自建（中性 1dp）> 普通（无）
+        // 考试用错误色容器（淡红）：课程是主题色系，两者不能共用一套色板
+        val container = if (isExam) {
+            // 三参数版本（带兜底色）：这里还没有 View，两参数的 getColor 只接受 View
+            com.google.android.material.color.MaterialColors.getColor(
+                ctx,
+                com.google.android.material.R.attr.colorErrorContainer,
+                tone.container
+            )
+        } else {
+            tone.container
+        }
+        val blockText = if (isExam) {
+            com.google.android.material.color.MaterialColors.getColor(
+                ctx,
+                com.google.android.material.R.attr.colorOnErrorContainer,
+                tone.onContainer
+            )
+        } else {
+            tone.onContainer
+        }
+        // 描边优先级：冲突（主题色 2dp）> 自建（中性 1dp）> 普通（无）。
+        // 考试不描边 —— 它靠配色已经足够醒目，再描一圈会和「有冲突」混淆
         return MaterialCardView(ctx).apply {
             radius = dimen(R.dimen.corner_sm).toFloat()
             cardElevation = 0f
@@ -1278,7 +1366,7 @@ class ScheduleFragment : Fragment() {
                 highlighted -> strokeColor = s.accent
                 isLocal -> strokeColor = s.onBackgroundVariant
             }
-            setCardBackgroundColor(tone.container)
+            setCardBackgroundColor(container)
             addView(LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
@@ -1293,6 +1381,19 @@ class ScheduleFragment : Fragment() {
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
+                // 考试：科目上方一行「考试」小字。考试通常跨多节、块够高，这一行挤不掉科目；
+                // 不额外显示时间 —— 块落在哪几节本身已经说明了时间段
+                if (isExam) {
+                    addView(TextView(ctx).apply {
+                        text = getString(R.string.schedule_exam_tag)
+                        setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
+                        setTextColor(blockText)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        gravity = Gravity.CENTER
+                        includeFontPadding = false
+                        maxLines = 1
+                    })
+                }
                 addView(TextView(ctx).apply {
                     text = ci.course.name ?: ""
                     setTextAppearance(R.style.TextAppearance_Lanhang_LabelSmall)
@@ -1395,6 +1496,29 @@ class ScheduleFragment : Fragment() {
             val end = lc.endPeriod.coerceIn(start, PeriodClock.count)
             result.add(CourseItem(lc.toCourse(), start, end, isLocal = true, localId = lc.id))
         }
+        // 考试层：考试是绝对日期，先把「第 N 周第 D 天」换算成具体日期再取当天的考试。
+        // 换算不出（没有周次锚点）就不画 —— 画错日期比不画更糟。
+        val date = ScheduleWeek.dateOf(
+            week,
+            dayIdx,
+            data.weekInfo?.currentWeek?.trim()?.toIntOrNull() ?: 0
+        )
+        if (date != null) {
+            LocalExamStore.forDate(date).forEach { exam ->
+                val range = exam.periodRange()
+                result.add(
+                    CourseItem(
+                        course = exam.toCourse(),
+                        periodStart = range.first,
+                        periodEnd = range.last,
+                        examId = exam.id,
+                        examTimeLabel = exam.startTime()?.let { s ->
+                            exam.endTime()?.let { e -> "$s-$e" }
+                        }
+                    )
+                )
+            }
+        }
         return result.sortedBy { it.periodStart }
     }
 
@@ -1412,10 +1536,12 @@ class ScheduleFragment : Fragment() {
                 result.add(item)
                 continue
             }
-            // 来源不同（学校 / 自建）即便同名同教室也不合并：它们是两层，要能分别翻转查看
+            // 来源不同（学校 / 自建 / 考试）即便同名同教室也不合并：它们是不同层，要能分别查看。
+            // examId 也参与判定：考试与同名同教室的课程合并后，点击会变成「点考试块却打开课程」
             val sameCourse = last.course.name == item.course.name &&
                 last.course.room == item.course.room &&
-                last.isLocal == item.isLocal
+                last.isLocal == item.isLocal &&
+                last.examId == item.examId
             val mergedEnd = maxOf(last.periodEnd, item.periodEnd)
             // 相邻（+1）或重叠（<=）都算连上；但不能跨过午休 / 晚休合成一整块
             val connects = item.periodStart <= last.periodEnd + 1

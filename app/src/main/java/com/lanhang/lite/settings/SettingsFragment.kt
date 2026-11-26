@@ -123,6 +123,45 @@ class SettingsFragment : Fragment() {
         saveDocument(uri, payload.csv.toByteArray(Charsets.UTF_8), "${payload.baseFileName}.csv")
     }
 
+    /** 日历同步失败原因 → 文案（别把「写入失败」也说成「没有日历」） */
+    private fun examCalendarErrorText(result: Int): Int = when (result) {
+        com.lanhang.lite.schedule.ExamCalendarSync.RESULT_NO_PERMISSION ->
+            R.string.settings_exam_calendar_no_permission
+
+        com.lanhang.lite.schedule.ExamCalendarSync.RESULT_NO_CALENDAR ->
+            R.string.settings_exam_calendar_no_calendar
+
+        else -> R.string.settings_exam_calendar_write_failed
+    }
+
+    /**
+     * 考试同步到系统日历的权限请求（2026-11-26）。
+     * 授权成功才真正落开关 + 同步；被拒就把开关弹回去，不留一个「开着但没权限」的假状态。
+     */
+    private val examCalendarPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val ctx = context ?: return@registerForActivityResult
+        val switch = view?.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(
+            R.id.switchExamCalendar
+        )
+        if (!granted) {
+            toast(R.string.settings_exam_calendar_no_permission)
+            switch?.isChecked = false
+            return@registerForActivityResult
+        }
+        com.lanhang.lite.schedule.ExamCalendarSync.setEnabled(ctx, true)
+        val result = com.lanhang.lite.schedule.ExamCalendarSync.sync(ctx)
+        if (result == com.lanhang.lite.schedule.ExamCalendarSync.RESULT_OK) {
+            toast(R.string.settings_exam_calendar_synced)
+        } else {
+            // 同步失败就把开关关回去：不留一个「开着但没生效」的假状态
+            com.lanhang.lite.schedule.ExamCalendarSync.setEnabled(ctx, false)
+            toast(examCalendarErrorText(result))
+            switch?.isChecked = false
+        }
+    }
+
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
             closeDetail()
@@ -613,6 +652,16 @@ class SettingsFragment : Fragment() {
             PAGE_TOOLS -> {
                 root.findViewById<View>(R.id.exportScheduleButton)
                     .setOnClickListener { showExportSchedule() }
+                // 我的考试：手录考试的列表（2026-11-26）。摘要写「还有 N 场」，没有就写还没添加
+                val upcomingExams = com.lanhang.lite.schedule.LocalExamStore.upcoming().size
+                root.findViewById<TextView>(R.id.tvExamSummary).text = if (upcomingExams > 0) {
+                    getString(R.string.local_exam_entry_summary, upcomingExams)
+                } else {
+                    getString(R.string.local_exam_entry_none)
+                }
+                root.findViewById<View>(R.id.rowExams).setOnClickListener {
+                    com.lanhang.lite.schedule.ExamListActivity.start(requireContext())
+                }
                 root.findViewById<View>(R.id.rowIdCard).setOnClickListener {
                     startActivity(Intent(requireContext(), IdCardActivity::class.java))
                 }
@@ -637,6 +686,37 @@ class SettingsFragment : Fragment() {
                 }
                 root.findViewById<View>(R.id.rowPermission).setOnClickListener {
                     PermissionControlActivity.start(requireContext())
+                }
+                // 考试同步到系统日历（2026-11-26）：需要日历读写权限，授权后才落开关
+                val examCalSwitch =
+                    root.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(
+                        R.id.switchExamCalendar
+                    )
+                examCalSwitch.isChecked =
+                    com.lanhang.lite.schedule.ExamCalendarSync.isEnabled(requireContext())
+                examCalSwitch.setOnCheckedChangeListener { _, checked ->
+                    val ctx = requireContext()
+                    when {
+                        !checked -> {
+                            com.lanhang.lite.schedule.ExamCalendarSync.setEnabled(ctx, false)
+                        }
+
+                        com.lanhang.lite.schedule.ExamCalendarSync.hasPermission(ctx) -> {
+                            com.lanhang.lite.schedule.ExamCalendarSync.setEnabled(ctx, true)
+                            val result = com.lanhang.lite.schedule.ExamCalendarSync.sync(ctx)
+                            if (result == com.lanhang.lite.schedule.ExamCalendarSync.RESULT_OK) {
+                                toast(R.string.settings_exam_calendar_synced)
+                            } else {
+                                com.lanhang.lite.schedule.ExamCalendarSync.setEnabled(ctx, false)
+                                toast(examCalendarErrorText(result))
+                                examCalSwitch.isChecked = false
+                            }
+                        }
+
+                        else -> examCalendarPermission.launch(
+                            android.Manifest.permission.WRITE_CALENDAR
+                        )
+                    }
                 }
                 // 退出登录**不在这里**：与「我的资料」页底部那颗按钮重复（2026-11-13 用户要求删）
 

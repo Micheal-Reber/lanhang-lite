@@ -88,6 +88,28 @@ object ScheduleWeek {
         return if (raw in from..to) raw else null
     }
 
+    /**
+     * 第 [week] 周、[dayIndex]（0=周一）那天的日期。
+     *
+     * 用与 [rawWeekOf] **同一个锚点**，保证「日期 → 周次」「周次 → 日期」两个方向一致；
+     * 没有锚点也没有缓存时间时返回 null（调用方据此不画考试，而不是瞎猜一个日期）。
+     *
+     * 考试是绝对日期，必须靠它落进某个显示周：不换算的话「第 8 周」和「11 月 20 日」
+     * 之间没有任何关系。
+     */
+    fun dateOf(week: Int, dayIndex: Int, cachedWeek: Int): LocalDate? {
+        val anchorAt = Session.scheduleWeekAnchorAt
+        val anchorWeek = Session.scheduleWeekAnchorWeek
+        val monday = if (anchorAt > 0L && anchorWeek > 0) {
+            mondayOf(anchorAt).plusWeeks((week - anchorWeek).toLong())
+        } else {
+            val modified = ScheduleRepository.cacheLastModified()
+            if (modified <= 0L || cachedWeek <= 0) return null
+            mondayOf(modified).plusWeeks((week - cachedWeek).toLong())
+        }
+        return monday.plusDays(dayIndex.toLong())
+    }
+
     /** 距离下一个周一 00:00:05 的毫秒数：跨周自动跳转用 */    fun millisUntilNextWeek(now: Long = System.currentTimeMillis()): Long {
         val zone = ZoneId.systemDefault()
         val nowTime = Instant.ofEpochMilli(now).atZone(zone)

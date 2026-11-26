@@ -90,13 +90,17 @@ object ScheduleExporter {
         // 自建层与学校层在导出这一层合流：occurrences 给 ics/文本（按周展开），
         // slots 给 csv（保留周次区间，不按周展开）
         val occurrences = collectOccurrences(weeks, termId, unnamed)
-        if (occurrences.isEmpty()) return null
+        // 考试不按周展开：它是绝对日期的一次性事件，直接按日期进 ics / 分享文本。
+        // ⚠️ CSV **不加**考试：那张表是给第三方课表 App 导入用的，塞进去会被当成一门课
+        // （对方按中文列名解析，考试行会出现在课表里）。
+        val exams = LocalExamStore.all().sortedWith(compareBy({ it.date }, { it.startMinute }))
+        if (occurrences.isEmpty() && exams.isEmpty()) return null
         val slots = collectSlots(weeks, plan, termId, unnamed)
         val currentMonday = LocalDate.now().with(DayOfWeek.MONDAY)
         return ExportPayload(
-            ics = buildIcs(context, occurrences, plan.currentWeek, currentMonday),
+            ics = buildIcs(context, occurrences, plan.currentWeek, currentMonday, exams),
             csv = buildCsv(slots),
-            text = buildText(context, data, occurrences, plan, currentMonday),
+            text = buildText(context, data, occurrences, plan, currentMonday, exams),
             baseFileName = "${context.getString(R.string.schedule_export_file_prefix)}_" +
                 LocalDate.now().format(fileDate),
             courseCount = occurrences.map { it.name }.distinct().size,
@@ -281,7 +285,8 @@ object ScheduleExporter {
         context: Context,
         occurrences: List<Occurrence>,
         currentWeek: Int,
-        currentMonday: LocalDate
+        currentMonday: LocalDate,
+        exams: List<LocalExam> = emptyList()
     ): String {
         val sb = StringBuilder()
         fun line(value: String) {
@@ -325,6 +330,28 @@ object ScheduleExporter {
             line("DTEND:${icsDate.format(date)}T${compactTime(endTime)}")
             line("SUMMARY:${escapeIcs(item.name)}")
             if (item.room.isNotEmpty()) line("LOCATION:${escapeIcs(item.room)}")
+            line("DESCRIPTION:${escapeIcs(description)}")
+            line("END:VEVENT")
+        }
+        // 考试：UID 用 exam.id，反复导出不会在系统日历里堆重复事件
+        for (exam in exams) {
+            val date = exam.localDate() ?: continue
+            val start = exam.startTime() ?: continue
+            val end = exam.endTime() ?: continue
+            val description = buildList {
+                add(context.getString(R.string.schedule_export_exam_tag))
+                exam.seat.takeIf { it.isNotEmpty() }?.let {
+                    add(context.getString(R.string.local_exam_seat_value, it))
+                }
+                exam.note.takeIf { it.isNotEmpty() }?.let { add(it) }
+            }.joinToString("\n")
+            line("BEGIN:VEVENT")
+            line("UID:exam-${exam.id}@lanhang.lite")
+            line("DTSTAMP:$stamp")
+            line("DTSTART:${icsDate.format(date)}T${compactTime(start.toString())}")
+            line("DTEND:${icsDate.format(date)}T${compactTime(end.toString())}")
+            line("SUMMARY:${escapeIcs(context.getString(R.string.schedule_export_exam_summary, exam.subject))}")
+            if (exam.location.isNotEmpty()) line("LOCATION:${escapeIcs(exam.location)}")
             line("DESCRIPTION:${escapeIcs(description)}")
             line("END:VEVENT")
         }
@@ -406,7 +433,8 @@ object ScheduleExporter {
         data: ScheduleData,
         occurrences: List<Occurrence>,
         plan: Plan,
-        currentMonday: LocalDate
+        currentMonday: LocalDate,
+        exams: List<LocalExam> = emptyList()
     ): String {
         val lines = mutableListOf<String>()
         lines.add(context.getString(R.string.schedule_export_file_prefix))
@@ -451,6 +479,30 @@ object ScheduleExporter {
                     )
                     if (meta.isNotEmpty()) lines.add("    ${meta.joinToString(" · ")}")
                 }
+            }
+        }
+        // 考试单独一段：不挂在某一周下面（它是绝对日期，跨周很正常）
+        if (exams.isNotEmpty()) {
+            lines.add("")
+            lines.add(context.getString(R.string.schedule_export_exams_header))
+            for (exam in exams) {
+                val date = exam.localDate() ?: continue
+                val start = exam.startTime() ?: continue
+                val end = exam.endTime() ?: continue
+                lines.add(
+                    "  " + context.getString(
+                        R.string.schedule_export_exam_line,
+                        displayDate.format(date),
+                        "$start-$end",
+                        exam.subject
+                    )
+                )
+                val meta = listOfNotNull(
+                    exam.location.takeIf { it.isNotEmpty() },
+                    exam.seat.takeIf { it.isNotEmpty() }
+                        ?.let { context.getString(R.string.local_exam_seat_value, it) }
+                )
+                if (meta.isNotEmpty()) lines.add("    ${meta.joinToString(" · ")}")
             }
         }
         return lines.joinToString("\n").trimEnd()

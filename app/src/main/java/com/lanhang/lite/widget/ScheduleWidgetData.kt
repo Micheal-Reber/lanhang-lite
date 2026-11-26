@@ -1,6 +1,7 @@
 package com.lanhang.lite.widget
 
 import com.lanhang.lite.schedule.DayCourses
+import com.lanhang.lite.schedule.LocalExamStore
 import com.lanhang.lite.schedule.ScheduleData
 import com.lanhang.lite.schedule.ScheduleRepository
 import com.lanhang.lite.schedule.ScheduleWeek
@@ -16,7 +17,9 @@ object ScheduleWidgetData {
         val name: String,
         val room: String,
         val start: Int,
-        val end: Int
+        val end: Int,
+        /** true = 手录考试（2026-11-26）：小部件里固定用红色，不和课程抢色板 */
+        val isExam: Boolean = false
     )
 
     data class DayInfo(
@@ -58,9 +61,22 @@ object ScheduleWidgetData {
             ScheduleRepository.loadCachedWeek(week)?.data
         }
         val days = (0..6).map { index ->
+            val date = monday.plusDays(index.toLong())
+            // 考试是绝对日期，不随周次展开，直接按当天日期塞进这一天的课程表
+            val exams = LocalExamStore.forDate(date).map { exam ->
+                val range = exam.periodRange()
+                CourseBlock(
+                    name = exam.subject,
+                    room = exam.location,
+                    start = range.first,
+                    end = range.last,
+                    isExam = true
+                )
+            }
             DayInfo(
-                date = monday.plusDays(index.toLong()),
-                courses = source?.let { coursesForDay(it, index, week) }.orEmpty()
+                date = date,
+                courses = (source?.let { coursesForDay(it, index, week) }.orEmpty() + exams)
+                    .sortedBy { it.start }
             )
         }
         val sunday = monday.plusDays(6)

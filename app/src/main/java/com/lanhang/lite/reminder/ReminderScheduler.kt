@@ -80,9 +80,13 @@ object ReminderScheduler {
         cancelRecurringLocked()
         if (!ReminderPrefs.isEnabled(context)) {
             cancelBeforeClassLocked()
+            ExamReminderScheduler.cancelAll(context)
             ReminderLog.event("schedule-all", "result=disabled")
             return false
         }
+        // 考试提醒跟「上课提醒」总开关走，不看课前提醒那个子开关：
+        // 用户关了课前提醒通常只是不想每节课都响，考试还是要知道的
+        ExamReminderScheduler.resync(context)
         var daily = 0
         if (ReminderPrefs.isDailyEnabled(context)) {
             if (ReminderPrefs.isTodayEnabled(context)) { scheduleDaily(); daily++ }
