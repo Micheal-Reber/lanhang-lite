@@ -951,6 +951,8 @@
     <string name="local_exam_edit_title">Edit exam</string>
     <string name="local_exam_subject">Subject</string>
     <string name="local_exam_date">Date</string>
+    <string name="local_exam_hour">Hour</string>
+    <string name="local_exam_minute">Minute</string>
     <string name="local_exam_start_time">Start time</string>
     <string name="local_exam_end_time">End time</string>
     <string name="local_exam_location">Location (optional)</string>

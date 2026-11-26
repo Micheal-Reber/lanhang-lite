@@ -10,14 +10,16 @@ import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.NumberPicker
+import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.timepicker.MaterialTimePicker
-import com.google.android.material.timepicker.TimeFormat
 import com.lanhang.lite.R
 import com.lanhang.lite.databinding.SheetLocalExamEditBinding
 import com.lanhang.lite.reminder.ReminderRescheduler
@@ -124,6 +126,9 @@ class LocalExamEditSheet : BottomSheetDialogFragment() {
         val picker = MaterialDatePicker.Builder.datePicker()
             .setTitleText(R.string.local_exam_date)
             .setSelection(selection)
+            // 按钮文案同样别交给 Material 的默认资源（理由见 pickTime）
+            .setPositiveButtonText(R.string.common_ok)
+            .setNegativeButtonText(R.string.common_cancel)
             .build()
         picker.addOnPositiveButtonClickListener { millis ->
             date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
@@ -132,22 +137,62 @@ class LocalExamEditSheet : BottomSheetDialogFragment() {
         picker.show(parentFragmentManager, "exam_date")
     }
 
+    /**
+     * 时间选择：**用 NumberPicker 自己拼**，不用 `MaterialTimePicker`。
+     *
+     * 2026-11-26 用户反馈「外面都是中文，只有这个弹窗是英文」——MaterialTimePicker 的
+     * Hour/Minute/Cancel/OK 走的是 Material 库自带的 `m3c_time_picker_*` 文案，
+     * 在纯中文环境下这几条没有中文翻译，且我们 App 用的是自己的 locale 覆盖，
+     * 没法让它们跟着变。自己拼的年代感虽然朴素，但语言、字号、按钮文案全部可控。
+     * （课程编辑的节次选择也是这么做的，两者风格一致。）
+     */
     private fun pickTime(isStart: Boolean) {
+        val ctx = requireContext()
         val current = if (isStart) startMinute else endMinute
-        val picker = MaterialTimePicker.Builder()
-            .setTimeFormat(TimeFormat.CLOCK_24H)
-            .setHour(current / 60)
-            .setMinute(current % 60)
-            .setTitleText(
-                if (isStart) R.string.local_exam_start_time else R.string.local_exam_end_time
-            )
-            .build()
-        picker.addOnPositiveButtonClickListener {
-            val minute = picker.hour * 60 + picker.minute
-            if (isStart) startMinute = minute else endMinute = minute
-            renderDateAndTime()
+        val density = resources.displayMetrics.density
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, (16 * density).toInt(), 0, 0)
         }
-        picker.show(parentFragmentManager, if (isStart) "exam_start" else "exam_end")
+        fun column(label: Int, min: Int, max: Int, value: Int, onChange: (Int) -> Unit) {
+            val col = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+            }
+            col.addView(TextView(ctx).apply {
+                text = getString(label)
+                setTextAppearance(R.style.TextAppearance_Lanhang_LabelMedium)
+            })
+            col.addView(NumberPicker(ctx).apply {
+                minValue = min
+                maxValue = max
+                this.value = value
+                wrapSelectorWheel = true
+                // 两位数显示：选「5」时不至于看起来像「05」和「5」混着
+                setFormatter { "%02d".format(it) }
+                setOnValueChangedListener { _, _, newVal -> onChange(newVal) }
+                // NumberPicker 默认编辑态会在「输入」和「滚轮」之间切换，这里固定成滚轮
+                descendantFocusability = NumberPicker.FOCUS_BLOCK_DESCENDANTS
+            })
+            container.addView(col)
+        }
+
+        var hour = current / 60
+        var minute = current % 60
+        column(R.string.local_exam_hour, 0, 23, hour) { hour = it }
+        column(R.string.local_exam_minute, 0, 59, minute) { minute = it }
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(if (isStart) R.string.local_exam_start_time else R.string.local_exam_end_time)
+            .setView(container)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.common_ok) { _, _ ->
+                val total = hour * 60 + minute
+                if (isStart) startMinute = total else endMinute = total
+                renderDateAndTime()
+            }
+            .show()
     }
 
     private fun save() {

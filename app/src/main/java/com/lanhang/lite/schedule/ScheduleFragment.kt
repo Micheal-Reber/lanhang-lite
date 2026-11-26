@@ -1043,6 +1043,26 @@ class ScheduleFragment : Fragment() {
         )
         fun breaksBefore(p: Int): Int = breaksAfter.keys.count { it < p }
         fun yTopOfRow(p: Int): Int = (p - 1) * rowH + breaksBefore(p) * bandH
+
+        /**
+         * 分钟 → 网格 y 坐标（考试专用）。
+         *
+         * 网格不是等比例的：每节 45 分钟占 [rowH]，节间空隙与午休/晚休色带**不占**课程格子高度。
+         * 所以只能换算到「所属节内部的比例」；落在空隙/休息带的分钟取前一节的底边。
+         */
+        fun yOfMinute(minute: Int): Float {
+            for (p in 1..periodCount) {
+                val startMin = PeriodClock.startMinute(p)
+                val endMin = PeriodClock.endMinute(p)
+                if (startMin < 0 || endMin <= startMin) continue
+                if (minute in startMin..endMin) {
+                    val frac = (minute - startMin).toFloat() / (endMin - startMin)
+                    return yTopOfRow(p) + frac * rowH
+                }
+            }
+            val prev = (1..periodCount).lastOrNull { PeriodClock.endMinute(it) <= minute }
+            return if (prev != null) (yTopOfRow(prev) + rowH).toFloat() else yTopOfRow(1).toFloat()
+        }
         val gridH = yTopOfRow(periodCount) + rowH
 
         // ===== 表头：纯文字两行（周几 + 日期），今天整列用强调色，不再有底色卡片 =====
@@ -1197,12 +1217,25 @@ class ScheduleFragment : Fragment() {
                 if (group.size == 1) {
                     val ci = group[0]
                     val block = buildCourseBlock(ctx, ci, s, highlighted = false, isLocal = ci.isLocal)
+                    // 考试按真实分钟定位（9:00 的考试从 8:00 那格往下 1/6 处开始，而不是贴着整节）；
+                    // 课程仍按整节摆放 —— 节次本来就是它的天然单位
+                    val examFrom = ci.examStartMinute
+                    val examTo = ci.examEndMinute
+                    val topPx: Float
+                    val heightPx: Float
+                    if (examFrom != null && examTo != null && examTo > examFrom) {
+                        topPx = yOfMinute(examFrom)
+                        heightPx = (yOfMinute(examTo) - topPx).coerceAtLeast(rowH * 0.4f)
+                    } else {
+                        topPx = yTopOfRow(ci.periodStart).toFloat()
+                        heightPx = ((ci.periodEnd - ci.periodStart + 1) * rowH).toFloat()
+                    }
                     val lp = FrameLayout.LayoutParams(
                         colWidth(d0) - 2 * blockInsetX,
-                        (ci.periodEnd - ci.periodStart + 1) * rowH - 2 * blockInsetY
+                        (heightPx - 2 * blockInsetY).toInt().coerceAtLeast(dp(20))
                     )
                     lp.leftMargin = xInCols(d0) + blockInsetX
-                    lp.topMargin = yTopOfRow(ci.periodStart) + blockInsetY
+                    lp.topMargin = (topPx + blockInsetY).toInt()
                     block.setOnClickListener { openItem(ci) }
                     cols.addView(block, lp)
                     return@forEach
@@ -1514,7 +1547,9 @@ class ScheduleFragment : Fragment() {
                         examId = exam.id,
                         examTimeLabel = exam.startTime()?.let { s ->
                             exam.endTime()?.let { e -> "$s-$e" }
-                        }
+                        },
+                        examStartMinute = exam.startMinute,
+                        examEndMinute = exam.endMinute
                     )
                 )
             }

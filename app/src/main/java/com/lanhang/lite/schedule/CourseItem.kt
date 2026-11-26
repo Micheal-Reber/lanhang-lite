@@ -27,5 +27,13 @@ data class CourseItem(
      * 不在这里回查 [LocalExamStore]：网格/列表每次布局都查一遍文件太浪费，
      * 构建 [CourseItem] 时顺手格式化好传下来。
      */
-    val examTimeLabel: String? = null
+    val examTimeLabel: String? = null,
+    /**
+     * 考试的真实起止（从 0 点算的分钟），网格用它**按分钟精确摆放**。
+     *
+     * 只用 [periodStart]/[periodEnd] 的话，考试会被对齐到整节格子：9:00 开始的考试从
+     * 8:00（第 1 节顶部）画起，结束时间同理偏一截 —— 用户 2026-11-26 反馈「时间对不上」。
+     */
+    val examStartMinute: Int? = null,
+    val examEndMinute: Int? = null
 )
