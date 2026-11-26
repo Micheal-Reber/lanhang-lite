@@ -171,12 +171,7 @@ class MyMomentsActivity : AppCompatActivity() {
                     val feeds = MomentsApi.getFeeds(ids).filter {
                         it.user_id.isNullOrEmpty() || it.user_id == targetUserId
                     }
-                    val userIds = feeds.flatMap { f ->
-                        listOfNotNull(f.user_id) +
-                            (f.likes?.mapNotNull { it.user_id } ?: emptyList()) +
-                            (f.comments?.mapNotNull { it.user_id } ?: emptyList())
-                    }
-                    UserInfoCache.resolve(userIds)
+                    UserInfoCache.resolve(momentParticipants(feeds))
                     Page(feeds, ids.size, ids.lastOrNull())
                 }
 

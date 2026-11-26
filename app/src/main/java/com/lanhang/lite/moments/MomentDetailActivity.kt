@@ -102,10 +102,8 @@ class MomentDetailActivity : AppCompatActivity() {
             try {
                 val feed = withContext(Dispatchers.IO) {
                     val fresh = MomentsApi.getFeed(feedId) ?: return@withContext null
-                    val userIds = listOfNotNull(fresh.user_id) +
-                        (fresh.likes?.mapNotNull { it.user_id } ?: emptyList()) +
-                        (fresh.comments?.mapNotNull { it.user_id } ?: emptyList())
-                    UserInfoCache.resolve(userIds)
+                    // 作者 + 点赞人 + 评论人 + 被回复的人，一个都不能少（否则整屏「用户」）
+                    UserInfoCache.resolve(momentParticipants(listOf(fresh)))
                     fresh
                 }
                 if (feed == null) {

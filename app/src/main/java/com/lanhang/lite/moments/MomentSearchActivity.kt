@@ -329,7 +329,7 @@ class MomentSearchActivity : AppCompatActivity() {
         val ids = MomentsApi.getTimeLine(cursor, PAGE)
         if (ids.isEmpty()) return Page(emptyList(), 0, null)
         val feeds = MomentsApi.getFeeds(ids)
-        UserInfoCache.resolve(feeds.mapNotNull { it.user_id })
+        UserInfoCache.resolve(momentParticipants(feeds))
         return Page(feeds.map { MomentItem(it) }, ids.size, ids.last())
     }
 

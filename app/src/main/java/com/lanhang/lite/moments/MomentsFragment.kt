@@ -279,12 +279,7 @@ class MomentsFragment : Fragment() {
                 val page = withContext(Dispatchers.IO) {
                     val ids = MomentsApi.getTimeLine(if (reset) null else fromFeedId)
                     val feeds = MomentsApi.getFeeds(ids)
-                    val userIds = feeds.flatMap { f ->
-                        listOfNotNull(f.user_id) +
-                            (f.likes?.mapNotNull { it.user_id } ?: emptyList()) +
-                            (f.comments?.mapNotNull { it.user_id } ?: emptyList())
-                    }
-                    UserInfoCache.resolve(userIds)
+                    UserInfoCache.resolve(momentParticipants(feeds))
                     feeds
                 }
                 val items = page.map { MomentItem(it) }

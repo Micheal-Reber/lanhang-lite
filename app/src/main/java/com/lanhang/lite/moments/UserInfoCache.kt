@@ -24,6 +24,9 @@ object UserInfoCache {
     /** 已经为「缓存里没有头像」的记录补过一次的 id，避免列表每次刷新都重打网络 */
     private val retried = ConcurrentHashMap.newKeySet<String>()
 
+    /** `/staffs/batch` 单次最多带多少个 id（超出就分片，见 [resolve]） */
+    private const val BATCH_SIZE = 100
+
     fun get(id: String?): StaffBrief? {
         val key = id?.takeIf { it.isNotBlank() } ?: return null
         cache[key]?.let { return it }
@@ -83,19 +86,23 @@ object UserInfoCache {
         if (missing.isEmpty()) return
         try {
             withContext(Dispatchers.IO) {
-                val rows = RceApi.staffsBatch(missing)?.data.orEmpty()
-                rows.forEach { brief -> put(brief) }
-                // 批量接口没把人解析全（含返回空 data）必须留痕：以前这里静默，
-                // 表现是整屏头像空白却一条日志都没有，只能靠翻 coil 缓存反推
-                if (rows.size < missing.size) {
-                    Diagnostics.record(
-                        AppContext.instance,
-                        "UserInfoCache",
-                        IllegalStateException(
-                            "batch 不完整 请求=${missing.size} 返回=${rows.size} " +
-                                "带头像=${rows.count { it.bestPortrait.isNotBlank() }}"
-                        ),
-                    )
+                // 分片请求：搜索页一屏可能捎带上百个从没出现过的人（点赞 + 评论 + 回复），
+                // 一次性全塞给 /staffs/batch 容易被服务端截断，截断后界面就是一片「用户」
+                missing.chunked(BATCH_SIZE).forEach { chunk ->
+                    val rows = RceApi.staffsBatch(chunk)?.data.orEmpty()
+                    rows.forEach { brief -> put(brief) }
+                    // 批量接口没把人解析全（含返回空 data）必须留痕：以前这里静默，
+                    // 表现是整屏头像空白却一条日志都没有，只能靠翻 coil 缓存反推
+                    if (rows.size < chunk.size) {
+                        Diagnostics.record(
+                            AppContext.instance,
+                            "UserInfoCache",
+                            IllegalStateException(
+                                "batch 不完整 请求=${chunk.size} 返回=${rows.size} " +
+                                    "带头像=${rows.count { it.bestPortrait.isNotBlank() }}"
+                            ),
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -123,4 +130,30 @@ object UserInfoCache {
             portrait_big_url = avatar,
         )
     }
+}
+
+/**
+ * 一批动态里**所有会显示名字的人**：作者 + 点赞的人 + 评论的人 + 被回复的人。
+ *
+ * 🔴 只解析作者是不够的（2026-11-24 用户截图）：搜索工作圈时作者能出名字，
+ * 点赞区和评论区却整屏「用户，用户，用户…」—— 因为那些人从没在时间线里出现过，
+ * 缓存里没有记录，而渲染时只读缓存、不主动补拉。
+ *
+ * 去重交给 [UserInfoCache.resolve]（它内部会 `distinct()` 且对已缓存的直接跳过），
+ * 调用方不用担心同一批里有重复 id。
+ */
+fun momentParticipants(feeds: Collection<MomentFeed>): List<String> {
+    val ids = LinkedHashSet<String>()
+    feeds.forEach { feed ->
+        feed.user_id?.takeIf { it.isNotBlank() }?.let(ids::add)
+        feed.likes?.forEach { like ->
+            like.user_id?.takeIf { it.isNotBlank() }?.let(ids::add)
+        }
+        feed.comments?.forEach { comment ->
+            comment.user_id?.takeIf { it.isNotBlank() }?.let(ids::add)
+            // 「A 回复 B」里的 B 也要解析，否则回复链上那半句永远是「回复 用户」
+            comment.reply_to?.takeIf { it.isNotBlank() }?.let(ids::add)
+        }
+    }
+    return ids.toList()
 }
